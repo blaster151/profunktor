@@ -1,0 +1,32 @@
+# Cursor Rules for Context7 Integration
+
+## Auto-trigger Context7 for code-related questions
+When the user asks about:
+- Code examples or implementation
+- Library documentation or API usage
+- Setup or configuration steps
+- Framework-specific questions
+- Authentication or database queries
+
+Automatically use Context7 tools to provide up-to-date documentation and examples.
+
+## Library-specific triggers
+When users mention specific libraries or frameworks, use the appropriate Context7 library ID:
+- React → /react/docs
+- Next.js → /vercel/next.js
+- Supabase → /supabase/supabase
+- MongoDB → /mongodb/docs
+- And others as needed
+
+## Always provide practical examples
+When using Context7 documentation, include:
+- Working code snippets
+- Step-by-step implementation
+- Best practices from the official docs
+- Real-world usage patterns
+
+
+
+
+
+
