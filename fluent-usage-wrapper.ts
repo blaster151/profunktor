@@ -21,6 +21,8 @@ import {
   registerUsage 
 } from './usageRegistry';
 
+import globalConfig from './globalConfig.json';
+
 import { 
   getUsageBound as getGlobalUsageBound 
 } from './fp-registry-init';
@@ -82,7 +84,8 @@ export abstract class FluentOpsImpl<T, UB extends UsageBound<T>> implements Flue
     const usage = this.__usageBound.usage(input);
     
     // Runtime validation in dev mode
-    if (process.env.NODE_ENV === 'development') {
+    // Check config for runtime validation setting
+    if (globalConfig.runtimeValidation) {
       if (this.__usageBound.maxUsage !== undefined && 
           usage !== "∞" && 
           this.__usageBound.maxUsage !== "∞" && 
