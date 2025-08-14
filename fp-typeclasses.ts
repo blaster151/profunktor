@@ -6,6 +6,9 @@ import {
   ArrayK, TupleK, FunctionK, EitherK,
 } from './fp-hkt';
 
+// Re-export requested HKT symbols for downstream modules
+export type { Kind, Type, Apply } from './fp-hkt';
+
 // ============================================================================
 // Core Typeclass Definitions (Kind1/Kind2-based)
 // ============================================================================
@@ -96,7 +99,7 @@ export type Maybe<A> = { tag: 'Just'; value: A } | { tag: 'Nothing' };
 export const Just = <A>(a: A): Maybe<A> => ({ tag: 'Just', value: a });
 export const Nothing = <A = never>(): Maybe<A> => ({ tag: 'Nothing' });
 
-interface MaybeK extends Kind1 { readonly type: Maybe<this['A']>; }
+interface MaybeK extends Kind1 { readonly type: Maybe<this['arg0']>; }
 
 export const MaybeFunctor: Functor<MaybeK> = {
   map: (fa, f) => (fa as Maybe<any>).tag === 'Just' ? Just(f((fa as any).value)) : fa as any

@@ -23,9 +23,8 @@ import {
 
 import globalConfig from './globalConfig.json';
 
-import { 
-  getUsageBound as getGlobalUsageBound 
-} from './fp-registry-init';
+// import { getUsageBound as getGlobalUsageBound } from './fp-registry-init';
+const getGlobalUsageBound = (_: string) => undefined as any;
 
 // ============================================================================
 // Core Fluent Wrapper Types

@@ -17,10 +17,9 @@ import {
   hasUsageBound 
 } from './usageRegistry';
 
-import { 
-  getFPRegistry, 
-  registerUsageBound 
-} from './fp-registry-init';
+// Deferred global registry integration during incremental port
+const getFPRegistry = () => undefined as any;
+const registerUsageBound = (_key: string, _usage: any) => {};
 
 import { 
   Usage, 

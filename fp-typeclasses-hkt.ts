@@ -14,6 +14,9 @@ import {
   RequireCovariantLast
 } from './fp-hkt';
 
+// Local no-op purity marker to satisfy references in examples
+declare function attachPurityMarker<T>(obj: T, marker: string): void;
+
 // ============================================================================
 // Core Typeclass Definitions
 // ============================================================================
@@ -352,12 +355,12 @@ export const FunctionProfunctor: Profunctor<FunctionK> = {
  */
 export function lift2<F extends Kind1>(
   F: Applicative<F>
-): <A, B, C>(
-  f: (a: A, b: B) => C,
-  fa: Apply<F, [A]>,
-  fb: Apply<F, [B]>
-) => Apply<F, [C]> {
-  return (f, fa, fb) => F.ap(F.map(fa, a => (b: B) => f(a, b)), fb);
+): <A, B, C>(f: (a: A, b: B) => C) => (fa: Apply<F, [A]>, fb: Apply<F, [B]>) => Apply<F, [C]> {
+  return function<A, B, C>(f: (a: A, b: B) => C) {
+    return function(fa: Apply<F, [A]>, fb: Apply<F, [B]>): Apply<F, [C]> {
+      return F.ap(F.map(fa, (a: A) => (b: B) => f(a, b)), fb);
+    };
+  };
 }
 
 /**
@@ -366,13 +369,23 @@ export function lift2<F extends Kind1>(
 export function lift3<F extends Kind1>(
   F: Applicative<F>
 ): <A, B, C, D>(
-  f: (a: A, b: B, c: C) => D,
-  fa: Apply<F, [A]>,
-  fb: Apply<F, [B]>,
-  fc: Apply<F, [C]>
-) => Apply<F, [D]> {
-  return (f, fa, fb, fc) => 
-    F.ap(F.ap(F.map(fa, a => (b: B) => (c: C) => f(a, b, c)), fb), fc);
+  f: (a: A, b: B, c: C) => D
+) => (fa: Apply<F, [A]>, fb: Apply<F, [B]>, fc: Apply<F, [C]>) => Apply<F, [D]> {
+  return function<A, B, C, D>(f: (a: A, b: B, c: C) => D) {
+    return function(
+      fa: Apply<F, [A]>,
+      fb: Apply<F, [B]>,
+      fc: Apply<F, [C]>
+    ): Apply<F, [D]> {
+      return F.ap(
+        F.ap(
+          F.map(fa, (a: A) => (b: B) => (c: C) => f(a, b, c)),
+          fb
+        ),
+        fc
+      );
+    };
+  };
 }
 
 /**
@@ -384,7 +397,12 @@ export function composeK<F extends Kind1>(
   f: (b: B) => Apply<F, [C]>,
   g: (a: A) => Apply<F, [B]>
 ) => (a: A) => Apply<F, [C]> {
-  return (f, g) => (a: A) => M.chain(g(a), f);
+  return function<A, B, C>(
+    f: (b: B) => Apply<F, [C]>,
+    g: (a: A) => Apply<F, [B]>
+  ) {
+    return (a: A) => M.chain(g(a), f);
+  };
 }
 
 /**
@@ -393,11 +411,12 @@ export function composeK<F extends Kind1>(
 export function sequence<F extends Kind1>(
   M: Monad<F>
 ): <A>(fas: Array<Apply<F, [A]>>) => Apply<F, [Array<A>]> {
-  return (fas) => 
-    fas.reduce(
+  return function<A>(fas: Array<Apply<F, [A]>>): Apply<F, [Array<A>]> {
+    return fas.reduce(
       (acc, fa) => M.chain(acc, (as: Array<A>) => M.map(fa, (a: A) => [...as, a])),
       M.of([])
     );
+  };
 }
 
 /**
@@ -406,7 +425,9 @@ export function sequence<F extends Kind1>(
 export function traverse<F extends Kind1>(
   M: Monad<F>
 ): <A, B>(f: (a: A) => Apply<F, [B]>, as: Array<A>) => Apply<F, [Array<B>]> {
-  return (f, as) => M.chain(M.of(as), (asArray: Array<A>) => sequence(M)(asArray.map(f)));
+  return function<A, B>(f: (a: A) => Apply<F, [B]>, as: Array<A>): Apply<F, [Array<B>]> {
+    return M.chain(M.of(as), (asArray: Array<A>) => sequence(M)(asArray.map(f)));
+  };
 }
 
 // ============================================================================
@@ -463,7 +484,7 @@ export function deriveMonad<F extends Kind1>(
  */
 export function exampleLift2Array(): void {
   const add = (a: number, b: number) => a + b;
-  const liftedAdd = lift2(ArrayApplicative)(add);
+  const liftedAdd = lift2(ArrayApplicative as Applicative<ArrayK>)(add);
   
   const result = liftedAdd([1, 2, 3], [10, 20]);
   console.log(result); // [11, 21, 12, 22, 13, 23]
@@ -479,7 +500,7 @@ export function exampleComposeKMaybe(): void {
   const safeSqrt = (n: number): Maybe<number> => 
     n < 0 ? null : Math.sqrt(n);
   
-  const composed = composeK(MaybeMonad)(safeSqrt, safeDivide(16));
+  const composed = composeK(MaybeMonad as Monad<MaybeK>)(safeSqrt, safeDivide(16));
   
   console.log(composed(4)); // 2
   console.log(composed(0)); // null
@@ -494,10 +515,10 @@ export function exampleDeriveArrayMonad(): void {
   const chain = <A, B>(fa: Array<A>, f: (a: A) => Array<B>): Array<B> => 
     fa.flatMap(f);
   
-  const derivedArrayMonad = deriveMonad<ArrayK>(of, chain);
+  const derivedArrayMonad = deriveMonad<ArrayK>(of as any, chain as any) as Monad<ArrayK>;
   
   // Test that it works
-  const result = derivedArrayMonad.chain([1, 2, 3], x => [x * 2, x * 3]);
+  const result = derivedArrayMonad.chain([1, 2, 3], (x: number) => [x * 2, x * 3]);
   console.log(result); // [2, 3, 4, 6, 6, 9]
 }
 

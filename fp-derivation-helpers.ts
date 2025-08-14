@@ -14,6 +14,7 @@ import type {
   Apply, 
   Type 
 } from './fp-typeclasses';
+import type { Kind1, Kind2 } from './fp-hkt';
 
 // ============================================================================
 // Core Derivation Types
@@ -139,7 +140,7 @@ export function analyzeADT(adt: any): ADTAnalysis {
 /**
  * Derive Functor instance for an ADT
  */
-export function deriveFunctor<F extends Kind<[Type]>>(
+export function deriveFunctor<F extends Kind1>(
   config: DerivationConfig = {}
 ): Functor<F> {
   return {
@@ -149,8 +150,8 @@ export function deriveFunctor<F extends Kind<[Type]>>(
       }
 
       // Default implementation for tagged unions
-      if (typeof fa === 'object' && fa !== null && 'tag' in fa) {
-        return fa.match({
+      if (typeof fa === 'object' && fa !== null && 'tag' in (fa as any)) {
+        return (fa as any).match({
           Just: ({ value }) => ({ tag: 'Just', value: f(value) }),
           Nothing: () => ({ tag: 'Nothing' }),
           Left: ({ value }) => ({ tag: 'Left', value }),
@@ -178,7 +179,7 @@ export function deriveFunctor<F extends Kind<[Type]>>(
 /**
  * Derive Applicative instance for an ADT
  */
-export function deriveApplicative<F extends Kind<[Type]>>(
+export function deriveApplicative<F extends Kind1>(
   config: DerivationConfig = {}
 ): Applicative<F> {
   const functor = deriveFunctor<F>(config);
@@ -191,7 +192,7 @@ export function deriveApplicative<F extends Kind<[Type]>>(
     },
     ap: <A, B>(fab: Apply<F, [(a: A) => B]>, fa: Apply<F, [A]>): Apply<F, [B]> => {
       // Default implementation for Maybe
-      return fab.match({
+      return (fab as any).match({
         Just: ({ value: f }) => functor.map(fa, f),
         Nothing: () => ({ tag: 'Nothing' }),
         _: () => functor.map(fa, (a: A) => (fab as any).value(a))
@@ -207,7 +208,7 @@ export function deriveApplicative<F extends Kind<[Type]>>(
 /**
  * Derive Monad instance for an ADT
  */
-export function deriveMonad<F extends Kind<[Type]>>(
+export function deriveMonad<F extends Kind1>(
   config: DerivationConfig = {}
 ): Monad<F> {
   const applicative = deriveApplicative<F>(config);
@@ -220,7 +221,7 @@ export function deriveMonad<F extends Kind<[Type]>>(
       }
 
       // Default implementation for Maybe
-      return fa.match({
+      return (fa as any).match({
         Just: ({ value }) => f(value),
         Nothing: () => ({ tag: 'Nothing' }),
         Left: ({ value }) => ({ tag: 'Left', value }),
@@ -240,7 +241,7 @@ export function deriveMonad<F extends Kind<[Type]>>(
 /**
  * Derive Bifunctor instance for an ADT
  */
-export function deriveBifunctor<F extends Kind<[Type, Type]>>(
+export function deriveBifunctor<F extends Kind2>(
   config: DerivationConfig = {}
 ): Bifunctor<F> {
   return {
@@ -254,7 +255,7 @@ export function deriveBifunctor<F extends Kind<[Type, Type]>>(
       }
 
       // Default implementation for Either/Result
-      return fab.match({
+      return (fab as any).match({
         Left: ({ value }) => ({ tag: 'Left', value: f(value) }),
         Right: ({ value }) => ({ tag: 'Right', value: g(value) }),
         Ok: ({ value }) => ({ tag: 'Ok', value: g(value) }),
@@ -286,33 +287,33 @@ export function deriveEq<A>(config: DerivationConfig = {}): Eq<A> {
       }
 
       // Default deep equality for tagged unions
-      if (typeof a === 'object' && a !== null && 'tag' in a &&
-          typeof b === 'object' && b !== null && 'tag' in b) {
+      if (typeof a === 'object' && a !== null && 'tag' in (a as any) &&
+          typeof b === 'object' && b !== null && 'tag' in (b as any)) {
         
-        if (a.tag !== b.tag) return false;
+        if ((a as any).tag !== (b as any).tag) return false;
 
-        return a.match({
-          Just: ({ value: aValue }) => b.match({
+        return (a as any).match({
+          Just: ({ value: aValue }) => (b as any).match({
             Just: ({ value: bValue }) => aValue === bValue,
             Nothing: () => false
           }),
-          Nothing: () => b.match({
+          Nothing: () => (b as any).match({
             Just: () => false,
             Nothing: () => true
           }),
-          Left: ({ value: aValue }) => b.match({
+          Left: ({ value: aValue }) => (b as any).match({
             Left: ({ value: bValue }) => aValue === bValue,
             Right: () => false
           }),
-          Right: ({ value: aValue }) => b.match({
+          Right: ({ value: aValue }) => (b as any).match({
             Left: () => false,
             Right: ({ value: bValue }) => aValue === bValue
           }),
-          Ok: ({ value: aValue }) => b.match({
+          Ok: ({ value: aValue }) => (b as any).match({
             Ok: ({ value: bValue }) => aValue === bValue,
             Err: () => false
           }),
-          Err: ({ error: aError }) => b.match({
+          Err: ({ error: aError }) => (b as any).match({
             Ok: () => false,
             Err: ({ error: bError }) => aError === bError
           }),
@@ -347,16 +348,16 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
       }
 
       // Default lexicographic ordering for tagged unions
-      if (typeof a === 'object' && a !== null && 'tag' in a &&
-          typeof b === 'object' && b !== null && 'tag' in b) {
+      if (typeof a === 'object' && a !== null && 'tag' in (a as any) &&
+          typeof b === 'object' && b !== null && 'tag' in (b as any)) {
         
         // First compare tags
-        const tagComparison = a.tag.localeCompare(b.tag);
+        const tagComparison = (a as any).tag.localeCompare((b as any).tag);
         if (tagComparison !== 0) return tagComparison;
 
         // Then compare values
-        return a.match({
-          Just: ({ value: aValue }) => b.match({
+        return (a as any).match({
+          Just: ({ value: aValue }) => (b as any).match({
             Just: ({ value: bValue }) => {
               if (aValue < bValue) return -1;
               if (aValue > bValue) return 1;
@@ -364,11 +365,11 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
             },
             Nothing: () => 1 // Just > Nothing
           }),
-          Nothing: () => b.match({
+          Nothing: () => (b as any).match({
             Just: () => -1, // Nothing < Just
             Nothing: () => 0
           }),
-          Left: ({ value: aValue }) => b.match({
+          Left: ({ value: aValue }) => (b as any).match({
             Left: ({ value: bValue }) => {
               if (aValue < bValue) return -1;
               if (aValue > bValue) return 1;
@@ -376,7 +377,7 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
             },
             Right: () => -1 // Left < Right
           }),
-          Right: ({ value: aValue }) => b.match({
+          Right: ({ value: aValue }) => (b as any).match({
             Left: () => 1, // Right > Left
             Right: ({ value: bValue }) => {
               if (aValue < bValue) return -1;
@@ -411,8 +412,8 @@ export function deriveShow<A>(config: DerivationConfig = {}): Show<A> {
       }
 
       // Default string representation for tagged unions
-      if (typeof a === 'object' && a !== null && 'tag' in a) {
-        return a.match({
+      if (typeof a === 'object' && a !== null && 'tag' in (a as any)) {
+        return (a as any).match({
           Just: ({ value }) => `Just(${JSON.stringify(value)})`,
           Nothing: () => 'Nothing',
           Left: ({ value }) => `Left(${JSON.stringify(value)})`,
@@ -438,7 +439,7 @@ export function deriveShow<A>(config: DerivationConfig = {}): Show<A> {
  * @deprecated Use individual derivation functions (deriveEqInstance, deriveFunctorInstance, etc.) instead.
  * This function will be removed in a future version.
  */
-export function deriveInstances<F extends Kind<any[]>>(
+export function deriveInstances<F extends Kind1>(
   config: DerivationConfig
 ): DerivedInstances {
   console.warn('⚠️ deriveInstances is deprecated. Use individual derivation functions instead.');
@@ -458,7 +459,8 @@ export function deriveInstances<F extends Kind<any[]>>(
   }
 
   if (config.bifunctor) {
-    instances.bifunctor = deriveBifunctor<F>(config);
+    // For bifunctor derivation, allow passing a binary kind independently
+    instances.bifunctor = deriveBifunctor<any>(config) as any;
   }
 
   if (config.eq) {
@@ -488,28 +490,28 @@ export function deriveInstances<F extends Kind<any[]>>(
 /**
  * Derive Functor instance
  */
-export function deriveFunctorInstance<F extends Kind<[Type]>>(config?: DerivationConfig): Functor<F> {
+export function deriveFunctorInstance<F extends Kind1>(config?: DerivationConfig): Functor<F> {
   return deriveFunctor<F>(config);
 }
 
 /**
  * Derive Applicative instance
  */
-export function deriveApplicativeInstance<F extends Kind<[Type]>>(config?: DerivationConfig): Applicative<F> {
+export function deriveApplicativeInstance<F extends Kind1>(config?: DerivationConfig): Applicative<F> {
   return deriveApplicative<F>(config);
 }
 
 /**
  * Derive Monad instance
  */
-export function deriveMonadInstance<F extends Kind<[Type]>>(config?: DerivationConfig): Monad<F> {
+export function deriveMonadInstance<F extends Kind1>(config?: DerivationConfig): Monad<F> {
   return deriveMonad<F>(config);
 }
 
 /**
  * Derive Bifunctor instance
  */
-export function deriveBifunctorInstance<F extends Kind<[Type, Type]>>(config?: DerivationConfig): Bifunctor<F> {
+export function deriveBifunctorInstance<F extends Kind2>(config?: DerivationConfig): Bifunctor<F> {
   return deriveBifunctor<F>(config);
 }
 

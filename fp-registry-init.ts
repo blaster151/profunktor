@@ -1,3 +1,26 @@
+// Minimal FP Registry stub to keep registrations optional and non-failing
+
+export interface FPRegistry {
+  registerTypeclass: (adtName: string, typeclass: string, instance: unknown) => void;
+}
+
+let _registry: FPRegistry | undefined;
+
+/**
+ * Returns a global FP registry if one was provided by a host app.
+ * Stubbed here to undefined by default so optional registrations no-op.
+ */
+export function getFPRegistry(): FPRegistry | undefined {
+  return _registry;
+}
+
+/**
+ * Allow a host to inject a registry at runtime (optional).
+ */
+export function setFPRegistry(registry: FPRegistry | undefined): void {
+  _registry = registry;
+}
+
 /**
  * FP Registry Initialization
  * 
