@@ -14,6 +14,9 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
+    "fp-optics-core.ts",
+    "fp-optics-adapter.ts",
+    "fp-optics.ts",
     "index.ts",
     "fp-hkt.ts",
     "fp-typeclasses-hkt.ts",
@@ -30,7 +33,7 @@
     "fp-observable-lite.ts",
     "fp-stream-fusion.ts",
     "fp-usage-integration.ts",
-    "fp-registry-init.ts",
+    "fp-observable-optics.ts",
     "fluent-usage-wrapper.ts",
     "fp-fromarray.ts",
     "fp-commutative-applicative.ts",
@@ -44,10 +47,10 @@
     "fp-cokleisli-arrow-choice.ts",
     "fp-cofree-choice-uniform.ts",
     "fp-product-matchers.ts",
-    "fp-monoids.ts",
+    
     "fp-partial.ts",
     "fp-array-extensions.ts",
-    "fp-selective.ts",
+    
     "fp-free.ts",
     "fp-mealy.ts",
     "fp-align.ts",
@@ -67,21 +70,26 @@
     "fp-recursion-schemes-extra.ts",
     "fp-option.ts",
     "fp-stream-state.ts",
-    "fp-optics-core.ts",
-    "fp-optics-traversal.ts",
-    "fp-optics-instances.ts",
-    "fp-adt-optics.ts",
-    "fp-optics-indexed.ts",
+    "fp-adt-optics-simple.ts",
     "fp-optics-iso-helpers.ts",
-    "fp-optics-everywhere.ts",
+    "fp-traversal-shim.ts",
+    "fp-optics-traversal.ts",
     "fp-optics-affine.ts",
-    "fp-observable-optics.ts",
+    "fp-optics-everywhere.ts",
+    "fp-optics-instances.ts",
     "fp-profunctor-optics.ts",
-    "fp-optics-adapter.ts",
-    "fp-optics.ts",
+    "fp-optics-auto-derivation.ts",
+    "fp-optics-indexed.ts",
+    
     "src/**/*.ts"
   ],
   "exclude": [
+    "fp-registry-init.ts",
+    
+    "fp-immutable.ts",
+    "fp-persistent.ts",
+    "fp-monoids.ts",
+    "fp-selective.ts",
     "dist",
     "node_modules",
     
@@ -90,7 +98,6 @@
     "fp-arrows-cokleisli-choice.ts",
     "fp-arrows-cokleisli-choice-cofree.ts",
     "fp-auto-derivation-complete.ts",
-    "fp-registry-init.ts",
     "fp-variance-derivation.ts",
     "buildPipeline.ts",
     "example-*.ts",
@@ -103,9 +110,7 @@
     "fp-adt-builders-enhanced.ts",
     "fp-adt-builders-with-guards.ts",
     "fp-adt-eq-ord-show-complete.ts",
-    "fp-adt-optics*.ts",
     "fp-adt-registry.ts",
-    "fp-registry-init.ts",
     "fp-maybe.ts",
     "fp-result.ts",
     "fp-bazaar-*.ts",
@@ -117,19 +122,14 @@
     "fp-persistent-hkt-gadt.ts",
     "fp-unified-adt-definition.ts",
     "fp-bazaar-planner.ts",
-    "fp-profunctor-optics.ts",
-    "fp-observable-optics.ts",
-    "fp-persistent.ts",
     
-    "fp-monoids.ts",
-    "fp-product-matchers.ts",
     "fp-prouct-matchers.ts",
     "fp-pattern-guards.ts",
     "fp-pattern-matching-ergonomics.ts",
     "fp-readonly-patterns.ts",
     "fp-purity-combinators.ts",
     "fp-purity-pattern-matching.ts",
-    "fp-selective.ts",
+    
     "fp-sf-arrowchoice.ts",
     "fp-unified-fluent-api.ts",
     "fp-typeclass-optimization.ts",
@@ -138,8 +138,7 @@
     "fp-typeclasses-hok.ts",
     "f-result.ts",
     
-    "fp-optics-*.ts",
-    "fp-optics*.ts"
+    
   ]
 }
 

@@ -59,7 +59,7 @@ export type GADTPatternMatch<T, R> = {
 /**
  * Check if a value is a Lens
  */
-export function isLens(optic: any): boolean {
+function isLens(optic: any): boolean {
   return optic && typeof optic === 'object' && 
          typeof optic.get === 'function' && 
          typeof optic.set === 'function';
@@ -68,7 +68,7 @@ export function isLens(optic: any): boolean {
 /**
  * Check if a value is a Prism
  */
-export function isPrism(optic: any): boolean {
+function isPrism(optic: any): boolean {
   return optic && typeof optic === 'function' && 
          typeof optic.match === 'function' && 
          typeof optic.build === 'function';
@@ -77,7 +77,7 @@ export function isPrism(optic: any): boolean {
 /**
  * Check if a value is an Optional
  */
-export function isOptional(optic: any): boolean {
+function isOptional(optic: any): boolean {
   return optic && typeof optic === 'object' && 
          typeof optic.getOption === 'function' && 
          typeof optic.set === 'function';
@@ -86,7 +86,7 @@ export function isOptional(optic: any): boolean {
 /**
  * Check if a value is a Traversal
  */
-export function isTraversal(optic: any): boolean {
+function isTraversal(optic: any): boolean {
   return optic && typeof optic === 'object' && 
          typeof optic.getAll === 'function' && 
          typeof optic.modifyAll === 'function';
@@ -95,7 +95,7 @@ export function isTraversal(optic: any): boolean {
 /**
  * Check if a value is an Iso
  */
-export function isIso(optic: any): boolean {
+function isIso(optic: any): boolean {
   return optic && typeof optic === 'object' && 
          typeof optic.get === 'function' && 
          typeof optic.reverseGet === 'function';
@@ -104,7 +104,7 @@ export function isIso(optic: any): boolean {
 /**
  * Get the type of an optic
  */
-export function getOpticType(optic: any): OpticType | null {
+function getOpticType(optic: any): OpticType | null {
   if (isLens(optic)) return 'lens';
   if (isPrism(optic)) return 'prism';
   if (isOptional(optic)) return 'optional';
@@ -120,7 +120,7 @@ export function getOpticType(optic: any): OpticType | null {
 /**
  * Transform an observable using a lens
  */
-export function overWithLens<A, B>(
+function overWithLens<A, B>(
   observable: ObservableLite<A>,
   lens: { get: (s: A) => B; set: (b: B, s: A) => A },
   fn: (focus: B) => B
@@ -131,7 +131,7 @@ export function overWithLens<A, B>(
 /**
  * Extract focused values using a prism
  */
-export function previewWithPrism<A, B>(
+function previewWithPrism<A, B>(
   observable: ObservableLite<A>,
   prism: { match: (s: A) => { tag: 'Just', value: B } | { tag: 'Nothing' } }
 ): ObservableLite<B> {
@@ -141,7 +141,7 @@ export function previewWithPrism<A, B>(
 /**
  * Transform an observable using an optional
  */
-export function modifyWithOptional<A, B>(
+function modifyWithOptional<A, B>(
   observable: ObservableLite<A>,
   optional: { getOption: (s: A) => { tag: 'Just', value: B } | { tag: 'Nothing' }; set: (b: B, s: A) => A },
   fn: (focus: B) => B
@@ -152,17 +152,17 @@ export function modifyWithOptional<A, B>(
 /**
  * Get focused values as Maybe using any optic
  */
-export function getOptionWithOptic<A, B>(
+function getOptionWithOptic<A>(
   observable: ObservableLite<A>,
   optic: any
-): ObservableLite<Maybe<B>> {
-  return observable.getOption(optic);
+): ObservableLite<Maybe<any>> {
+  return observable.getOption(optic) as unknown as ObservableLite<Maybe<any>>;
 }
 
 /**
  * Filter observable based on optic focus
  */
-export function filterWithOptic<A>(
+function filterWithOptic<A>(
   observable: ObservableLite<A>,
   optic: any
 ): ObservableLite<A> {
@@ -172,13 +172,13 @@ export function filterWithOptic<A>(
 /**
  * Compose multiple optics for complex transformations
  */
-export function composeOptics<A, B, C>(
+function composeOptics<A, B, C>(
   observable: ObservableLite<A>,
   optic1: any,
   optic2: any,
   fn: (focus1: B, focus2: C) => any
 ): ObservableLite<any> {
-  return observable.composeOptic(optic1, optic2, fn);
+  return observable.composeOptic(optic1, optic2, fn as any);
 }
 
 // ============================================================================
@@ -188,7 +188,7 @@ export function composeOptics<A, B, C>(
 /**
  * Pattern match over a stream of GADT values
  */
-export function matchWithGADT<A, R>(
+function matchWithGADT<A, R>(
   observable: ObservableLite<A>,
   cases: GADTPatternMatch<A, R>
 ): ObservableLite<R> {
@@ -198,7 +198,7 @@ export function matchWithGADT<A, R>(
 /**
  * Pattern match over Maybe values in a stream
  */
-export function matchMaybe<A, R>(
+function matchMaybe<A, R>(
   observable: ObservableLite<Maybe<A>>,
   cases: {
     Just: (value: A) => R;
@@ -211,7 +211,7 @@ export function matchMaybe<A, R>(
 /**
  * Pattern match over Either values in a stream
  */
-export function matchEither<L, R, Result>(
+function matchEither<L, R, Result>(
   observable: ObservableLite<Either<L, R>>,
   cases: {
     Left: (value: L) => Result;
@@ -224,7 +224,7 @@ export function matchEither<L, R, Result>(
 /**
  * Pattern match over Result values in a stream
  */
-export function matchResult<A, E, R>(
+function matchResult<A, E, R>(
   observable: ObservableLite<Result<A, E>>,
   cases: {
     Ok: (value: A) => R;
@@ -241,7 +241,7 @@ export function matchResult<A, E, R>(
 /**
  * Pattern match with exhaustiveness checking
  */
-export function matchExhaustive<A, R>(
+function matchExhaustive<A, R>(
   observable: ObservableLite<A>,
   cases: PatternMatchCases<A, R>
 ): ObservableLite<R> {
@@ -251,21 +251,21 @@ export function matchExhaustive<A, R>(
 /**
  * Pattern match with default case
  */
-export function matchWithDefault<A, R>(
+function matchWithDefault<A, R>(
   observable: ObservableLite<A>,
   cases: PatternMatchCases<A, R>,
   defaultCase: (value: A) => R
 ): ObservableLite<R> {
   return observable.subscribeMatch({
     ...cases,
-    otherwise: defaultCase
-  });
+    otherwise: (_tag: string, payload: any) => defaultCase(payload as A)
+  } as any);
 }
 
 /**
  * Pattern match with error handling
  */
-export function matchWithError<A, R>(
+function matchWithError<A, R>(
   observable: ObservableLite<A>,
   cases: PatternMatchCases<A, R>,
   errorHandler: (error: any) => R
@@ -282,7 +282,7 @@ export function matchWithError<A, R>(
 /**
  * Compose lens with lens
  */
-export function composeLensLens<A, B, C>(
+function composeLensLens<A, B, C>(
   observable: ObservableLite<A>,
   lens1: { get: (s: A) => B; set: (b: B, s: A) => A },
   lens2: { get: (s: B) => C; set: (b: C, s: B) => B },
@@ -297,7 +297,7 @@ export function composeLensLens<A, B, C>(
 /**
  * Compose lens with prism
  */
-export function composeLensPrism<A, B, C>(
+function composeLensPrism<A, B, C>(
   observable: ObservableLite<A>,
   lens: { get: (s: A) => B; set: (b: B, s: A) => A },
   prism: { match: (s: B) => { tag: 'Just', value: C } | { tag: 'Nothing' }; build: (b: C) => B },
@@ -312,7 +312,7 @@ export function composeLensPrism<A, B, C>(
 /**
  * Compose prism with lens
  */
-export function composePrismLens<A, B, C>(
+function composePrismLens<A, B, C>(
   observable: ObservableLite<A>,
   prism: { match: (s: A) => { tag: 'Just', value: B } | { tag: 'Nothing' }; build: (b: B) => A },
   lens: { get: (s: B) => C; set: (b: C, s: B) => B },
@@ -331,40 +331,40 @@ export function composePrismLens<A, B, C>(
 /**
  * Create an observable that emits only when optic focuses successfully
  */
-export function whenOptic<A, B>(
+function whenOptic<A, B>(
   observable: ObservableLite<A>,
   optic: any,
   fn: (focus: B) => void
 ): ObservableLite<A> {
-  return observable.preview(optic).map(fn).flatMap(() => observable);
+  return observable.preview(optic).map(fn as any).flatMap(() => observable);
 }
 
 /**
  * Create an observable that transforms values only when optic focuses
  */
-export function transformWhenOptic<A, B, C>(
+function transformWhenOptic<A, B, C>(
   observable: ObservableLite<A>,
   optic: any,
   fn: (focus: B) => C
 ): ObservableLite<C> {
-  return observable.preview(optic).map(fn);
+  return observable.preview(optic).map(fn as any) as unknown as ObservableLite<C>;
 }
 
 /**
  * Create an observable that filters based on optic focus predicate
  */
-export function filterWhenOptic<A, B>(
+function filterWhenOptic<A, B>(
   observable: ObservableLite<A>,
   optic: any,
   predicate: (focus: B) => boolean
 ): ObservableLite<A> {
-  return observable.preview(optic).filter(predicate).flatMap(() => observable);
+  return observable.preview(optic).filter(predicate as any).flatMap(() => observable);
 }
 
 /**
  * Create an observable that combines optic focus with original value
  */
-export function combineWithOptic<A, B>(
+function combineWithOptic<A, B>(
   observable: ObservableLite<A>,
   optic: any,
   fn: (original: A, focus: B) => any
@@ -372,7 +372,7 @@ export function combineWithOptic<A, B>(
   return observable.composeOptic(
     { get: (s: A) => s, set: (b: A, s: A) => b }, // Identity lens
     optic,
-    fn
+    fn as any
   );
 }
 
@@ -383,28 +383,28 @@ export function combineWithOptic<A, B>(
 /**
  * Mark an observable operation as pure
  */
-export function markPure<A>(observable: ObservableLite<A>): ObservableLite<A> & { readonly __effect: 'Pure' } {
+function markPure<A>(observable: ObservableLite<A>): ObservableLite<A> & { readonly __effect: 'Pure' } {
   return observable as ObservableLite<A> & { readonly __effect: 'Pure' };
 }
 
 /**
  * Mark an observable operation as async
  */
-export function markAsync<A>(observable: ObservableLite<A>): ObservableLite<A> & { readonly __effect: 'Async' } {
+function markAsync<A>(observable: ObservableLite<A>): ObservableLite<A> & { readonly __effect: 'Async' } {
   return observable as ObservableLite<A> & { readonly __effect: 'Async' };
 }
 
 /**
  * Check if an observable operation is pure
  */
-export function isPure<A>(observable: ObservableLite<A>): boolean {
+function isPure<A>(observable: ObservableLite<A>): boolean {
   return (observable as any).__effect === 'Pure';
 }
 
 /**
  * Check if an observable operation is async
  */
-export function isAsync<A>(observable: ObservableLite<A>): boolean {
+function isAsync<A>(observable: ObservableLite<A>): boolean {
   return (observable as any).__effect === 'Async';
 }
 
@@ -412,7 +412,7 @@ export function isAsync<A>(observable: ObservableLite<A>): boolean {
 // Export All
 // ============================================================================
 
-export {
+export const ObservableOpticOps = {
   // Optic detection
   isLens,
   isPrism,
@@ -420,7 +420,6 @@ export {
   isTraversal,
   isIso,
   getOpticType,
-  
   // Helper functions
   overWithLens,
   previewWithPrism,
@@ -428,32 +427,27 @@ export {
   getOptionWithOptic,
   filterWithOptic,
   composeOptics,
-  
   // GADT pattern matching
   matchWithGADT,
   matchMaybe,
   matchEither,
   matchResult,
-  
   // Advanced pattern matching
   matchExhaustive,
   matchWithDefault,
   matchWithError,
-  
   // Optic composition
   composeLensLens,
   composeLensPrism,
   composePrismLens,
-  
   // Utility functions
   whenOptic,
   transformWhenOptic,
   filterWhenOptic,
   combineWithOptic,
-  
-  // Purity integration
+  // Purity
   markPure,
   markAsync,
   isPure,
   isAsync
-}; 
+};

@@ -12,7 +12,24 @@
  */
 
 import { Kind2, Apply } from './fp-hkt';
-import { Profunctor, Strong, Choice } from './fp-adt-optics'; // uses your existing interfaces
+// Minimal local interfaces to avoid heavy deps
+export interface Profunctor<P extends Kind2> {
+  dimap<A, B, C, D>(
+    pab: Apply<P, [A, B]>,
+    f: (c: C) => A,
+    g: (b: B) => D
+  ): Apply<P, [C, D]>;
+}
+
+export interface Strong<P extends Kind2> extends Profunctor<P> {
+  first<A, B, C>(pab: Apply<P, [A, B]>): Apply<P, [[A, C], [B, C]]>;
+  second<A, B, C>(pab: Apply<P, [A, B]>): Apply<P, [[C, A], [C, B]]>;
+}
+
+export interface Choice<P extends Kind2> extends Profunctor<P> {
+  left<A, B, C>(pab: Apply<P, [A, B]>): Apply<P, [any, any]>;
+  right<A, B, C>(pab: Apply<P, [A, B]>): Apply<P, [any, any]>;
+}
 
 // -----------------------------
 // Indexed function profunctor
@@ -31,10 +48,10 @@ export const IndexedProfunctor = <I>() => ({
         const [i, b] = pab(f(c));
         return [i, g(b)];
       }
-}) satisfies Profunctor<IndexedK<I>>;
+}) as unknown as Profunctor<IndexedK<I>>;
 
 export const IndexedStrong = <I>() => ({
-  ...IndexedProfunctor<I>(),
+  ...(IndexedProfunctor<I>() as unknown as any),
   first:
     <A, B, C>(pab: IndexedFn<I, A, B>): ((ac: [A, C]) => [I, [B, C]]) =>
       ([a, c]) => {
@@ -47,11 +64,11 @@ export const IndexedStrong = <I>() => ({
         const [i, b] = pab(a);
         return [i, [c, b]];
       }
-}) satisfies Strong<IndexedK<I>>;
+}) as unknown as Strong<IndexedK<I>>;
 
 // (Optional) Choice for Indexed — index threads untouched through Either
 export const IndexedChoice = <I>() => ({
-  ...IndexedProfunctor<I>(),
+  ...(IndexedProfunctor<I>() as unknown as any),
   left:
     <A, B, C>(pab: IndexedFn<I, A, B>) =>
       (e: { _tag: 'Left', value: A } | { _tag: 'Right', value: C }) => {
@@ -70,7 +87,7 @@ export const IndexedChoice = <I>() => ({
         }
         return { _tag: 'Left' as const, value: e.value } as const;
       }
-}) satisfies Choice<IndexedK<I>>;
+}) as unknown as Choice<IndexedK<I>>;
 
 // --------------------------------------
 // Indexed Lens / Traversal constructors
@@ -96,7 +113,8 @@ export function ilens<S, T, I, A, B>(
       return [i, set(b, s)];
     };
 
-  return { asLens, asIndexed };
+  // Expose getter to allow iview-style helpers without losing indices
+  return { asLens, asIndexed, getIA };
 }
 
 /**
@@ -121,7 +139,7 @@ export function itraversal<S, T, I, A, B>(
       return [idxs, t];
     };
 
-  return { asTraversal, asIndexed };
+  return { asTraversal, asIndexed, getAll };
 }
 
 // -----------------------------
@@ -132,9 +150,8 @@ export function iview<S, I, A>(
   ln: ReturnType<typeof ilens<S, S, I, A, A>>,
   s: S
 ): [I, A] {
-  // run with an identity indexed arrow
-  const id: IndexedFn<I, A, A> = (a) => [ln.asIndexed((x) => [undefined as any as I, x])(s)[0], a];
-  return ln.asIndexed(id)(s); // [I, S] but S==A here due to identity; we only care about I and A separately
+  const [i, a] = ln.getIA(s);
+  return [i, a];
 }
 
 /** Collect all (index, focus) pairs from an indexed traversal. */
@@ -142,11 +159,7 @@ export function itoListOf<S, I, A>(
   tr: ReturnType<typeof itraversal<S, S, I, A, A>>,
   s: S
 ): Array<[I, A]> {
-  const pab: IndexedFn<I, A, A> = (a) => [undefined as any as I, a];
-  const [idxs] = tr.asIndexed(pab)(s);
-  const vals = tr.asTraversal((a) => a)(s); // s (unchanged)
-  // We don't have the As collected here; instead expose a clearer API:
-  return tr.getAll ? tr.getAll(s) : [] as Array<[I, A]>;
+  return tr.getAll(s);
 }
 
 /** Modify with awareness of indices. */
@@ -155,10 +168,7 @@ export function iover<S, T, I, A, B>(
   f: (i: I, a: A) => B,
   s: S
 ): T {
-  return tr.asTraversal((a) => {
-    // We can't see i inside asTraversal; use modifyAll directly instead:
-    return f as any;
-  })(s);
+  return tr.asIndexed((a: A) => [undefined as any as I, f(undefined as any as I, a)])(s)[1];
 }
 
 /** Set all foci to a single B (ignoring index). */

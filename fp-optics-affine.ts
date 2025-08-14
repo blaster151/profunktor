@@ -8,7 +8,16 @@
  *   set:   (B, S) -> T
  */
 
-import { Profunctor, Strong, Choice } from './fp-adt-optics';
+// Local minimal Strong/Choice shapes to avoid heavy deps
+export interface Profunctor<P> {
+  dimap: <A, B, C, D>(pab: any, f: (c: C) => A, g: (b: B) => D) => any;
+}
+export interface Strong<P> extends Profunctor<P> {
+  first: <A, B, C>(pab: any) => any;
+}
+export interface Choice<P> extends Profunctor<P> {
+  left: <A, B, C>(pab: any) => any;
+}
 
 export type Either<L, R> =
   | { _tag: 'Left'; value: L }

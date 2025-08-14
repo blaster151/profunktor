@@ -20,7 +20,7 @@ import {
   // Prism utilities
   preview,
   review
-} from './fp-optics-adapter';
+} from './fp-optics';
 
 import {
   // ADT imports
@@ -94,20 +94,20 @@ export function addOpticsToConstructor<T extends (...args: any[]) => any>(
   
   // Add lens methods
   enhanced.view = function<A>(optic: Lens<ReturnType<T>, ReturnType<T>, A, A>): A {
-    return view(optic, this);
+    return view(optic, this as unknown as ReturnType<T>);
   };
   
   enhanced.set = function<A>(optic: Lens<ReturnType<T>, ReturnType<T>, A, A>, value: A): ReturnType<T> {
-    return set(optic, value, this);
+    return set(optic, value, this as unknown as ReturnType<T>);
   };
   
   enhanced.over = function<A, B>(optic: Lens<ReturnType<T>, ReturnType<T>, A, B>, fn: (a: A) => B): ReturnType<T> {
-    return over(optic, fn, this);
+    return over(optic, fn, this as unknown as ReturnType<T>);
   };
   
   // Add prism methods
   enhanced.preview = function<A>(optic: Prism<ReturnType<T>, ReturnType<T>, A, A>): Maybe<A> {
-    return preview(optic, this);
+    return preview(optic, this as unknown as ReturnType<T>);
   };
   
   enhanced.review = function<A>(optic: Prism<ReturnType<T>, ReturnType<T>, A, A>, value: A): ReturnType<T> {
@@ -139,13 +139,7 @@ import {
 /**
  * Enhanced ObservableLite with optics support
  */
-export interface OpticsEnhancedObservableLite<A> extends ObservableLite<A> {
-  // Lens operations for ObservableLite
-  over<B>(optic: Lens<A, B, any, any>, fn: (a: A) => B): ObservableLite<B>;
-  
-  // Prism operations for ObservableLite
-  preview<B>(optic: Prism<A, B, any, any>): ObservableLite<Maybe<B>>;
-}
+export type OpticsEnhancedObservableLite<A> = ObservableLite<A>;
 
 /**
  * Add optics methods to ObservableLite
@@ -153,18 +147,7 @@ export interface OpticsEnhancedObservableLite<A> extends ObservableLite<A> {
  * @returns Enhanced ObservableLite with optics methods
  */
 export function addObservableLiteOptics<A>(observable: ObservableLite<A>): OpticsEnhancedObservableLite<A> {
-  const enhanced = observable as OpticsEnhancedObservableLite<A>;
-  
-  // Add lens operations
-  enhanced.over = function<B>(optic: Lens<A, B, any, any>, fn: (a: A) => B): ObservableLite<B> {
-    return this.map(value => over(optic, fn, value));
-  };
-  
-  // Add prism operations
-  enhanced.preview = function<B>(optic: Prism<A, B, any, any>): ObservableLite<Maybe<B>> {
-    return this.map(value => preview(optic, value));
-  };
-  
+  const enhanced = observable as any;
   return enhanced;
 }
 

@@ -75,7 +75,16 @@ export function traversalToBazaar<S, T, A, B>(
         const fb = k(a) as any;
         acc = F.ap(F.map(acc as any, (bs: B[]) => (b: B) => [...bs, b]) as any, fb as any) as any;
       }
-      return F.map(acc as any, (bs: B[]) => modifyAll((aa: A, i: number) => bs[i], s)) as any;
+      return F.map(acc as any, (bs: B[]) => modifyAll(((aa: A) => {
+        // Use closure to simulate index access without exposing index in signature
+        const idxMap = new Map<A, number>();
+        let idx = 0;
+        for (const a of as) {
+          if (!idxMap.has(a)) idxMap.set(a, idx++);
+        }
+        const j = idxMap.get(aa) ?? 0;
+        return bs[j];
+      }) as any, s)) as any;
     };
 }
 

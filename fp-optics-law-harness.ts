@@ -130,12 +130,12 @@ export function checkIndexedLensCoherence<S, T, I, A, B>(opts: {
 
     // I1b get(set(b, s)) == b
     const t2 = set(b, s);
-    const [, a2] = getIA((t2 as unknown as S));
+    const [, a2] = getIA((t2 as unknown as any as S));
     I1b_ok = I1b_ok && (String(a2) === String(b)); // structural equality without Eq<B>
 
     // I2 index stability (best-effort; only checked when B~A)
     const t3 = set((a as unknown as B), s);
-    const [i2] = getIA((t3 as unknown as S));
+    const [i2] = getIA((t3 as unknown as any as S));
     if (opts.eqI) I2_ok = I2_ok && opts.eqI(i1, i2);
   }
 

@@ -38,7 +38,7 @@ import {
   // Utility functions
   isLens,
   isPrism
-} from './fp-optics-adapter';
+} from './fp-optics';
 
 import {
   // ADT Builder imports
@@ -107,7 +107,7 @@ export interface OpticsEnhancedADT<T> {
 /**
  * Optics-enhanced Sum Type Builder
  */
-export interface OpticsEnhancedSumTypeBuilder<Spec> extends SumTypeBuilder<Spec> {
+export interface OpticsEnhancedSumTypeBuilder<Spec extends ConstructorSpec> extends SumTypeBuilder<Spec> {
   // Enhanced constructors with optics support
   readonly constructors: {
     [K in keyof Spec]: Constructor<Spec[K]> & OpticsEnhancedADT<ReturnType<Spec[K]>>;
@@ -120,7 +120,7 @@ export interface OpticsEnhancedSumTypeBuilder<Spec> extends SumTypeBuilder<Spec>
 /**
  * Optics-enhanced Product Type Builder
  */
-export interface OpticsEnhancedProductTypeBuilder<Fields> extends ProductTypeBuilder<Fields> {
+export interface OpticsEnhancedProductTypeBuilder<Fields extends ProductFields> extends ProductTypeBuilder<Fields> {
   // Enhanced instance type with optics support
   readonly Instance: ProductTypeInstance<Fields> & OpticsEnhancedADT<ProductTypeInstance<Fields>>;
 }
@@ -207,7 +207,7 @@ export function addOpticsToConstructor<T extends (...args: any[]) => any>(
  * @param config - Configuration options
  * @returns Enhanced sum type builder with optics support
  */
-export function createOpticsEnhancedSumType<Spec extends Record<string, (...args: any[]) => any>>(
+export function createOpticsEnhancedSumType<Spec extends ConstructorSpec>(
   spec: Spec,
   config: SumTypeConfig = {}
 ): OpticsEnhancedSumTypeBuilder<Spec> {
@@ -236,7 +236,7 @@ export function createOpticsEnhancedSumType<Spec extends Record<string, (...args
  * @param config - Configuration options
  * @returns Enhanced product type builder with optics support
  */
-export function createOpticsEnhancedProductType<Fields extends Record<string, any>>(
+export function createOpticsEnhancedProductType<Fields extends ProductFields>(
   config: ProductTypeConfig = {}
 ): OpticsEnhancedProductTypeBuilder<Fields> {
   // Create base product type
@@ -441,42 +441,4 @@ export function enhanceWithOptics<T>(instance: T): T & OpticsEnhancedADT<T> {
 // Part 8: Export All
 // ============================================================================
 
-export {
-  // Core types
-  OpticsEnhancedADT,
-  OpticsEnhancedSumTypeBuilder,
-  OpticsEnhancedProductTypeBuilder,
-  
-  // Enhanced builders
-  createOpticsEnhancedSumType,
-  createOpticsEnhancedProductType,
-  
-  // Enhanced instances
-  MaybeOpticsEnhanced,
-  EitherOpticsEnhanced,
-  ResultOpticsEnhanced,
-  
-  // Enhanced constructors
-  JustOptics,
-  NothingOptics,
-  LeftOptics,
-  RightOptics,
-  OkOptics,
-  ErrOptics,
-  
-  // ObservableLite enhancement
-  OpticsEnhancedObservableLite,
-  addObservableLiteOptics,
-  ObservableLiteOptics,
-  
-  // Utility functions
-  addOpticsMethods,
-  addOpticsToConstructor,
-  hasOpticsMethods,
-  getAvailableOpticsMethods,
-  enhanceWithOptics,
-  
-  // Type utilities
-  ExtractOpticsEnhancedInstance,
-  ExtractOpticsEnhancedHKT
-}; 
+// Note: symbols above are already exported; avoid redundant export list to prevent conflicts
