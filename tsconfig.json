@@ -81,6 +81,7 @@
     "fp-optics-auto-derivation.ts",
     "fp-registry-init.ts",
     "fp-optics-indexed.ts",
+    "fp-anamorphisms.ts",
     
     "src/**/*.ts"
   ],

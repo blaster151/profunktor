@@ -72,6 +72,7 @@ This log tracks temporary exclusions and stubs added to keep the core build gree
 - Traversal: introduced lightweight shim (`fp-traversal-shim.ts`) and re-exported from adapter to provide a minimal, conflict-free API (`traversal`, `modifyOf`, `setOf`, `overOf`, `getAllOf`, `foldOf`, `foldMapOf`)
 - Iso helpers: enabled `fp-optics-iso-helpers.ts` with a safe callback arity fix compatible with the shim
 - Optics modules enabled and aligned to adapter: `fp-optics-traversal.ts`, `fp-observable-optics.ts`, `fp-optics-indexed.ts`, `fp-profunctor-optics.ts` (facade), `fp-optics-auto-derivation.ts` (facade)
+- Unfolds: added `fp-anamorphisms.ts` (new, minimal builder-driven ana + unified ADT helpers)
  - Added minimal `fp-registry-init.ts` facade (no eager imports) to support optional registry usage
  - Harness `fp-optics-law-harness.ts` kept out of build to avoid generic-cast noise; runnable as standalone if needed
 - Registry: attempted `fp-registry-init.ts`, reverted due to duplicate/compat errors to keep build green
