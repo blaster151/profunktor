@@ -1,3 +1,47 @@
+// Minimal FP Registry (side-effect free, no eager imports)
+
+export interface FPRegistry {
+  readonly store: Map<string, any>;
+  register: (key: string, value: any) => void;
+  get: <T = unknown>(key: string) => T | undefined;
+  has: (key: string) => boolean;
+  // Optional namespaced helpers (no strong typing to keep this facade light)
+  registerTypeclass?: (name: string, instance: any) => void;
+  registerDerivable?: (name: string, instance: any) => void;
+  registerOptic?: (name: string, payload: any) => void;
+}
+
+function createRegistry(): FPRegistry {
+  const store = new Map<string, any>();
+  const api: FPRegistry = {
+    store,
+    register: (key, value) => { store.set(key, value); },
+    get: (key) => store.get(key),
+    has: (key) => store.has(key),
+  };
+  // Provide optional convenience namespaces that simply prefix keys
+  api.registerTypeclass = (name, instance) => api.register(`typeclass:${name}`, instance);
+  api.registerDerivable = (name, instance) => api.register(`derivable:${name}`, instance);
+  api.registerOptic = (name, payload) => api.register(`optic:${name}`, payload);
+  return api;
+}
+
+export function getFPRegistry(): FPRegistry {
+  const g = globalThis as any;
+  if (!g.__FP_REGISTRY) {
+    g.__FP_REGISTRY = createRegistry();
+  }
+  return g.__FP_REGISTRY as FPRegistry;
+}
+
+// Export quick helpers for convenience
+export function register(name: string, value: any): void {
+  getFPRegistry().register(name, value);
+}
+export function get<T = unknown>(name: string): T | undefined {
+  return getFPRegistry().get<T>(name);
+}
+
 // Minimal FP Registry stub to keep registrations optional and non-failing
 
 export interface FPRegistry {

@@ -79,6 +79,7 @@
     "fp-optics-instances.ts",
     "fp-profunctor-optics.ts",
     "fp-optics-auto-derivation.ts",
+    "fp-registry-init.ts",
     "fp-optics-indexed.ts",
     
     "src/**/*.ts"
