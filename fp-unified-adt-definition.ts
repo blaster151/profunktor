@@ -157,9 +157,9 @@ export interface UnifiedADTInstance<Spec extends ConstructorSpec> {
 /**
  * Unified ADT builder with all capabilities
  */
-export interface UnifiedADTBuilder<Spec extends ConstructorSpec> {
-  // Constructor functions
-  [K in keyof Spec]: (...args: Parameters<Spec[K]>) => UnifiedADTInstance<Spec>;
+export interface UnifiedADTBuilder<Spec> {
+  // Constructor functions - using simpler mapped type
+  [K in keyof Spec]: any;
   
   // Static methods
   of<A>(value: A): UnifiedADTInstance<Spec>;
@@ -225,7 +225,11 @@ export function defineADT<Spec extends ConstructorSpec>(
   
   // Create base ADT builder
   const baseBuilder = createSumType(spec, {
-    purity: finalConfig.purity as any
+    name,
+    effect: ((finalConfig.purity !== undefined ? finalConfig.purity : 'Pure') as any),
+    enableHKT: true,
+    enableDerivableInstances: false,
+    enableRuntimeMarkers: false
   });
   
   // Derive typeclass instances
@@ -262,11 +266,19 @@ export function defineADT<Spec extends ConstructorSpec>(
     
     // Pattern matching methods
     match<Result>(handlers: any): Result {
-      return baseBuilder.match(this, handlers);
+      const tag = this.tag as string;
+      const h = handlers[tag] ?? handlers._ ?? handlers.otherwise;
+      if (!h) throw new Error(`Unhandled case: ${tag}`);
+      // convention: case handler receives the payload object
+      return h(this.payload);
     }
     
     matchTag<Result>(handlers: any): Result {
-      return baseBuilder.matchTag(this, handlers);
+      const tag = this.tag as string;
+      const h = handlers[tag] ?? handlers._ ?? handlers.otherwise;
+      if (!h) throw new Error(`Unhandled tag: ${tag}`);
+      // tag-only handler receives the tag string
+      return h(tag);
     }
     
     is<K extends keyof Spec>(tag: K): boolean {
@@ -283,11 +295,11 @@ export function defineADT<Spec extends ConstructorSpec>(
     
     // Fluent API methods
     map<B>(f: (a: any) => B): any {
-      return fluentImpl.map?.(this, f) ?? this;
+      return fluentImpl.map ? fluentImpl.map(this, f) : this;
     }
     
     chain<B>(f: (a: any) => any): any {
-      return fluentImpl.chain?.(this, f) ?? this;
+      return fluentImpl.chain ? fluentImpl.chain(this, f) : this;
     }
     
     flatMap<B>(f: (a: any) => any): any {
@@ -295,27 +307,27 @@ export function defineADT<Spec extends ConstructorSpec>(
     }
     
     ap<B>(fab: any): any {
-      return fluentImpl.ap?.(this, fab) ?? this;
+      return fluentImpl.ap ? fluentImpl.ap(this, fab) : this;
     }
     
-    filter(predicate: (a: any) => boolean): any {
-      return fluentImpl.filter?.(this, predicate) ?? this;
+        filter(predicate: (a: any) => boolean): any {
+      return fluentImpl.filter ? fluentImpl.filter(this, predicate) : this;
     }
-    
+
     filterMap<B>(f: (a: any) => any): any {
-      return fluentImpl.filterMap?.(this, f) ?? this;
+      return fluentImpl.filterMap ? fluentImpl.filterMap(this, f) : this;
     }
-    
+
     bimap<C, D>(f: (a: any) => C, g: (b: any) => D): any {
-      return fluentImpl.bimap?.(this, f, g) ?? this;
+      return fluentImpl.bimap ? fluentImpl.bimap(this, f, g) : this;
     }
-    
+
     mapLeft<C>(f: (a: any) => C): any {
-      return fluentImpl.mapLeft?.(this, f) ?? this;
+      return fluentImpl.mapLeft ? fluentImpl.mapLeft(this, f) : this;
     }
-    
+
     mapRight<D>(g: (b: any) => D): any {
-      return fluentImpl.mapRight?.(this, g) ?? this;
+      return fluentImpl.mapRight ? fluentImpl.mapRight(this, g) : this;
     }
     
     // Optics methods (placeholder)
@@ -330,16 +342,16 @@ export function defineADT<Spec extends ConstructorSpec>(
     }
     
     // Utility methods
-    equals(other: any): boolean {
-      return instances.eq?.equals(this, other) ?? this === other;
+        equals(other: any): boolean {
+      return instances.eq ? instances.eq.equals(this, other) : this === other;
     }
-    
+
     compare(other: any): number {
-      return instances.ord?.compare(this, other) ?? 0;
+      return instances.ord ? instances.ord.compare(this, other) : 0;
     }
-    
+
     show(): string {
-      return instances.show?.show(this) ?? this.toString();
+      return instances.show ? instances.show.show(this) : this.toString();
     }
     
     toJSON(): any {
@@ -361,9 +373,9 @@ export function defineADT<Spec extends ConstructorSpec>(
   
   // Create constructor functions
   const constructors: any = {};
-  for (const [tag, constructor] of Object.entries(spec)) {
+  for (const [tag, ctor] of Object.entries(spec)) {
     constructors[tag] = (...args: any[]) => {
-      const payload = constructor(...args);
+      const payload = (ctor as any)(...args); // object: e.g. { value }, or {}
       return new UnifiedADT(tag as keyof Spec, payload);
     };
   }
@@ -376,12 +388,16 @@ export function defineADT<Spec extends ConstructorSpec>(
     isProductType: false,
     hasMatch: true,
     hasTag: true,
-    fieldTypes: Object.fromEntries(
-      Object.entries(spec).map(([tag, constructor]) => [
-        tag,
-        Array.from({ length: constructor.length }, (_, i) => `arg${i}`)
-      ])
-    ),
+    fieldTypes: ((): Record<string, any[]> => {
+      const out: Record<string, any[]> = {};
+      for (const tag of Object.keys(spec)) {
+        const ctor = (spec as any)[tag];
+        const n = typeof ctor === 'function' ? ctor.length : 0;
+        const args = Array(n).fill(0).map((_, i) => `arg${i}`);
+        out[tag] = args;
+      }
+      return out;
+    })(),
     purity: finalConfig.purity,
     typeclasses: Object.keys(instances).filter(key => instances[key as keyof typeof instances]),
     fluentMethods: Object.keys(fluentImpl),
@@ -527,12 +543,12 @@ function createFluentImpl(name: string, instances: any, customMethods: Record<st
   
   // Map to typeclass instances
   if (instances.functor) {
-    fluentImpl.map = (instance, f) => instances.functor.map(f, instance);
+    fluentImpl.map = (instance, f) => instances.functor.map(instance, f);
   }
   
   if (instances.monad) {
-    fluentImpl.chain = (instance, f) => instances.monad.chain(f, instance);
-    fluentImpl.flatMap = (instance, f) => instances.monad.chain(f, instance);
+    fluentImpl.chain = (instance, f) => instances.monad.chain(instance, f);
+    fluentImpl.flatMap = (instance, f) => instances.monad.chain(instance, f);
   }
   
   if (instances.applicative) {
@@ -540,9 +556,9 @@ function createFluentImpl(name: string, instances: any, customMethods: Record<st
   }
   
   if (instances.bifunctor) {
-    fluentImpl.bimap = (instance, f, g) => instances.bifunctor.bimap(f, g, instance);
-    fluentImpl.mapLeft = (instance, f) => instances.bifunctor.mapLeft(f, instance);
-    fluentImpl.mapRight = (instance, g) => instances.bifunctor.mapRight(g, instance);
+    fluentImpl.bimap = (instance, f, g) => instances.bifunctor.bimap(instance, f, g);
+    fluentImpl.mapLeft = (instance, f) => instances.bifunctor.mapLeft(instance, f);
+    fluentImpl.mapRight = (instance, g) => instances.bifunctor.mapRight(instance, g);
   }
   
   // Add custom methods
@@ -556,54 +572,20 @@ function createFluentImpl(name: string, instances: any, customMethods: Record<st
  */
 function registerADTInRegistry(name: string, metadata: ADTMetadata, instances: any) {
   const registry = getFPRegistry();
-  if (!registry) {
-    console.warn(`⚠️ FP Registry not available, skipping registration for ${name}`);
-    return;
-  }
-  
-  try {
-    // Register HKT
-    registry.registerHKT(name, `${name}K`);
-    
-    // Register purity
-    registry.registerPurity(name, metadata.purity);
-    
-    // Register typeclass instances
-    if (instances.functor) {
-      registry.registerTypeclass(name, 'Functor', instances.functor);
-    }
-    if (instances.applicative) {
-      registry.registerTypeclass(name, 'Applicative', instances.applicative);
-    }
-    if (instances.monad) {
-      registry.registerTypeclass(name, 'Monad', instances.monad);
-    }
-    if (instances.bifunctor) {
-      registry.registerTypeclass(name, 'Bifunctor', instances.bifunctor);
-    }
-    if (instances.eq) {
-      registry.registerTypeclass(name, 'Eq', instances.eq);
-    }
-    if (instances.ord) {
-      registry.registerTypeclass(name, 'Ord', instances.ord);
-    }
-    if (instances.show) {
-      registry.registerTypeclass(name, 'Show', instances.show);
-    }
-    
-    // Register derivable instances
-    registry.registerDerivable(name, {
-      ...instances,
-      purity: { effect: metadata.purity as const }
-    });
-    
-    // Register metadata for auto-derivation
-    registerADTMetadata(name, metadata);
-    
-    console.log(`✅ Registered ${name} in FP Registry`);
-  } catch (error) {
-    console.warn(`⚠️ Failed to register ${name} in registry:`, error);
-  }
+  if (!registry) return;
+
+  // One flat keyspace is simplest and avoids API-mismatch errors
+  registry.register(`${name}.metadata`, metadata);
+  if (instances.functor)     registry.register(`${name}.Functor`, instances.functor);
+  if (instances.applicative) registry.register(`${name}.Applicative`, instances.applicative);
+  if (instances.monad)       registry.register(`${name}.Monad`, instances.monad);
+  if (instances.bifunctor)   registry.register(`${name}.Bifunctor`, instances.bifunctor);
+  if (instances.eq)          registry.register(`${name}.Eq`, instances.eq);
+  if (instances.ord)         registry.register(`${name}.Ord`, instances.ord);
+  if (instances.show)        registry.register(`${name}.Show`, instances.show);
+
+  // keep metadata in auto-derivation side too
+  registerADTMetadata(name, metadata);
 }
 
 // ============================================================================

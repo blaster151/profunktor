@@ -5,12 +5,15 @@
 //  - NDJSON streaming writers for deltaStream / deltaW
 
 import {
-  Semiring, NatSemiring,
+  Semiring, NatSemiring, numberWeightMonoid, bigIntWeightMonoid,
   deltaStream, deltaW,
 } from "./fp-cooperad-weights";
 
+import type {
+  Tree, Forest
+} from "./fp-cooperad-trees";
 import {
-  Tree, Forest, keyOf, keyForest
+  keyOf, keyForest
 } from "./fp-cooperad-trees";
 
 // -------------------------------------------------------------
@@ -175,11 +178,11 @@ export async function writeDeltaNDJSON<A>(
  * Write weighted Δ as NDJSON.
  * Each line: { coef: number, forest: string|object, trunk: string|object }
  */
-export async function writeDeltaWNDJSON<A, C>(
+export async function writeDeltaWNDJSON<A, W = number>(
   tr: Tree<A>,
   filePath: string,
-  C: Semiring<C>,
-  coefOf: (P: Forest<A>, R: Tree<A>) => C = () => C.one,
+  monoid: WeightMonoid<W>,
+  coefOf: (P: Forest<A>, R: Tree<A>) => Weight<W> = () => monoid.empty,
   opts: NDJSONOpts<A> = {}
 ): Promise<void> {
   const flushEvery = opts.flushEvery ?? 1000;
@@ -190,7 +193,7 @@ export async function writeDeltaWNDJSON<A, C>(
   let lineCount = 0;
 
   try {
-    const weighted = deltaW(tr, C, coefOf);
+    const weighted = deltaW(tr, monoid, coefOf);
     for (const { coef, forest, trunk } of weighted.values()) {
       const line = structural
         ? { coef, forest: forestToJSON(forest, encodeA), trunk: treeToJSON(trunk, encodeA) }
@@ -208,35 +211,5 @@ export async function writeDeltaWNDJSON<A, C>(
   }
 }
 
-// --- tiny demo if invoked directly
-if (require.main === module) {
-  const ex: Tree<string> = {
-    label: "f",
-    kids: [
-      { label: "g", kids: [{ label: "x", kids: [] }, { label: "y", kids: [] }] },
-      { label: "z", kids: [] },
-    ],
-  };
-
-  console.log("Tree:", ex.label);
-
-  // Polynomial semiring demo
-  const StringPoly = PolynomialSemiring(StringMonoid());
-  const poly1 = new Map([["a", 2], ["b", 3]]);
-  const poly2 = new Map([["c", 1], ["d", 4]]);
-  const sum = StringPoly.add(poly1, poly2);
-  const prod = StringPoly.mul(poly1, poly2);
-  
-  console.log("\nPolynomial demo:");
-  console.log("  poly1:", showPoly(poly1));
-  console.log("  poly2:", showPoly(poly2));
-  console.log("  sum:", showPoly(sum));
-  console.log("  product:", showPoly(prod));
-
-  // BigInt demo
-  console.log("\nBigInt demo:");
-  const big1 = 12345678901234567890n;
-  const big2 = 98765432109876543210n;
-  console.log("  big1 + big2:", BigIntSemiring.add(big1, big2));
-  console.log("  big1 * big2:", BigIntSemiring.mul(big1, big2));
-}
+// Browser-compatible execution check
+// Note: Examples can be called directly by creating a demo function

@@ -71,7 +71,7 @@ export const arrowChoiceSF: ArrowChoiceTC<SFK> = {
         const [b, pab1] = pab.step(eac.left as A);
         return [Left<B, C>(b), arrowChoiceSF.left(pab1) as SF<Either<A, C>, Either<B, C>>];
       } else {
-        return [Right<B, C>(eac.right as C), arrowChoiceSF.left(pab) as SF<Either<A, C>, Either<B, C>>];
+        return [Right<C, B>(eac.right as C), arrowChoiceSF.left(pab) as SF<Either<A, C>, Either<B, C>>];
       }
     }) as any
 };

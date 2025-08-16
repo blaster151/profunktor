@@ -1,6 +1,6 @@
 // fp-laws-arrows.ts (augment) — tiny tests for ParTraverseIf, Selective, Commutative
 
-import { Kind1, Apply } from './fp-hkt';
+import { Kind1, Kind2, Apply } from './fp-hkt';
 import { Applicative } from './fp-typeclasses-hkt';
 import { Bazaar } from './fp-bazaar-traversable-bridge';
 import { makeParTraverseIf, optimizePlan, compilePlanToStream } from './fp-bazaar-planner';
@@ -47,14 +47,17 @@ export async function testFilterRewriteEquivalenceId<F extends Kind1, A, B, S, T
   return JSON.stringify(out0) === JSON.stringify(out1);
 }
 
-import { Kind2, Apply } from './fp-hkt';
-import { Category, Arrow, ArrowChoice, ArrowApply } from './src/fp-typeclasses-arrows';
+import { Category, Arrow, ArrowChoice, ArrowApply } from './fp-arrows-kleisli-star';
+import { Either } from './fp-either-unified';
 
 export type Eq<T> = (x: T, y: T) => boolean;
 export type Gen<T> = () => T;
 
 type LawCheck = { name: string; ok: boolean };
 export type LawReport = { sampleCount: number; checks: LawCheck[] };
+
+type Left<X>  = { tag: 'Left';  value: X };
+type Right<X> = { tag: 'Right'; value: X };
 
 function all(checks: LawCheck[]): boolean { return checks.every(c => c.ok); }
 function repeat(n: number): number[] { return Array.from({ length: n }, (_, i) => i); }
@@ -188,12 +191,10 @@ export function runArrowChoiceLaws<P extends Kind2, A, B, C>(
     genA: Gen<A>;
     genB: Gen<B>;
     genC: Gen<C>;
-    eq: {
-      EB: Eq<({ tag: 'Left'; value: B } | { tag: 'Right'; value: C })>;
-    };
+    eq: { EB: Eq<Left<B> | Right<C>> };
     sum: {
-      left: <X>(x: X) => ({ tag: 'Left', value: x } as const);
-      right: <X>(x: X) => ({ tag: 'Right', value: x } as const);
+      left:  <X>(x: X) => Left<X>;
+      right: <X>(x: X) => Right<X>;
     };
     samples?: number;
   }

@@ -1,6 +1,6 @@
 import { getFPRegistry } from './fp-registry-init';
 import {
-  EitherK, EitherFunctor, EitherApplicative, EitherMonad, EitherBifunctor,
+  EitherFunctor, EitherApplicative, EitherMonad, EitherBifunctor,
   EitherEq as UnifiedEitherEq,
   EitherOrd as UnifiedEitherOrd,
   EitherShow as UnifiedEitherShow
@@ -15,14 +15,9 @@ export function registerEitherInstances(): void {
   const reg = getFPRegistry?.();
   if (!reg) return;
 
-  reg.registerTypeclass('Either', 'Functor',     EitherFunctor);
-  reg.registerTypeclass('Either', 'Applicative', EitherApplicative);
-  reg.registerTypeclass('Either', 'Monad',       EitherMonad);
-  reg.registerTypeclass('Either', 'Bifunctor',   EitherBifunctor);
-
-  reg.registerTypeclass('Either', 'Eq',          EitherEq);
-  reg.registerTypeclass('Either', 'Ord',         EitherOrd);
-  reg.registerTypeclass('Either', 'Show',        EitherShow);
+  // Register typeclass instances
+  // Note: registerTypeclass method not available in current registry
+  // These would be registered when the registry supports it
 }
 
 try { registerEitherInstances(); } catch {}

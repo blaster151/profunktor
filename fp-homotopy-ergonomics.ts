@@ -19,6 +19,8 @@ export function demonstrateErgonomics() {
   // 1. Your existing strict cooperad (unchanged)
   const existingCooperad = {
     delta: (t: Tree<string>) => admissibleCuts(t),
+    key: (t: Tree<string>) => t.label,
+    degree: (t: Tree<string>) => t.kids.length,
     // ... your existing cooperad methods
   };
   
@@ -193,6 +195,8 @@ export function demonstrateHomotopyWorkflow<A>() {
   // 1. Start with existing cooperad
   const existingCooperad = {
     delta: (t: Tree<A>) => admissibleCuts(t),
+    key: (t: Tree<A>) => t.label,
+    degree: (t: Tree<A>) => t.kids.length,
     // ... existing methods
   };
   
@@ -217,7 +221,7 @@ export function demonstrateHomotopyWorkflow<A>() {
     equals: (x: string, y: string) => x === y
   };
   
-  const deformationComplex = deformationComplex(dgCooperad, algebra);
+  const deformationComplexResult = deformationComplex(dgCooperad, algebra);
   
   // 4. Use homotopy-aware law runner
   const lawRunner = homotopyLawRunner<A>();
@@ -227,7 +231,7 @@ export function demonstrateHomotopyWorkflow<A>() {
   return {
     existingCooperad,
     dgCooperad,
-    deformationComplex,
+    deformationComplex: deformationComplexResult,
     lawRunner
   };
 }

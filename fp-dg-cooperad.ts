@@ -41,14 +41,14 @@ export function coderivationFromLocal<T>(
   // "counit-like" reassembly that picks the left component as the redex site.
   // If your Δ exposes such an inverse precisely, swap the "TODO(reassemble)" section.
   return function dAll(t: T): Sum<T> {
-    const dtPieces: Sum<T> = [];
+    let dtPieces: Array<{ coef: number; term: T }> = [];
 
     for (const { coef: c, term: [x, y] } of delta(t)) {
       // (d ⊗ id)(x,y): all terms from dLocal(x) tensored with y
       for (const { coef: a, term: dx } of dLocal(x)) {
         // reassemble "(dx, y) back into a T" at the same cut site
         const rebuiltXY = tryReassemble(C, dx, y);
-        dtPieces.push({ coef: c * a, term: rebuiltXY });
+        dtPieces = [...dtPieces, { coef: c * a, term: rebuiltXY }];
       }
 
       // (id ⊗ d)(x,y): sign = (-1)^{|x|}
@@ -57,7 +57,7 @@ export function coderivationFromLocal<T>(
                                // for coderivations from local data, dLocal is typical.
       for (const { coef: b, term: dy } of dySum) {
         const rebuiltXy = tryReassemble(C, x, dy);
-        dtPieces.push({ coef: c * s * b, term: rebuiltXy });
+        dtPieces = [...dtPieces, { coef: c * s * b, term: rebuiltXy }];
       }
     }
 

@@ -2,7 +2,8 @@
 // DG extensions for cooperad infrastructure
 // Integrates fp-dg-core with existing admissible cuts
 
-import { Tree, Forest, admissibleCuts, admissibleCutsGen, keyOf, keyForest } from './fp-cooperad-trees';
+import type { Tree, Forest } from './fp-cooperad-trees';
+import { admissibleCuts, keyOf, keyForest } from './fp-cooperad-trees';
 import { 
   Degree, DgModule, Sum, Term, koszul, signByDeg, normalizeByKey, 
   sum, zero, scale, plus 
@@ -62,28 +63,24 @@ export function leafDegree<A>(_tree: Tree<A>): Degree {
  */
 export function dgDelta<A>(tree: GradedTree<A>): Sum<GradedTree<A>> {
   const cuts = admissibleCuts(tree);
-  const terms: Term<GradedTree<A>>[] = [];
   
-  for (const { forest, trunk } of cuts) {
-    // Skip the empty cut (no differential contribution)
-    if (forest.length === 0) continue;
-    
-    // Compute degree of the forest
-    const forestDeg = forestDegree(forest);
-    
-    // Apply Koszul sign: (-1)^{deg(forest) * deg(trunk)}
-    const sign = koszul(forestDeg, trunk.degree);
-    
-    // Create graded trunk with degree shifted by -1
-    const gradedTrunk: GradedTree<A> = {
-      ...trunk,
-      degree: tree.degree - 1
-    };
-    
-    terms.push({ coef: sign, term: gradedTrunk });
-  }
-  
-  return terms;
+  return cuts
+    .filter(({ forest }) => forest.length > 0) // Skip empty cuts
+    .map(({ forest, trunk }) => {
+      // Compute degree of the forest
+      const forestDeg = forestDegree(forest);
+      
+      // Apply Koszul sign: (-1)^{deg(forest) * deg(trunk)}
+      const sign = koszul(forestDeg, treeDegree(trunk));
+      
+      // Create graded trunk with degree shifted by -1
+      const gradedTrunk: GradedTree<A> = {
+        ...trunk,
+        degree: tree.degree - 1
+      };
+      
+      return { coef: sign, term: gradedTrunk };
+    });
 }
 
 /**
@@ -155,37 +152,35 @@ export function deltaWGraded<A>(
   mode: GradedSymmetryMode,
   dgModule: DgModule<GradedTree<A>> = gradedTreeDgModule<A>()
 ): Sum<GradedTree<A>> {
-  // Use your existing admissible cuts generator
-  const cuts = admissibleCutsGen(tr);
-  const terms: Term<GradedTree<A>>[] = [];
+  // Use your existing admissible cuts
+  const cuts = admissibleCuts(tr);
   
-  for (const { forest, trunk } of cuts) {
-    // Skip empty cut
-    if (forest.length === 0) continue;
-    
-    // Create graded trunk
-    const gradedTrunk: GradedTree<A> = {
-      ...trunk,
-      degree: tr.degree - 1
-    };
-    
-    let coefficient = 1;
-    
-    // Apply graded signs if enabled
-    if (mode.graded) {
-      const forestDeg = forestDegree(forest);
-      coefficient *= koszul(forestDeg, trunk.degree);
-    }
-    
-    // Apply symmetry mode specific logic
-    if (mode.kind === 'symmetric-orbit') {
-      // For orbit mode, you'd need to compute automorphism size
-      // This is a simplified version
-      coefficient *= 1; // Placeholder for orbit normalization
-    }
-    
-    terms.push({ coef: coefficient, term: gradedTrunk });
-  }
+  const terms = Array.from(cuts)
+    .filter(({ forest }) => forest.length > 0) // Skip empty cuts
+    .map(({ forest, trunk }) => {
+      // Create graded trunk
+      const gradedTrunk: GradedTree<A> = {
+        ...trunk,
+        degree: tr.degree - 1
+      };
+      
+      let coefficient = 1;
+      
+      // Apply graded signs if enabled
+      if (mode.graded) {
+        const forestDeg = forestDegree(forest);
+        coefficient *= koszul(forestDeg, treeDegree(trunk));
+      }
+      
+      // Apply symmetry mode specific logic
+      if (mode.kind === 'symmetric-orbit') {
+        // For orbit mode, you'd need to compute automorphism size
+        // This is a simplified version
+        coefficient *= 1; // Placeholder for orbit normalization
+      }
+      
+      return { coef: coefficient, term: gradedTrunk };
+    });
   
   // Normalize by key to merge equivalent terms
   return normalizeByKey(terms, (t) => keyOf(t));

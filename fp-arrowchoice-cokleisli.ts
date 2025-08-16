@@ -68,10 +68,12 @@ export function arrowChoiceCoKleisli<W extends Kind1>(
     left: <A0, B0, C0>(pab: CoKleisli<W, A0, B0>) =>
       CoK<W, Either<A0, C0>, Either<B0, C0>>((wac) => {
         const split = Wco.distEither(wac);
-        return 'left' in split
-          ? Left<B0, C0>(pab(split.left as any))
-          : Right<B0, C0>(Wco.extract(split.right as any));
-      })
+        if ('left' in split) {
+          return Left<B0, C0>(pab(split.left as Apply<W, [A0]>));
+        } else {
+          return Right<C0, B0>(Wco.extract(split.right as Apply<W, [C0]>));
+        }
+      }) as any
   } as any;
 }
 

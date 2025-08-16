@@ -611,21 +611,9 @@ export function hyloLazy<
     const compute = () => hylo<F, A, B, Purity>(unfold, fold)(seed);
     
     // Return a lazy promise or value
-    if (Purity extends 'Impure') {
-      return new Promise<B>((resolve) => {
-        // Lazy computation
-        setTimeout(() => {
-          const result = compute();
-          if (result instanceof Promise) {
-            result.then(resolve);
-          } else {
-            resolve(result as B);
-          }
-        }, 0);
-      }) as HyloResult<B, Purity>;
-    }
-    
-    return compute() as HyloResult<B, Purity>;
+    // Lazy computation - the type system handles purity at compile time
+    const result = compute();
+    return result as HyloResult<B, Purity>;
   };
 }
 

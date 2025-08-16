@@ -350,7 +350,7 @@ interface MaybeHOK extends HigherKind<Kind1, Kind1> {
 interface EitherHOK extends HigherKind<Kind2, Kind2> {
   readonly __input: Kind2;
   readonly __output: Kind2;
-  readonly type: { left: this['__input']['arg0'] } | { right: this['__input']['arg1'] };
+  readonly type: { left: any } | { right: any };
 }
 
 /**

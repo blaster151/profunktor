@@ -200,10 +200,8 @@ class ConditionalMapStreamImpl<In, Out> implements ConditionalMapStream<In, Out>
   run(input: In): StateFn<void, Out> {
     return (state: void) => {
       if (this.predicate(input)) {
-        this.multiplicity = 1;
         return [state, this.fn(input)]; // Consume once
       } else {
-        this.multiplicity = 2;
         // Simulate consuming twice by calling fn twice
         const result1 = this.fn(input);
         const result2 = this.fn(input);
@@ -221,10 +219,8 @@ class AdaptiveFilterStreamImpl<In> implements AdaptiveFilterStream<In> {
   run(input: In): StateFn<{ adaptiveThreshold: number }, In | null> {
     return (state: { adaptiveThreshold: number }) => {
       if (this.predicate(input)) {
-        this.multiplicity = 1;
         return [{ ...state, adaptiveThreshold: state.adaptiveThreshold + 1 }, input];
       } else {
-        this.multiplicity = 3;
         // Simulate higher consumption when filtering out
         const _check1 = this.predicate(input);
         const _check2 = this.predicate(input);
@@ -439,13 +435,8 @@ function demonstrateCompileTimeValidation() {
   console.log("Adaptive multiplicity depends on filtering behavior");
 }
 
-// Run the demonstration
-if (require.main === module) {
-  demonstratePathDependentMultiplicity();
-  demonstrateMultiplicityComposition();
-  demonstrateIllegalEscalation();
-  demonstrateCompileTimeValidation();
-}
+// Browser-compatible execution check
+// Note: Examples can be called directly: demonstratePathDependentMultiplicity(); demonstrateMultiplicityComposition(); demonstrateIllegalEscalation(); demonstrateCompileTimeValidation();
 
 export {
   StreamModule,

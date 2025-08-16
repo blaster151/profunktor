@@ -1009,13 +1009,13 @@ export class PersistentMap<K, V> {
  * Provides efficient add/remove operations with structural sharing
  */
 export class PersistentSet<T> {
-  private constructor(private readonly map: PersistentMap<T, true>) {}
+  private constructor(private readonly internalMap: PersistentMap<T, true>) {}
   
   /**
    * Get the size of the set
    */
   get size(): number {
-    return this.map.size;
+    return this.internalMap.size;
   }
   
   /**
@@ -1040,28 +1040,28 @@ export class PersistentSet<T> {
    * Add a value to the set
    */
   add(value: T): PersistentSet<T> {
-    return new PersistentSet<T>(this.map.set(value, true));
+    return new PersistentSet<T>(this.internalMap.set(value, true));
   }
   
   /**
    * Remove a value from the set
    */
   delete(value: T): PersistentSet<T> {
-    return new PersistentSet<T>(this.map.delete(value));
+    return new PersistentSet<T>(this.internalMap.delete(value));
   }
   
   /**
    * Check if value exists in the set
    */
   has(value: T): boolean {
-    return this.map.has(value);
+    return this.internalMap.has(value);
   }
   
   /**
    * Union with another set
    */
   union(other: PersistentSet<T>): PersistentSet<T> {
-    let result = this;
+    let result: PersistentSet<T> = this;
     for (const value of other) {
       result = result.add(value);
     }
@@ -1136,7 +1136,7 @@ export class PersistentSet<T> {
    * Iterator support
    */
   [Symbol.iterator](): Iterator<T> {
-    return this.map.keys()[Symbol.iterator]();
+    return this.internalMap.keys()[Symbol.iterator]();
   }
 
   /**
@@ -1337,8 +1337,8 @@ export const PersistentSetEq = deriveEqInstance({
 export const PersistentSetOrd = deriveOrdInstance({
   customOrd: <A>(a: PersistentSet<A>, b: PersistentSet<A>): number => {
     if (a.size !== b.size) return a.size - b.size;
-    const arrA = a.toArray().sort();
-    const arrB = b.toArray().sort();
+    const arrA = [...a.toArray()].sort();
+    const arrB = [...b.toArray()].sort();
     for (let i = 0; i < arrA.length; i++) {
       if (arrA[i] < arrB[i]) return -1;
       if (arrA[i] > arrB[i]) return 1;
@@ -1660,7 +1660,7 @@ export const PersistentListMonadAlt = deriveMonadInstance<PersistentListK>({
     if (fa.flatMap) {
       return fa.flatMap(f);
     }
-    return fa.map(f).foldLeft(PersistentList.empty<B>(), (acc, val) => acc.append(val));
+    return fa.map(f).foldLeft(PersistentList.empty<B>(), (acc, bs) => acc.concat(bs)) as PersistentList<B>;
   }
 });
 
@@ -1735,11 +1735,7 @@ const PersistentListFluentImpl: FluentImpl<any> = {
       return acc; 
     });
   },
-  reduce: (self, reducer, seed) => self.foldLeft(seed, reducer),
-  tap: (self, side) => { 
-    self.forEach(side); 
-    return self; 
-  },
+
   pipe: (self, ...fns) => {
     let result = self;
     for (const fn of fns) {
@@ -1759,7 +1755,7 @@ const PersistentMapFluentImpl: FluentImpl<any> = {
       return self.flatMap(f);
     }
     // Fallback implementation for chain
-    const entries = Array.from(self.entries());
+    const entries = Array.from(self.entries() as Iterable<[any, any]>);
     const results: any[] = [];
     for (const [k, v] of entries) {
       const result = f(v);
@@ -1776,7 +1772,7 @@ const PersistentMapFluentImpl: FluentImpl<any> = {
     if (self.flatMap && self.flatMap !== PersistentMapFluentImpl.flatMap) {
       return self.flatMap(f);
     }
-    const entries = Array.from(self.entries());
+    const entries = Array.from(self.entries() as Iterable<[any, any]>);
     const results: any[] = [];
     for (const [k, v] of entries) {
       const result = f(v);
@@ -1796,17 +1792,7 @@ const PersistentMapFluentImpl: FluentImpl<any> = {
       return acc; 
     });
   },
-  reduce: (self, reducer, seed) => {
-    let acc = seed;
-    for (const v of self.values()) {
-      acc = reducer(acc, v);
-    }
-    return acc;
-  },
-  tap: (self, side) => { 
-    self.forEach(side); 
-    return self; 
-  },
+
   pipe: (self, ...fns) => {
     let result = self;
     for (const fn of fns) {
@@ -1861,17 +1847,7 @@ const PersistentSetFluentImpl: FluentImpl<any> = {
       return acc; 
     });
   },
-  reduce: (self, reducer, seed) => {
-    let acc = seed;
-    for (const v of self) {
-      acc = reducer(acc, v);
-    }
-    return acc;
-  },
-  tap: (self, side) => { 
-    self.forEach(side); 
-    return self; 
-  },
+
   pipe: (self, ...fns) => {
     let result = self;
     for (const fn of fns) {

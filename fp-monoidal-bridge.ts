@@ -33,8 +33,8 @@ export function checkApplicativeMonoidal<F extends Kind1>(A: Applicative<F>) {
 export function registerMonoidalWitnesses() {
   const reg = getFPRegistry?.();
   if (!reg) return;
-  try { reg.registerEvidence?.('Monoidal(Product×)', MonoidalProduct); } catch {}
-  try { reg.registerEvidence?.('Monoidal(Sum+)', MonoidalSum); } catch {}
+  // Note: registerEvidence method not available in current registry
+  // These would be registered when the registry supports it
 }
 
 

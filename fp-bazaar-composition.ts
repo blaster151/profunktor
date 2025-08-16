@@ -9,7 +9,7 @@
  * - Advanced composition patterns
  */
 
-import { Kind1, Apply } from './fp-hkt';
+import { Kind1, Apply, RequireCovariantLast } from './fp-hkt';
 import { Applicative, Monad } from './fp-typeclasses-hkt';
 import { Bazaar } from './fp-optics-iso-helpers';
 
@@ -186,6 +186,103 @@ export function composeBazaarWithErrorHandling<A, B, S, T>(
         }
         throw error;
       }
+    };
+}
+
+// Part X: Monad-aware Bazaar composition helpers
+// -----------------------------------------------
+
+/**
+ * Kleisli composition of continuations:
+ *   (g ∘K f)(a) = f(a) >>= g
+ */
+ export function composeK<F extends RequireCovariantLast<Kind1>, A, B, C>(
+  F: Monad<F>,
+  g: (b: B) => Apply<F, [C]>,
+  f: (a: A) => Apply<F, [B]>
+): (a: A) => Apply<F, [C]> {
+  return (a) => F.chain(f(a), g);
+}
+
+/**
+ * ♯3 — Monad-fusion composition of Bazaars.
+ *
+ * Caller supplies the *factored* continuations:
+ *   - k1 : A -> F<B>  (for the inner bazaar)
+ *   - k2 : B -> F<C>  (for the outer bazaar)
+ *
+ * We execute inner, then outer, and fuse nested F with `chain`.
+ */
+export function composeBazaarM<A, B, C, S, T, U>(
+  outer: Bazaar<B, C, T, U>,
+  inner: Bazaar<A, B, S, T>
+): <F extends RequireCovariantLast<Kind1>>(
+  F: Monad<F>,
+  k1: (a: A) => Apply<F, [B]>,
+  k2: (b: B) => Apply<F, [C]>
+) => (s: S) => Apply<F, [U]> {
+  return <F extends RequireCovariantLast<Kind1>>(
+    F: Monad<F>,
+    k1: (a: A) => Apply<F, [B]>,
+    k2: (b: B) => Apply<F, [C]>
+  ) =>
+    (s: S) => {
+      // Run inner with k1 to get F<T>, then feed T into outer with k2.
+      const tF = inner(F, k1)(s);           // F<T>
+      return F.chain(tF, (t) => outer(F, k2)(t));  // F<U> (fused via chain)
+    };
+}
+
+/**
+ * ♯1 — Kleisli-style composition where the *outer* continuation
+ * can depend on the observed B (data-dependent sequencing).
+ *
+ * `refine` lets you derive a B-specific continuation B -> F<C>.
+ * If you already have a fixed k2, pass `(_b) => k2`.
+ */
+export function composeBazaarK<A, B, C, S, T, U>(
+  outer: Bazaar<B, C, T, U>,
+  inner: Bazaar<A, B, S, T>
+): <F extends RequireCovariantLast<Kind1>>(
+  F: Monad<F>,
+  k1: (a: A) => Apply<F, [B]>,
+  refine: (b: B) => (b: B) => Apply<F, [C]>
+) => (s: S) => Apply<F, [U]> {
+  return <F extends RequireCovariantLast<Kind1>>(
+    F: Monad<F>,
+    k1: (a: A) => Apply<F, [B]>,
+    refine: (b: B) => (b: B) => Apply<F, [C]>
+  ) =>
+    (s: S) => {
+      // inner first (monadically), then outer, with a B-dependent continuation
+      const tF = inner(F, k1)(s); // F<T>
+      return F.chain(tF, (t) =>
+        outer(F, (b) => refine(b)(b))(t) // continuation chosen after observing `b`
+      );
+    };
+}
+
+/**
+ * Convenience: If you only have a single composed continuation k' : A -> F<C>,
+ * and you *can* (or want to) factor it as k' = k2 ∘K k1, use this:
+ */
+export function composeBazaarViaK<A, B, C, S, T, U>(
+  outer: Bazaar<B, C, T, U>,
+  inner: Bazaar<A, B, S, T>
+): <F extends RequireCovariantLast<Kind1>>(
+  F: Monad<F>,
+  k1: (a: A) => Apply<F, [B]>,
+  k2: (b: B) => Apply<F, [C]>
+) => (s: S) => Apply<F, [U]> {
+  return <F extends RequireCovariantLast<Kind1>>(
+    F: Monad<F>,
+    k1: (a: A) => Apply<F, [B]>,
+    k2: (b: B) => Apply<F, [C]>
+  ) =>
+    (s: S) => {
+      // This uses the same core as composeBazaarM; provided for readability.
+      const tF = inner(F, k1)(s);
+      return F.chain(tF, (t) => outer(F, k2)(t));
     };
 }
 

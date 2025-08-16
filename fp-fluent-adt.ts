@@ -14,6 +14,7 @@ import type {
   Apply, 
   Type 
 } from './fp-typeclasses';
+import type { Kind1, Kind2 } from './fp-hkt';
 import { getTypeclassInstance } from './fp-registry-init';
 
 // ============================================================================
@@ -48,7 +49,7 @@ export interface FluentBifunctorADT<F extends Kind<[Type, Type]>, L, R> {
 /**
  * Add fluent methods to an ADT instance
  */
-export function addFluentMethods<F extends Kind<[Type]>, A>(
+export function addFluentMethods<F extends Kind1, A>(
   adt: Apply<F, [A]>,
   typeName: string
 ): Apply<F, [A]> & FluentADT<F, A> {
@@ -95,7 +96,7 @@ export function addFluentMethods<F extends Kind<[Type]>, A>(
 /**
  * Add fluent bifunctor methods to an ADT instance
  */
-export function addBifunctorMethods<F extends Kind<[Type, Type]>, L, R>(
+export function addBifunctorMethods<F extends Kind2, L, R>(
   adt: Apply<F, [L, R]>,
   typeName: string
 ): Apply<F, [L, R]> & FluentBifunctorADT<F, L, R> {
@@ -183,7 +184,7 @@ export function fluentObservable<A>(observable: any): any & FluentADT<any, A> {
 /**
  * Augment ADT constructors with fluent methods
  */
-export function augmentADTWithFluent<F extends Kind<[Type]>>(
+export function augmentADTWithFluent<F extends Kind1>(
   constructor: any,
   typeName: string
 ): void {
@@ -226,7 +227,7 @@ export function augmentADTWithFluent<F extends Kind<[Type]>>(
 /**
  * Augment bifunctor ADT constructors with fluent methods
  */
-export function augmentBifunctorADTWithFluent<F extends Kind<[Type, Type]>>(
+export function augmentBifunctorADTWithFluent<F extends Kind2>(
   constructor: any,
   typeName: string
 ): void {

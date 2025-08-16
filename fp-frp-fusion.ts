@@ -253,30 +253,17 @@ export function optimizeFRPPlan(plan: FRPStreamPlanNode): FRPStreamPlanNode {
 /**
  * Optimize FRP stream using FRP-specific fusion rules
  */
-export function optimizeFRPStream<S, I, O>(
-  stream: StatefulStream<I, S, O>
-): StatefulStream<I, S, O> {
-  // Check if the stream has a plan
-  if (!stream.__plan) {
-    return stream;
-  }
-  
-  // Optimize the plan using FRP-specific rules
-  const optimizedPlan = optimizeFRPPlan(stream.__plan as FRPStreamPlanNode);
-  
-  // If no optimization occurred, return original stream
-  if (!optimizedPlan.isOptimized()) {
-    return stream;
-  }
-  
-  // Create optimized stream
-  const optimized = {
-    ...stream,
-    __plan: optimizedPlan
-  };
-  
-  return optimized;
+// fp-frp-fusion.ts
+export function optimizeFRPStream<I, S, O>(stream: StatefulStream<I, S, O>): StatefulStream<I, S, O> {
+  const plan = stream.__plan;
+  if (!plan) return stream;
+  const optimizedPlan = optimizeFRPPlan(plan as FRPStreamPlanNode);
+  // If nothing changed, return the *same* instance
+  if (optimizedPlan === plan) return stream;
+  stream.__plan = optimizedPlan;         // mutate in place
+  return stream;
 }
+
 
 /**
  * Check if FRP stream can be optimized
@@ -540,20 +527,3 @@ export function batchOptimizeFRPStreams(streams: StatefulStream<any, any, any>[]
 // Part 8: Exports
 // ============================================================================
 
-export {
-  FRPFusionRules,
-  FRPFusionRegistry,
-  optimizeFRPPlan,
-  optimizeFRPStream,
-  canOptimizeFRPStream,
-  applyFRPPurityFusion,
-  optimizeEventStream,
-  combineEventStreams,
-  optimizeUIEventStream,
-  optimizeReactivePipeline,
-  analyzeReactivePipeline,
-  getFRPPerformanceMetrics,
-  createFRPFusionOptimizer,
-  withAutoFRPOptimization,
-  batchOptimizeFRPStreams
-}; 

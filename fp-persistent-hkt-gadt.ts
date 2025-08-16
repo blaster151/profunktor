@@ -91,26 +91,23 @@ export type ApplyPersistentSet<A> = Apply<PersistentSetHKT, [A]>;
 /**
  * GADT form for PersistentList
  */
-export type ListGADT<A> = GADT<string, any> & (
-  | { tag: 'Nil' }
-  | { tag: 'Cons'; head: A; tail: PersistentList<A> }
-);
+export type ListGADT<A> =
+  | { tag: 'Nil'; payload: {} }
+  | { tag: 'Cons'; payload: { head: A; tail: PersistentList<A> } };
 
 /**
  * GADT form for PersistentMap
  */
-export type MapGADT<K, V> = GADT<string, any> & (
-  | { tag: 'Empty' }
-  | { tag: 'NonEmpty'; key: K; value: V; rest: PersistentMap<K, V> }
-);
+export type MapGADT<K, V> =
+  | { tag: 'Empty'; payload: {} }
+  | { tag: 'NonEmpty'; payload: { key: K; value: V; rest: PersistentMap<K, V> } };
 
 /**
  * GADT form for PersistentSet
  */
-export type SetGADT<A> = GADT<string, any> & (
-  | { tag: 'Empty' }
-  | { tag: 'NonEmpty'; element: A; rest: PersistentSet<A> }
-);
+export type SetGADT<A> =
+  | { tag: 'Empty'; payload: {} }
+  | { tag: 'NonEmpty'; payload: { element: A; rest: PersistentSet<A> } };
 
 /**
  * GADT tags for ListGADT
@@ -159,11 +156,10 @@ export type SetGADTPayload<T extends SetGADTTags> =
  * GADT constructors for ListGADT
  */
 export const ListGADT = {
-  Nil: (): ListGADT<any> => ({ tag: 'Nil' }),
+  Nil: (): ListGADT<any> => ({ tag: 'Nil', payload: {} }),
   Cons: <A>(head: A, tail: PersistentList<A>): ListGADT<A> => ({ 
     tag: 'Cons', 
-    head, 
-    tail 
+    payload: { head, tail }
   })
 };
 
@@ -171,12 +167,10 @@ export const ListGADT = {
  * GADT constructors for MapGADT
  */
 export const MapGADT = {
-  Empty: (): MapGADT<any, any> => ({ tag: 'Empty' }),
+  Empty: (): MapGADT<any, any> => ({ tag: 'Empty', payload: {} }),
   NonEmpty: <K, V>(key: K, value: V, rest: PersistentMap<K, V>): MapGADT<K, V> => ({ 
     tag: 'NonEmpty', 
-    key, 
-    value, 
-    rest 
+    payload: { key, value, rest }
   })
 };
 
@@ -184,11 +178,10 @@ export const MapGADT = {
  * GADT constructors for SetGADT
  */
 export const SetGADT = {
-  Empty: (): SetGADT<any> => ({ tag: 'Empty' }),
+  Empty: (): SetGADT<any> => ({ tag: 'Empty', payload: {} }),
   NonEmpty: <A>(element: A, rest: PersistentSet<A>): SetGADT<A> => ({ 
     tag: 'NonEmpty', 
-    element, 
-    rest 
+    payload: { element, rest }
   })
 };
 
@@ -206,7 +199,10 @@ export function matchList<A, R>(
     Cons: (payload: { head: A; tail: PersistentList<A> }) => R;
   }
 ): R {
-  return pmatch(gadt, patterns as any);
+  return pmatch(gadt)
+    .with('Nil', () => patterns.Nil())
+    .with('Cons', p => patterns.Cons(p))
+    .exhaustive() as R;
 }
 
 /**
@@ -219,7 +215,10 @@ export function matchMap<K, V, R>(
     NonEmpty: (payload: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
   }
 ): R {
-  return pmatch(gadt, patterns as any);
+  return pmatch(gadt)
+    .with('Empty', () => patterns.Empty())
+    .with('NonEmpty', p => patterns.NonEmpty(p))
+    .exhaustive() as R;
 }
 
 /**
@@ -232,7 +231,10 @@ export function matchSet<A, R>(
     NonEmpty: (payload: { element: A; rest: PersistentSet<A> }) => R;
   }
 ): R {
-  return pmatch(gadt, patterns as any);
+  return pmatch(gadt)
+    .with('Empty', () => patterns.Empty())
+    .with('NonEmpty', p => patterns.NonEmpty(p))
+    .exhaustive() as R;
 }
 
 /**
@@ -649,13 +651,35 @@ export function preserveImmutability<T>(value: T): T {
   return value;
 }
 
+// ============================================================================
+// Part 11: Derived Instances for Persistent Collections
+// ============================================================================
+
+/**
+ * Derived instances for PersistentListHKT
+ */
+export const PersistentListHKTEq = deriveEqInstance({ kind: PersistentListHKT });
+export const PersistentListHKTOrd = deriveOrdInstance({ kind: PersistentListHKT });
+export const PersistentListHKTShow = deriveShowInstance({ kind: PersistentListHKT });
+
+/**
+ * Derived instances for PersistentMapHKT
+ */
+export const PersistentMapHKTEq = deriveEqInstance({ kind: PersistentMapHKT });
+export const PersistentMapHKTOrd = deriveOrdInstance({ kind: PersistentMapHKT });
+export const PersistentMapHKTShow = deriveShowInstance({ kind: PersistentMapHKT });
+
+/**
+ * Derived instances for PersistentSetHKT
+ */
+export const PersistentSetHKTEq = deriveEqInstance({ kind: PersistentSetHKT });
+export const PersistentSetHKTOrd = deriveOrdInstance({ kind: PersistentSetHKT });
+export const PersistentSetHKTShow = deriveShowInstance({ kind: PersistentSetHKT });
+
 /**
  * Type-safe operation that preserves immutability
  */
 export function safeOperation<A, B>(
-export const PersistentListHKTEq = deriveEqInstance({ kind: PersistentListHKT });
-export const PersistentListHKTOrd = deriveOrdInstance({ kind: PersistentListHKT });
-export const PersistentListHKTShow = deriveShowInstance({ kind: PersistentListHKT });
   operation: (a: A) => B,
   value: A
 ): B {
@@ -691,9 +715,6 @@ export const PersistentListHKTShow = deriveShowInstance({ kind: PersistentListHK
  * 4. Branding Law: Immutability branding is preserved
  */ 
 export function registerPersistentListHKTDerivations(): void {
-export const PersistentMapHKTEq = deriveEqInstance({ kind: PersistentMapHKT });
-export const PersistentMapHKTOrd = deriveOrdInstance({ kind: PersistentMapHKT });
-export const PersistentMapHKTShow = deriveShowInstance({ kind: PersistentMapHKT });
   if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
     const registry = (globalThis as any).__FP_REGISTRY;
     registry.register('PersistentListHKTEq', PersistentListHKTEq);
@@ -703,9 +724,6 @@ export const PersistentMapHKTShow = deriveShowInstance({ kind: PersistentMapHKT 
 }
 registerPersistentListHKTDerivations();
 export function registerPersistentMapHKTDerivations(): void {
-export const PersistentSetHKTEq = deriveEqInstance({ kind: PersistentSetHKT });
-export const PersistentSetHKTOrd = deriveOrdInstance({ kind: PersistentSetHKT });
-export const PersistentSetHKTShow = deriveShowInstance({ kind: PersistentSetHKT });
   if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
     const registry = (globalThis as any).__FP_REGISTRY;
     registry.register('PersistentMapHKTEq', PersistentMapHKTEq);

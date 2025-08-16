@@ -16,8 +16,7 @@ import {
   Expr, ExprK, evaluate, transformString, ExprFunctor,
   MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor,
-  Ok, Err
+  Result as ResultGADT, ResultK, ResultFunctor
 } from './fp-gadt-enhanced';
 
 import {
@@ -80,12 +79,24 @@ export function foldGeneric<T extends GADT<string, any>, R>(
  * Each handler receives the payload and returns the fold result
  */
 export type FoldExpr<A, R> = {
-  Const: (payload: { value: A }) => R;
-  Add: (payload: { left: Expr<number>; right: Expr<number> }) => R;
-  If: (payload: { cond: Expr<boolean>; then: Expr<A>; else: Expr<A> }) => R;
-  Var: (payload: { name: string }) => R;
-  Let: (payload: { name: string; value: Expr<A>; body: Expr<A> }) => R;
+  Const: (value: A) => R;
+  Add: (left: R, right: R) => R;
+  If: (cond: boolean, thenBranch: R, elseBranch: R) => R;
+  Var: (name: string) => R;
+  Let: (name: string, value: R, body: R) => R;
 };
+
+function foldBool(expr: Expr<boolean>): boolean {
+  return pmatch(expr)
+    .with('Const', ({ value }) => value)
+    .with('If', ({ cond, then, else: else_ }) =>
+      foldBool(cond) ? foldBool(then as any) : foldBool(else_ as any)
+    )
+    .with('Var', ({ name }) => { throw new Error(`Unbound variable: ${name}`); })
+    .with('Add', () => { throw new Error('Cannot evaluate Add as boolean'); })
+    .with('Let', ({ name, value, body }) => foldBool(body as any))
+    .exhaustive();
+}
 
 /**
  * Catamorphism for Expr<A> that recurses through the structure and applies handlers bottom-up
@@ -96,27 +107,21 @@ export function cataExpr<A, R>(
   algebra: FoldExpr<A, R>
 ): R {
   return pmatch(expr)
-    .with('Const', algebra.Const)
-    .with('Add', ({ left, right }) => 
-      algebra.Add({ 
-        left, 
-        right 
-      })
+    .with('Const', ({ value }) => algebra.Const(value))
+    .with('Add', ({ left, right }) => algebra.Add(
+      cataExpr(left as any, algebra),
+      cataExpr(right as any, algebra)
+    ))
+    .with('If', ({ cond, then, else: else_ }) =>
+      algebra.If(
+        foldBool(cond),
+        cataExpr(then as any, algebra),
+        cataExpr(else_ as any, algebra)
+      )
     )
-    .with('If', ({ cond, then, else: else_ }) => 
-      algebra.If({ 
-        cond, 
-        then, 
-        else: else_ 
-      })
-    )
-    .with('Var', algebra.Var)
-    .with('Let', ({ name, value, body }) => 
-      algebra.Let({ 
-        name, 
-        value, 
-        body 
-      })
+    .with('Var', ({ name }) => algebra.Var(name))
+    .with('Let', ({ name, value, body }) =>
+      algebra.Let(name, cataExpr(value as any, algebra), cataExpr(body as any, algebra))
     )
     .exhaustive();
 }
@@ -513,8 +518,8 @@ export function exampleExprFold(): void {
  * Example: Using fold with Result
  */
 export function exampleResultFold(): void {
-  const success = Ok(42);
-  const failure = Err('Something went wrong');
+  const success = ResultGADT.Ok(42);
+  const failure = ResultGADT.Err('Something went wrong');
   
   const successAlgebra = resultSuccessAlgebra<number, string>(
     error => parseInt(error) || 0

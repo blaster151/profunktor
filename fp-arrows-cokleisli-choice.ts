@@ -26,17 +26,17 @@ export interface CoKleisliK<W extends Kind1> extends Kind1 {
 }
 
 // Category / Arrow / ArrowChoice dictionaries (keep in sync with your project)
-export interface Category<~> {
+export interface Category<F> {
   id<A>(): any; // A ~> A
   compose<A, B, C>(g: any, f: any): any; // (A~>B) -> (B~>C) -> (A~>C)
 }
 
-export interface Arrow<~> extends Category<~> {
+export interface Arrow<F> extends Category<F> {
   arr<A, B>(f: (a: A) => B): any;                 // A ~> B
   first<A, B, C>(f: any): any;                    // (A~>B) -> ([A,C] ~> [B,C])
 }
 
-export interface ArrowChoice<~> extends Arrow<~> {
+export interface ArrowChoice<F> extends Arrow<F> {
   left<A, B, C>(f: any): any;                     // (A~>B) -> (Either<A,C] ~> Either<B,C])
 }
 

@@ -62,31 +62,33 @@ export function admissibleCuts<A>(root: Tree<A>): Array<{ forest: Forest<A>; tru
     return [{ forest: [], trunk: root }];
   }
 
-  // Cartesian product over children choices
-  const out: Array<{ forest: Forest<A>; trunk: Tree<A> }> = [];
-
-  function go(i: number, accForest: Array<Tree<A>>, accKids: Array<Tree<A>>) {
+  // Cartesian product over children choices - fully immutable
+  function go(i: number, accForest: ReadonlyArray<Tree<A>>, accKids: ReadonlyArray<Tree<A>>): Array<{ forest: Forest<A>; trunk: Tree<A> }> {
     if (i === choicesPerChild.length) {
-      out.push({ forest: accForest.slice(), trunk: t(root.label, accKids.slice()) });
-      return;
+      return [{ forest: accForest, trunk: t(root.label, accKids) }];
     }
+    
+    const results: Array<{ forest: Forest<A>; trunk: Tree<A> }> = [];
     for (const ch of choicesPerChild[i]) {
       if (ch.kind === "cut") {
         // prune this whole child; no trunk child
-        go(i + 1, accForest.concat(ch.forest), accKids);
+        const newForest = [...accForest, ...ch.forest];
+        results.push(...go(i + 1, newForest, accKids));
       } else {
         // descend: keep truncated child in the trunk
-        go(i + 1, accForest.concat(ch.forest), accKids.concat([ch.trunkChild]));
+        const newForest = [...accForest, ...ch.forest];
+        const newKids = [...accKids, ch.trunkChild];
+        results.push(...go(i + 1, newForest, newKids));
       }
     }
+    return results;
   }
 
-  go(0, [], []);
-  return out;
+  return go(0, [], []);
 }
 
-// --- tiny demo if invoked directly
-if (require.main === module) {
+// Browser-compatible demo function
+export function demoCooperadTrees() {
   const ex = t("f", [t("g", [leaf("x"), leaf("y")]), leaf("z")]);
   const cuts = admissibleCuts(ex);
   console.log("Tree:", pretty(ex));

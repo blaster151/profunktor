@@ -6,13 +6,56 @@
 // - deltaW (weighted, merges duplicates via semiring.add)
 // - Symmetry modes: planar, symmetric-agg, symmetric-orbit
 
+import type {
+  Tree, Forest,
+} from "./fp-cooperad-trees";
 import {
-  Tree, Forest, t, keyOf, keyForest, pretty,
+  t, keyOf, keyForest, pretty,
 } from "./fp-cooperad-trees";
 
 // Import symmetry support
 import { Rational, RationalSemiring as RS, R } from './math/rational';
 import { canonicalize } from './trees/canonicalTree';
+
+// ============================================================================
+// Weight Abstraction Layer
+// ============================================================================
+
+export interface NumericLike {
+  add(b: this): this;
+  sub?(b: this): this;
+  mul?(b: this): this;
+  compare(b: this): number; // -1 | 0 | 1
+}
+
+export type Weight<W = number> = W;
+
+export interface WeightMonoid<W = number> {
+  empty: W;
+  concat: (a: W, b: W) => W;
+}
+
+// Factory functions for common weight types
+export function numberWeightMonoid(): WeightMonoid<number> {
+  return {
+    empty: 0,
+    concat: (a, b) => a + b,
+  };
+}
+
+export function bigIntWeightMonoid(): WeightMonoid<bigint> {
+  return {
+    empty: BigInt(0),
+    concat: (a, b) => a + b,
+  };
+}
+
+export function rationalWeightMonoid(): WeightMonoid<Rational> {
+  return {
+    empty: R.zero,
+    concat: (a, b) => a.add(b),
+  };
+}
 
 // -----------------------------
 // 1) Symmetry Modes
@@ -58,7 +101,7 @@ function autSizeOf(treeLike: { children: any[] }): bigint {
 // main: add 1 · term, possibly divided by |Aut|
 export function emitNode<K>(ctx: EmitCtx<K>): void {
   const { poly, keyOfCurrentNode: k, mode } = ctx;
-  let w = R.fromInt(1n); // start with 1
+  let w = R.fromInt(BigInt(1)); // start with 1
 
   if (mode.kind === 'planar') {
     // unchanged
@@ -171,13 +214,13 @@ export function* deltaStream<A>(
 // -----------------------------
 // 7) Weighted Δ with merging
 // -----------------------------
-export type WeightedTerm<A, C> = {
-  coef: C;
+export type WeightedTerm<A, W = number> = {
+  coef: Weight<W>;
   forest: Forest<A>;
   trunk: Tree<A>;
 };
 
-export type WeightedSum<A, C> = Map<string, WeightedTerm<A, C>>;
+export type WeightedSum<A, W = number> = Map<string, WeightedTerm<A, W>>;
 
 function pairKey<A>(P: Forest<A>, R: Tree<A>): string {
   return `${keyForest(P)}|${keyOf(R)}`;
@@ -187,22 +230,22 @@ function pairKey<A>(P: Forest<A>, R: Tree<A>): string {
  * Weighted Δ:
  * - streams all admissible cuts of `tr`
  * - for each term, computes its weight (default 1)
- * - merges duplicate (forest,trunk) pairs by summing coefficients via C.add
+ * - merges duplicate (forest,trunk) pairs by summing coefficients via weight monoid
  *
  * `coefOf` lets you attach custom weights per cut (default: 1 per cut).
  */
-export function deltaW<A, C>(
+export function deltaW<A, W = number>(
   tr: Tree<A>,
-  C: Semiring<C>,
-  coefOf: (P: Forest<A>, R: Tree<A>) => C = () => C.one
-): WeightedSum<A, C> {
-  const out: WeightedSum<A, C> = new Map();
+  monoid: WeightMonoid<W>,
+  coefOf: (P: Forest<A>, R: Tree<A>) => Weight<W> = () => monoid.empty
+): WeightedSum<A, W> {
+  const out: WeightedSum<A, W> = new Map();
   for (const [P, R] of deltaStream(tr)) {
     const k = pairKey(P, R);
     const w = coefOf(P, R);
     const prev = out.get(k);
     if (prev) {
-      out.set(k, { coef: C.add(prev.coef, w), forest: prev.forest, trunk: prev.trunk });
+      out.set(k, { coef: monoid.concat(prev.coef, w), forest: prev.forest, trunk: prev.trunk });
     } else {
       out.set(k, { coef: w, forest: P, trunk: R });
     }
@@ -221,7 +264,7 @@ export function deltaW<A, C>(
 export function deltaWSym<A>(
   tr: Tree<A>,
   mode: SymmetryMode,
-  coefOf: (P: Forest<A>, R: Tree<A>) => Rational = () => R.fromInt(1n)
+  coefOf: (P: Forest<A>, R: Tree<A>) => Rational = () => R.fromInt(BigInt(1))
 ): Poly<string, Rational> {
   const poly: Poly<string, Rational> = new Map();
   
@@ -268,14 +311,14 @@ function treeToCanonicalTree<A>(tree: Tree<A>): { children: any[] } {
 }
 
 // Pretty-print a weighted sum (debug)
-export function showWeighted<A, C>(
-  ws: WeightedSum<A, C>,
+export function showWeighted<A, W = number>(
+  ws: WeightedSum<A, W>,
   showA: (a: A) => string = (x) => String(x),
-  showC: (c: C) => string = (x) => String(x)
+  showW: (w: Weight<W>) => string = (x) => String(x)
 ): string[] {
   const lines: string[] = [];
   for (const { coef, forest, trunk } of ws.values()) {
-    lines.push(`${showC(coef)} · ${keyForest(forest, showA)} ⊗ ${keyOf(trunk, showA)}`);
+    lines.push(`${showW(coef)} · ${keyForest(forest, showA)} ⊗ ${keyOf(trunk, showA)}`);
   }
   return lines;
 }
@@ -293,42 +336,5 @@ export function showPoly<K, W>(
   return lines;
 }
 
-// --- tiny demo if invoked directly
-if (require.main === module) {
-  const ex: Tree<string> = {
-    label: "f",
-    kids: [
-      { label: "g", kids: [{ label: "x", kids: [] }, { label: "y", kids: [] }] },
-      { label: "z", kids: [] },
-    ],
-  };
-
-  console.log("Tree:", pretty(ex));
-
-  console.log("\nLazy Δ (first few terms):");
-  let n = 0;
-  for (const [P, R] of deltaStream(ex)) {
-    console.log(" ", keyForest(P), "⊗", keyOf(R));
-    if (++n > 6) break;
-  }
-
-  console.log("\nWeighted Δ with Nat coefficients (default 1 per term):");
-  const w1 = deltaW(ex, NatSemiring);
-  for (const line of showWeighted(w1)) console.log(" ", line);
-
-  console.log("\nWeighted Δ with a custom weight (size of forest):");
-  const w2 = deltaW(
-    ex,
-    NatSemiring,
-    (P, _R) => P.length // weight = number of pruned components in the forest
-  );
-  for (const line of showWeighted(w2)) console.log(" ", line);
-
-  console.log("\nSymmetry-aware Δ (planar mode):");
-  const sym1 = deltaWSym(ex, { kind: 'planar' });
-  for (const line of showPoly(sym1)) console.log(" ", line);
-
-  console.log("\nSymmetry-aware Δ (symmetric-orbit mode):");
-  const sym2 = deltaWSym(ex, { kind: 'symmetric-orbit' });
-  for (const line of showPoly(sym2)) console.log(" ", line);
-}
+// Browser-compatible execution check
+// Note: Examples can be called directly by creating a demo function

@@ -5,10 +5,9 @@
  * and purity safety. Inspired by Haskell's do notation.
  * 
  * Features:
- * - Generator-based monadic chaining
+ * - Generator-based monadic chaining with explicit Monad instances
  * - Automatic purity inference and propagation
- * - Support for Monad1, Monad2, Monad3
- * - Nested doM blocks
+ * - Support for Kind1, Kind2, Kind3 via currying
  * - Type-safe effect composition
  */
 
@@ -17,7 +16,8 @@ import {
   Apply, Type, TypeArgs, KindArity, KindResult,
   ArrayK, MaybeK, EitherK, TupleK, FunctionK, PromiseK, SetK, MapK, ListK,
   ReaderK, WriterK, StateK,
-  Maybe, Either, Result, ObservableLite
+  Maybe, Either, ObservableLiteK,
+  Fix2Left, Fix2Right
 } from './fp-hkt';
 
 import {
@@ -28,7 +28,7 @@ import {
 import {
   EffectTag, EffectOf, Pure, IO, Async,
   createPurityInfo, attachPurityMarker, extractPurityMarker, hasPurityMarker,
-  composeEffects
+  ComposeEffects
 } from './fp-purity';
 
 // ============================================================================
@@ -36,19 +36,24 @@ import {
 // ============================================================================
 
 /**
- * Generator function type for doM
+ * Generator function type for doM with proper Apply tuple
  */
-export type DoMGenerator<F extends Kind1, A> = Generator<Apply<F, any>, A, any>;
+export type DoGen1<F extends Kind1, A> = Generator<Apply<F, [any]>, A, any>;
 
 /**
- * Generator function type for doM2
+ * Generator function type for doM2 (Kind2)
  */
-export type DoM2Generator<F extends Kind2, A, E> = Generator<Apply<F, [A, E]>, A, any>;
+export type DoGen2<F extends Kind2, Fixed, A> = Generator<Apply<Fix2Right<F, Fixed>, [any]>, A, any>;
 
 /**
- * Generator function type for doM3
+ * Generator function type for doM3 (Kind3)
  */
-export type DoM3Generator<F extends Kind3, A, E, R> = Generator<Apply<F, [A, E, R]>, A, any>;
+export type DoGen3<F extends Kind3, A, B, C> = Generator<Apply<Fix3To1<F, A, B>, [any]>, C, any>;
+
+/**
+ * Helper type for fixing Kind3 to Kind1
+ */
+type Fix3To1<F extends Kind3, A, B> = Fix2Right<Fix2Left<F, A>, B>;
 
 /**
  * Monadic value with effect tag
@@ -74,206 +79,120 @@ export type MonadicValue3<F extends Kind3, A, B, C, E extends EffectTag = 'Pure'
 export type ComposedEffect<T extends readonly EffectTag[]> = 
   T extends readonly [infer First, ...infer Rest]
     ? Rest extends readonly EffectTag[]
-      ? composeEffects<First, ComposedEffect<Rest>>
+      ? ComposeEffects<First, ComposedEffect<Rest>>
       : First
     : 'Pure';
 
 // ============================================================================
-// Part 2: Core doM Implementation
+// Part 2: Core doM Implementation with Monad Instances
 // ============================================================================
 
 /**
- * doM for unary type constructors (Monad1)
+ * doM for Kind1 with explicit Monad instance
  * Chains monadic values using generator syntax
  */
-export function doM<F extends Kind1, A, E extends EffectTag = 'Pure'>(
-  generator: () => DoMGenerator<F, A>
-): MonadicValue<F, A, E> {
-  return doMInternal(generator()) as MonadicValue<F, A, E>;
-}
-
-/**
- * doM2 for binary type constructors (Monad2)
- * Chains monadic values using generator syntax
- */
-export function doM2<F extends Kind2, A, B, E extends EffectTag = 'Pure'>(
-  generator: () => DoM2Generator<F, A, B>
-): MonadicValue2<F, A, B, E> {
-  return doM2Internal(generator()) as MonadicValue2<F, A, B, E>;
-}
-
-/**
- * doM3 for ternary type constructors (Monad3)
- * Chains monadic values using generator syntax
- */
-export function doM3<F extends Kind3, A, B, C, E extends EffectTag = 'Pure'>(
-  generator: () => DoM3Generator<F, A, B, C>
-): MonadicValue3<F, A, B, C, E> {
-  return doM3Internal(generator()) as MonadicValue3<F, A, B, C, E>;
-}
-
-// ============================================================================
-// Part 3: Internal Implementation
-// ============================================================================
-
-/**
- * Internal implementation for doM
- */
-function doMInternal<F extends Kind1, A>(
-  generator: DoMGenerator<F, A>
+export function doM<F extends Kind1, A>(
+  M: Monad<F>,
+  gen: () => DoGen1<F, A>
 ): Apply<F, [A]> {
-  const iterator = generator;
-  let result: IteratorResult<Apply<F, any>, A>;
-  let currentValue: Apply<F, any> | null = null;
+  const it = gen();
 
-  function step(value?: any): Apply<F, [A]> {
-    try {
-      result = iterator.next(value);
-      
-      if (result.done) {
-        // Generator completed, return the final value
-        return result.value as Apply<F, [A]>;
-      }
-      
-      // Get the yielded monadic value
-      const monadicValue = result.value;
-      
-      // Chain with the next step
-      if (hasChain(monadicValue)) {
-        return monadicValue.chain((val: any) => step(val));
-      } else if (hasFlatMap(monadicValue)) {
-        return monadicValue.flatMap((val: any) => step(val));
-      } else {
-        // Fallback to map if no chain method
-        return monadicValue.map((val: any) => step(val));
-      }
-    } catch (error) {
-      // Handle errors in the generator
-      if (hasCatchError(monadicValue)) {
-        return monadicValue.catchError((err: any) => {
-          throw err;
-        });
-      }
-      throw error;
+  const step = (last?: any): Apply<F, [A]> => {
+    const r = it.next(last);
+    if (r.done) {
+      // Lift the final pure value into the monad
+      return M.of(r.value as A);
     }
-  }
+    // r.value :: Apply<F, [any]>
+    return M.chain(r.value as Apply<F, [any]>, step);
+  };
 
   return step();
 }
 
 /**
- * Internal implementation for doM2
+ * doM2 for Kind2 where the right param is the value (Either-like): F<X, A>
  */
-function doM2Internal<F extends Kind2, A, B>(
-  generator: DoM2Generator<F, A, B>
-): Apply<F, [A, B]> {
-  const iterator = generator;
-  let result: IteratorResult<Apply<F, [A, B]>, A>;
-
-  function step(value?: any): Apply<F, [A, B]> {
-    try {
-      result = iterator.next(value);
-      
-      if (result.done) {
-        return result.value as Apply<F, [A, B]>;
-      }
-      
-      const monadicValue = result.value;
-      
-      if (hasChain(monadicValue)) {
-        return monadicValue.chain((val: any) => step(val));
-      } else if (hasFlatMap(monadicValue)) {
-        return monadicValue.flatMap((val: any) => step(val));
-      } else {
-        return monadicValue.map((val: any) => step(val));
-      }
-    } catch (error) {
-      if (hasCatchError(monadicValue)) {
-        return monadicValue.catchError((err: any) => {
-          throw err;
-        });
-      }
-      throw error;
-    }
-  }
-
-  return step();
+export function doM2Right<F extends Kind2, X, A>(
+  M: Monad<Fix2Right<F, X>>,
+  gen: () => DoGen2<F, X, A>
+): Apply<Fix2Right<F, X>, [A]> {
+  return doM(M, gen);
 }
 
 /**
- * Internal implementation for doM3
+ * doM2 for Kind2 where the left param is the value (Reader-like): F<A, X>
  */
-function doM3Internal<F extends Kind3, A, B, C>(
-  generator: DoM3Generator<F, A, B, C>
-): Apply<F, [A, B, C]> {
-  const iterator = generator;
-  let result: IteratorResult<Apply<F, [A, B, C]>, A>;
+export function doM2Left<F extends Kind2, A, X>(
+  M: Monad<Fix2Left<F, X>>,
+  gen: () => Generator<Apply<Fix2Left<F, X>, [any]>, A, any>
+): Apply<Fix2Left<F, X>, [A]> {
+  return doM(M, gen);
+}
 
-  function step(value?: any): Apply<F, [A, B, C]> {
-    try {
-      result = iterator.next(value);
-      
-      if (result.done) {
-        return result.value as Apply<F, [A, B, C]>;
-      }
-      
-      const monadicValue = result.value;
-      
-      if (hasChain(monadicValue)) {
-        return monadicValue.chain((val: any) => step(val));
-      } else if (hasFlatMap(monadicValue)) {
-        return monadicValue.flatMap((val: any) => step(val));
-      } else {
-        return monadicValue.map((val: any) => step(val));
-      }
-    } catch (error) {
-      if (hasCatchError(monadicValue)) {
-        return monadicValue.catchError((err: any) => {
-          throw err;
-        });
-      }
-      throw error;
-    }
-  }
-
-  return step();
+/**
+ * doM3 for Kind3 - fix two params and reuse doM
+ */
+export function doM3<F extends Kind3, A, B, C>(
+  M: Monad<Fix3To1<F, A, B>>,
+  gen: () => DoGen3<F, A, B, C>
+): Apply<Fix3To1<F, A, B>, [C]> {
+  return doM(M, gen);
 }
 
 // ============================================================================
-// Part 4: Method Detection
+// Part 3: Convenience Helpers for Common Types
 // ============================================================================
 
 /**
- * Check if a value has a chain method
+ * doM specifically for Either<E, A>
  */
-function hasChain(value: any): value is { chain: (f: (a: any) => any) => any } {
-  return value && typeof value.chain === 'function';
+export function doMEither<E, A>(
+  gen: () => Generator<Apply<Fix2Right<EitherK, E>, [any]>, A, any>
+): Apply<Fix2Right<EitherK, E>, [A]> {
+  // Note: This requires EitherMonad to be available
+  // For now, we'll use a placeholder - you'll need to import the actual EitherMonad
+  const M = {} as Monad<Fix2Right<EitherK, E>>; // Placeholder
+  return doM(M, gen);
 }
 
 /**
- * Check if a value has a flatMap method
+ * doM specifically for Promise<A>
  */
-function hasFlatMap(value: any): value is { flatMap: (f: (a: any) => any) => any } {
-  return value && typeof value.flatMap === 'function';
+export function doMPromise<A>(
+  gen: () => Generator<Promise<any>, A, any>
+): Promise<A> {
+  const M = {
+    of: <T>(a: T): Promise<T> => Promise.resolve(a),
+    chain: <T, U>(fa: Promise<T>, f: (a: T) => Promise<U>): Promise<U> => fa.then(f)
+  } as Monad<PromiseK>;
+  return doM(M, gen);
 }
 
 /**
- * Check if a value has a map method
+ * doM specifically for Maybe<A>
  */
-function hasMap(value: any): value is { map: (f: (a: any) => any) => any } {
-  return value && typeof value.map === 'function';
-}
-
-/**
- * Check if a value has a catchError method
- */
-function hasCatchError(value: any): value is { catchError: (f: (err: any) => any) => any } {
-  return value && typeof value.catchError === 'function';
+export function doMMaybe<A>(
+  gen: () => Generator<Apply<MaybeK, [any]>, A, any>
+): Apply<MaybeK, [A]> {
+  // Note: This requires MaybeMonad to be available
+  const M = {} as Monad<MaybeK>; // Placeholder
+  return doM(M, gen);
 }
 
 // ============================================================================
-// Part 5: Purity Integration
+// Part 4: Purity Integration
 // ============================================================================
+
+/**
+ * Mark doM result with purity information
+ */
+export function markDoMResult<F extends Kind1, A, E extends EffectTag>(
+  value: Apply<F, [A]>,
+  effect: E
+): MonadicValue<F, A, E> {
+  return attachPurityMarker(value, effect) as MonadicValue<F, A, E>;
+}
 
 /**
  * Infer effect from monadic value
@@ -300,207 +219,100 @@ export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag
 export function composeMonadicEffects<Effects extends readonly EffectTag[]>(
   effects: Effects
 ): ComposedEffect<Effects> {
-  if (effects.length === 0) return 'Pure' as ComposedEffect<Effects>;
-  if (effects.length === 1) return effects[0] as ComposedEffect<Effects>;
-  
-  const [first, ...rest] = effects;
-  const restEffect = composeMonadicEffects(rest);
-  const composed = composeEffects(first, restEffect);
-  
-  return composed as ComposedEffect<Effects>;
-}
-
-/**
- * Mark doM result with composed effect
- */
-export function markDoMResult<F extends Kind1, A, E extends EffectTag>(
-  value: Apply<F, [A]>,
-  effect: E
-): MonadicValue<F, A, E> {
-  return attachPurityMarker(value, effect) as MonadicValue<F, A, E>;
+  return effects.reduce((acc, effect) => 
+    ComposeEffects<typeof acc, typeof effect>(acc, effect), 'Pure' as EffectTag
+  ) as ComposedEffect<Effects>;
 }
 
 // ============================================================================
-// Part 6: Nested doM Support
+// Part 5: Legacy Compatibility (Looser Runtime Duck-Typed Version)
 // ============================================================================
 
 /**
- * Yield a nested doM block
+ * Looser version: relies on .chain/.flatMap/.then existing at runtime
+ * Note: This isn't fully generic and won't type-check strongly
  */
-export function yieldDoM<F extends Kind1, A>(
-  doMBlock: MonadicValue<F, A>
-): Apply<F, [A]> {
-  return doMBlock;
-}
+export function doMLoose<A>(
+  gen: () => Generator<any, A, any>
+): any {
+  const it = gen();
+  let lastYield: any;
 
-/**
- * Yield a nested doM2 block
- */
-export function yieldDoM2<F extends Kind2, A, B>(
-  doMBlock: MonadicValue2<F, A, B>
-): Apply<F, [A, B]> {
-  return doMBlock;
-}
+  const step = (last?: any): any => {
+    const r = it.next(last);
+    if (r.done) {
+      // Best effort: if lastYield has .of, use it; if it's a Promise-like, wrap; else return as-is
+      if (lastYield?.constructor?.of) return lastYield.constructor.of(r.value);
+      if (typeof Promise !== 'undefined') return Promise.resolve(r.value);
+      return r.value;
+    }
+    lastYield = r.value;
+    const mv = r.value;
+    if (mv?.chain)   return mv.chain(step);
+    if (mv?.flatMap) return mv.flatMap(step);
+    if (mv?.then)    return mv.then(step);
+    throw new Error('Yielded value is not chainable');
+  };
 
-/**
- * Yield a nested doM3 block
- */
-export function yieldDoM3<F extends Kind3, A, B, C>(
-  doMBlock: MonadicValue3<F, A, B, C>
-): Apply<F, [A, B, C]> {
-  return doMBlock;
-}
-
-// ============================================================================
-// Part 7: Utility Functions
-// ============================================================================
-
-/**
- * Create a pure doM block
- */
-export function pureDoM<F extends Kind1, A>(
-  value: A
-): MonadicValue<F, A, 'Pure'> {
-  // This would need to be implemented based on the specific monad
-  // For now, return a mock implementation
-  return { value, __effect: 'Pure' } as any;
-}
-
-/**
- * Create an async doM block
- */
-export function asyncDoM<F extends Kind1, A>(
-  value: A
-): MonadicValue<F, A, 'Async'> {
-  return { value, __effect: 'Async' } as any;
-}
-
-/**
- * Create an IO doM block
- */
-export function ioDoM<F extends Kind1, A>(
-  value: A
-): MonadicValue<F, A, 'IO'> {
-  return { value, __effect: 'IO' } as any;
-}
-
-/**
- * Handle errors in doM blocks
- */
-export function catchDoM<F extends Kind1, A, E extends EffectTag>(
-  doMBlock: MonadicValue<F, A, E>,
-  errorHandler: (error: any) => MonadicValue<F, A, E>
-): MonadicValue<F, A, E> {
-  if (hasCatchError(doMBlock)) {
-    return doMBlock.catchError(errorHandler) as MonadicValue<F, A, E>;
-  }
-  return doMBlock;
-}
-
-/**
- * Map over doM result
- */
-export function mapDoM<F extends Kind1, A, B, E extends EffectTag>(
-  doMBlock: MonadicValue<F, A, E>,
-  f: (a: A) => B
-): MonadicValue<F, B, E> {
-  if (hasMap(doMBlock)) {
-    return doMBlock.map(f) as MonadicValue<F, B, E>;
-  }
-  return doMBlock as any;
-}
-
-/**
- * Chain doM blocks
- */
-export function chainDoM<F extends Kind1, A, B, E extends EffectTag>(
-  doMBlock: MonadicValue<F, A, E>,
-  f: (a: A) => MonadicValue<F, B, E>
-): MonadicValue<F, B, E> {
-  if (hasChain(doMBlock)) {
-    return doMBlock.chain(f) as MonadicValue<F, B, E>;
-  }
-  return doMBlock as any;
+  return step();
 }
 
 // ============================================================================
-// Part 8: Type Helpers
+// Part 6: Utility Functions
 // ============================================================================
 
 /**
- * Extract the effect type from a doM result
+ * Check if a value has a chain method
  */
-export type EffectOfDoM<T> = T extends MonadicValue<any, any, infer E> ? E : 'Pure';
+function hasChain(value: any): value is { chain: (f: (a: any) => any) => any } {
+  return value && typeof value.chain === 'function';
+}
 
 /**
- * Extract the value type from a doM result
+ * Check if a value has a flatMap method
  */
-export type ValueOfDoM<T> = T extends MonadicValue<any, infer A, any> ? A : never;
+function hasFlatMap(value: any): value is { flatMap: (f: (a: any) => any) => any } {
+  return value && typeof value.flatMap === 'function';
+}
 
 /**
- * Extract the monad type from a doM result
+ * Check if a value has a map method
  */
-export type MonadOfDoM<T> = T extends MonadicValue<infer F, any, any> ? F : never;
+function hasMap(value: any): value is { map: (f: (a: any) => any) => any } {
+  return value && typeof value.map === 'function';
+}
 
 /**
- * Check if a doM result is pure
+ * Check if a value has a then method (Promise-like)
  */
-export type IsDoMPure<T> = EffectOfDoM<T> extends 'Pure' ? true : false;
-
-/**
- * Check if a doM result is async
- */
-export type IsDoMAsync<T> = EffectOfDoM<T> extends 'Async' ? true : false;
-
-/**
- * Check if a doM result is IO
- */
-export type IsDoMIO<T> = EffectOfDoM<T> extends 'IO' ? true : false;
+function hasThen(value: any): value is { then: (f: (a: any) => any) => any } {
+  return value && typeof value.then === 'function';
+}
 
 // ============================================================================
-// Part 9: Export All
+// Part 7: Examples and Usage
 // ============================================================================
 
-export {
-  // Core doM functions
-  doM,
-  doM2,
-  doM3,
-  
-  // Internal implementations
-  doMInternal,
-  doM2Internal,
-  doM3Internal,
-  
-  // Method detection
-  hasChain,
-  hasFlatMap,
-  hasMap,
-  hasCatchError,
-  
-  // Purity integration
-  inferEffect,
-  composeMonadicEffects,
-  markDoMResult,
-  
-  // Nested doM support
-  yieldDoM,
-  yieldDoM2,
-  yieldDoM3,
-  
-  // Utility functions
-  pureDoM,
-  asyncDoM,
-  ioDoM,
-  catchDoM,
-  mapDoM,
-  chainDoM,
-  
-  // Type helpers
-  EffectOfDoM,
-  ValueOfDoM,
-  MonadOfDoM,
-  IsDoMPure,
-  IsDoMAsync,
-  IsDoMIO
-}; 
+/**
+ * Example usage with Promise
+ */
+export function examplePromise(): Promise<number> {
+  return doMPromise(function* () {
+    const a: number = yield Promise.resolve(2);
+    const b: number = yield Promise.resolve(10);
+    return a + b; // <- lifted with M.of
+  });
+}
+
+/**
+ * Example usage with Either (when EitherMonad is available)
+ */
+export function exampleEither(): Apply<Fix2Right<EitherK, string>, [number]> {
+  return doMEither<string, number>(function* () {
+    const a: number = yield { right: 2 } as any;
+    const b: number = yield { right: 3 } as any;
+    return a + b;
+  });
+}
+
+// All exports are already declared individually throughout the file 

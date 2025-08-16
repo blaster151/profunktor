@@ -2330,7 +2330,7 @@ function canReorderObservableLiteOperations(op1: string, op2: string): boolean {
  * Apply common operations to ObservableLite for unified API
  */
 // applyCommonOps is a no-op stub currently
-applyCommonOps(ObservableLite.prototype as any);
+applyCommonOps();
 
 /**
  * Extend ObservableLite with CommonStreamOps interface

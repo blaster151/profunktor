@@ -37,6 +37,8 @@ const lens = <S, T, A, B>(get: (s: S) => A, set: (b: B, s: S) => T): Lens<S, T, 
 
 // Import ObservableLite for conversions
 import { ObservableLite } from './fp-observable-lite';
+import { StreamPlanNode } from './fp-stream-fusion';
+
 
 // Note: We avoid runtime prototype augmentation for StatefulStream.
 
@@ -105,6 +107,7 @@ export interface StatefulStreamK extends Kind3 {
 export class StatefulStream<I, S, O> {
   public readonly __brand: 'StatefulStream' = 'StatefulStream';
   public readonly __purity: EffectTag;
+  public __plan?: StreamPlanNode;
   private readonly runFn: (input: I) => StateFn<S, O>;
 
   constructor(run: (input: I) => StateFn<S, O>, purity: EffectTag = 'State') {
@@ -121,7 +124,7 @@ export class StatefulStream<I, S, O> {
 		return new ObservableLite<O>((observer) => {
 			let state = initialState as S;
 			try {
-				for (const input of inputs) {
+				for (const input of Array.from(inputs as any)) {
 					const [s2, out] = this.run(input)(state as any);
 					state = s2;
 					observer.next(out);
@@ -515,7 +518,7 @@ export function runStatefulStreamList<I, S, O>(
   let state = initialState;
   const outputs: O[] = [];
   
-  for (const input of inputs) {
+  for (const input of Array.from(inputs as any)) {
     const [newState, output] = stream.run(input)(state);
     state = newState;
     outputs.push(output);

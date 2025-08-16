@@ -206,9 +206,9 @@ export const MaybeInstances = deriveInstances({
   applicative: true,
   monad: true,
   customMap: <A, B>(fa: Maybe<A>, f: (a: A) => B): Maybe<B> => 
-    fa === null || fa === undefined ? (fa as Maybe<B>) : f(fa),
+    fa === null || fa === undefined ? (fa as unknown as Maybe<B>) : f(fa),
   customChain: <A, B>(fa: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> => 
-    fa === null || fa === undefined ? (fa as Maybe<B>) : f(fa)
+    fa === null || fa === undefined ? (fa as unknown as Maybe<B>) : f(fa)
 });
 
 export const MaybeFunctor = MaybeInstances.functor;
@@ -346,6 +346,126 @@ export const FunctionProfunctor: Profunctor<FunctionK> = {
     (a: A) => g(p(a))
 };
 
+
+// =============================================================================
+// PromiseK instances
+// =============================================================================
+
+export const PromiseFunctor: Functor<PromiseK> = {
+  map: <A, B>(fa: Promise<A>, f: (a: A) => B): Promise<B> => fa.then(f)
+};
+
+// Sequential (lawful w.r.t. Monad) Applicative
+export const PromiseApplicativeSeq: Applicative<PromiseK> = {
+  ...PromiseFunctor,
+  of: <A>(a: A): Promise<A> => Promise.resolve(a),
+  ap: <A, B>(pfab: Promise<(a: A) => B>, pfa: Promise<A>): Promise<B> =>
+    pfab.then(f => pfa.then(a => f(a)))
+};
+
+// Parallel Applicative (not coherent with the Monad; useful for `traverse`)
+export const PromiseApplicativePar: Applicative<PromiseK> = {
+  ...PromiseFunctor,
+  of: <A>(a: A): Promise<A> => Promise.resolve(a),
+  ap: <A, B>(pfab: Promise<(a: A) => B>, pfa: Promise<A>): Promise<B> =>
+    Promise.all([pfab, pfa]).then(([f, a]) => f(a))
+};
+
+export const PromiseMonad: Monad<PromiseK> = {
+  ...PromiseApplicativeSeq,
+  chain: <A, B>(fa: Promise<A>, f: (a: A) => Promise<B>): Promise<B> =>
+    fa.then(f)
+};
+
+
+// =============================================================================
+/** Fix the environment of ReaderK to get a unary HKT: ReaderFix<R>[A] = Reader<R, A> */
+export interface ReaderFix<R> extends Kind1 {
+  readonly type: Apply<ReaderK, [R, this['arg0']]>;
+}
+
+// Instances parameterized by R
+export const ReaderFunctor = <R>(): Functor<ReaderFix<R>> => ({
+  map: <A, B>(fa: (r: R) => A, f: (a: A) => B): (r: R) => B =>
+    (r: R) => f(fa(r))
+});
+
+export const ReaderApplicative = <R>(): Applicative<ReaderFix<R>> => ({
+  ...ReaderFunctor<R>(),
+  of: <A>(a: A): ((r: R) => A) => (_r: R) => a,
+  ap: <A, B>(ff: (r: R) => (a: A) => B, fa: (r: R) => A): (r: R) => B =>
+    (r: R) => ff(r)(fa(r))
+});
+
+export const ReaderMonad = <R>(): Monad<ReaderFix<R>> => ({
+  ...ReaderApplicative<R>(),
+  chain: <A, B>(fa: (r: R) => A, f: (a: A) => (r: R) => B): (r: R) => B =>
+    (r: R) => f(fa(r))(r)
+});
+
+// Reader helpers
+export const ask = <R>(): ((r: R) => R) => (r: R) => r;
+export const asks = <R, A>(f: (r: R) => A): ((r: R) => A) => (r: R) => f(r);
+/** Modify the environment for a sub-computation */
+export const local = <R>(modify: (r: R) => R) =>
+  <A>(ma: (r: R) => A): ((r: R) => A) =>
+    (r: R) => ma(modify(r));
+
+
+
+// =============================================================================
+// Trifunctor for Kind3 + helpers
+// =============================================================================
+
+export interface Trifunctor<F extends Kind3> {
+  trimap<A, B, C, A2, B2, C2>(
+    fabc: Apply<F, [A, B, C]>,
+    f: (a: A) => A2,
+    g: (b: B) => B2,
+    h: (c: C) => C2
+  ): Apply<F, [A2, B2, C2]>;
+
+  map1?<A, B, C, A2>(fabc: Apply<F, [A, B, C]>, f: (a: A) => A2): Apply<F, [A2, B, C]>;
+  map2?<A, B, C, B2>(fabc: Apply<F, [A, B, C]>, g: (b: B) => B2): Apply<F, [A, B2, C]>;
+  map3?<A, B, C, C2>(fabc: Apply<F, [A, B, C]>, h: (c: C) => C2): Apply<F, [A, B, C2]>;
+}
+
+export function defaultTrifunctor<F extends Kind3>(T: {
+  trimap: Trifunctor<F>['trimap']
+}): Trifunctor<F> {
+  return {
+    trimap: T.trimap,
+    map1: (x, f) => T.trimap(x, f, (b: any) => b, (c: any) => c),
+    map2: (x, g) => T.trimap(x, (a: any) => a, g, (c: any) => c),
+    map3: (x, h) => T.trimap(x, (a: any) => a, (b: any) => b, h)
+  };
+}
+
+// =============================================================================
+// “Map the last covariant position” helpers by arity
+// =============================================================================
+
+export function mapLast1<F extends RequireCovariantLast<Kind1>>(
+  F: Functor<F>
+): <A, B>(fa: Apply<F, [A]>, f: (a: A) => B) => Apply<F, [B]> {
+  return (fa, f) => F.map(fa, f);
+}
+
+export function mapLast2<F extends Kind2>(
+  F: Bifunctor<F>
+): <A, B, C>(fab: Apply<F, [A, B]>, f: (b: B) => C) => Apply<F, [A, C]> {
+  return (fab, f) => F.mapRight(fab, f);
+}
+
+export function mapLast3<F extends Kind3>(
+  F: Trifunctor<F>
+): <A, B, C, D>(fabc: Apply<F, [A, B, C]>, f: (c: C) => D) => Apply<F, [A, B, D]> {
+  const map3 = F.map3 ?? ((x: any, h: any) => F.trimap(x, (a: any) => a, (b: any) => b, h));
+  return (fabc, f) => map3(fabc, f);
+}
+
+
+
 // ============================================================================
 // Generic Algorithms
 // ============================================================================
@@ -412,10 +532,13 @@ export function sequence<F extends Kind1>(
   M: Monad<F>
 ): <A>(fas: Array<Apply<F, [A]>>) => Apply<F, [Array<A>]> {
   return function<A>(fas: Array<Apply<F, [A]>>): Apply<F, [Array<A>]> {
-    return fas.reduce(
-      (acc, fa) => M.chain(acc, (as: Array<A>) => M.map(fa, (a: A) => [...as, a])),
-      M.of([])
-    );
+    let acc: Apply<F, [Array<A>]> = M.of([] as Array<A>);
+    for (const fa of fas) {
+      acc = M.chain<Array<A>, Array<A>>(acc, (as) =>
+        M.map(fa, (a) => [...as, a])
+      );
+    }
+    return acc;
   };
 }
 
@@ -475,6 +598,99 @@ export function deriveMonad<F extends Kind1>(
   };
 }
 
+
+
+// =============================================================================
+// EitherK instances (right-biased)
+// =============================================================================
+
+// Fix the left side to expose a unary HKT for instances
+export interface EitherFix<E> extends Kind1 {
+  readonly type: Apply<EitherK, [E, this['arg0']]>;
+}
+
+// Minimal algebra for optional accumulating applicative
+export interface Semigroup<T> { concat: (x: T, y: T) => T; }
+
+// Functor maps the Right; Left is untouched
+export const EitherFunctor = <E>(): Functor<EitherFix<E>> => ({
+  map: <A, B>(fa: Either<E, A>, f: (a: A) => B): Either<E, B> =>
+    ('right' in fa) ? { right: f(fa.right) } : fa as any
+});
+
+// Short-circuiting Applicative (coherent with Monad)
+export const EitherApplicative = <E>(): Applicative<EitherFix<E>> => ({
+  ...EitherFunctor<E>(),
+  of: <A>(a: A): Either<E, A> => ({ right: a }),
+  ap: <A, B>(ff: Either<E, (a: A) => B>, fa: Either<E, A>): Either<E, B> => {
+    if ('left' in ff) return ff;
+    if ('left' in fa) return fa as any;
+    return { right: ff.right(fa.right) };
+  }
+});
+
+// Accumulating Applicative (requires Semigroup<E>)
+export const EitherApplicativeAcc = <E>(S: Semigroup<E>): Applicative<EitherFix<E>> => ({
+  ...EitherFunctor<E>(),
+  of: <A>(a: A): Either<E, A> => ({ right: a }),
+  ap: <A, B>(ff: Either<E, (a: A) => B>, fa: Either<E, A>): Either<E, B> => {
+    if ('right' in ff && 'right' in fa) return { right: ff.right(fa.right) };
+    if ('left' in ff && 'left' in fa)   return { left: S.concat(ff.left, fa.left) };
+    return 'left' in ff ? ff : fa as any;
+  }
+});
+
+// Right-biased Monad
+export const EitherMonad = <E>(): Monad<EitherFix<E>> => ({
+  ...EitherApplicative<E>(),
+  chain: <A, B>(fa: Either<E, A>, f: (a: A) => Either<E, B>): Either<E, B> =>
+    ('right' in fa) ? f(fa.right) : fa as any
+});
+
+
+
+// const EM = EitherMonad<string>();
+// EM.chain({ right: 2 }, n => ({ right: n * 3 })); // { right: 6 }
+
+
+
+
+// =============================================================================
+// TupleK instances: focus on the 2nd (covariant) slot
+// =============================================================================
+
+// Fix the first component to expose a unary HKT: PairFix<X>[A] = [X, A]
+export interface PairFix<X> extends Kind1 {
+  readonly type: Apply<TupleK, [X, this['arg0']]>;
+}
+
+export interface Monoid<T> extends Semigroup<T> { empty: T; }
+
+// Functor maps the second element
+export const PairFunctor = <X>(): Functor<PairFix<X>> => ({
+  map: <A, B>(fa: [X, A], f: (a: A) => B): [X, B] => [fa[0], f(fa[1])]
+});
+
+// Applicative accumulates the first element with a Monoid
+export const PairApplicative = <X>(M: Monoid<X>): Applicative<PairFix<X>> => ({
+  ...PairFunctor<X>(),
+  of:     <A>(a: A): [X, A] => [M.empty, a],
+  ap: <A, B>(ff: [X, (a: A) => B], fa: [X, A]): [X, B] =>
+    [M.concat(ff[0], fa[0]), ff[1](fa[1])]
+});
+
+// Monad also requires Monoid to combine contexts in `chain`
+export const PairMonad = <X>(M: Monoid<X>): Monad<PairFix<X>> => ({
+  ...PairApplicative<X>(M),
+  chain: <A, B>(fa: [X, A], f: (a: A) => [X, B]): [X, B] => {
+    const [x2, b] = f(fa[1]);
+    return [M.concat(fa[0], x2), b];
+  }
+});
+
+
+
+
 // ============================================================================
 // Example Usage and Tests
 // ============================================================================
@@ -522,6 +738,23 @@ export function exampleDeriveArrayMonad(): void {
   console.log(result); // [2, 3, 4, 6, 6, 9]
 }
 
+export function exampleX(): void {
+  // Promise demo
+const P = PromiseMonad;
+P.chain(P.of(2), (n: number) => P.of(n * 10)).then(console.log); // 20
+
+// Reader demo
+type Env = { base: number };
+const RM = ReaderMonad<Env>();
+const addBase = (n: number) => (e: Env) => n + e.base;
+const prog = RM.chain((e: Env) => e.base, (b: number) => addBase(b)); // (e) => b + e.base
+console.log(prog({ base: 3 })); // 6
+
+// mapLast demos
+const lift2P = lift2(PromiseApplicativePar)((a: number, b: number) => a + b);
+lift2P(Promise.resolve(1), Promise.resolve(2)).then(console.log); // 3
+
+}
 // ============================================================================
 // Laws Documentation
 // ============================================================================

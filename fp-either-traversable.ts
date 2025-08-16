@@ -13,7 +13,7 @@ export function foldMapEither<M, L, R>(
   return (e) =>
     matchEither(e, {
       Left: _ => Monoid.empty,
-      Right: r => f(r),
+      Right: r => f(r as R),
     });
 }
 
@@ -25,7 +25,7 @@ export function reduceEither<A, L, R>(
   return (e) =>
     matchEither(e, {
       Left: _ => init,
-      Right: r => f(init, r),
+      Right: r => f(init, r as R),
     });
 }
 
@@ -43,8 +43,8 @@ export function traverseEitherA<F extends Kind1>() {
   ): (e: Either<L, R>) => Apply<F, [Either<L, B>]> {
     return (e) =>
       matchEither(e, {
-        Left: (l) => A.of(Left<L>(l)) as any,
-        Right: (r) => A.map(f(r), (b: B) => Right<B>(b)) as any,
+        Left: (l) => A.of(Left<L>(l as L)) as any,
+        Right: (r) => A.map(f(r as R), (b: B) => Right<B>(b)) as any,
       });
   };
 }
@@ -58,8 +58,8 @@ export function sequenceEitherA<F extends Kind1>() {
   ): (e: Either<L, Apply<F, [R]>>) => Apply<F, [Either<L, R>]> {
     return (e) =>
       matchEither(e, {
-        Left: (l) => A.of(Left<L>(l)) as any,
-        Right: (fr) => A.map(fr, (r: R) => Right<R>(r)) as any,
+        Left: (l) => A.of(Left<L>(l as L)) as any,
+        Right: (fr) => A.map(fr as Apply<F, [R]>, (r: R) => Right<R>(r)) as any,
       });
   };
 }

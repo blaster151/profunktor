@@ -146,14 +146,14 @@ export class Err<E, A> {
 /**
  * Create an Ok value
  */
-export function ok<E, A>(value: A): Ok<E, A> {
+export function ok<E, A>(value: A): Result<E, A> {
   return new Ok(value);
 }
 
 /**
  * Create an Err value
  */
-export function err<E, A>(error: E): Err<E, A> {
+export function err<E, A>(error: E): Result<E, A> {
   return new Err(error);
 }
 
@@ -205,7 +205,7 @@ export function map<E, A, B>(f: (a: A) => B, result: Result<E, A>): Result<E, B>
   return result.match({
     Ok: ({ value }) => ok(f(value)),
     Err: ({ error }) => err(error)
-  });
+  }) as Result<E, B>;
 }
 
 /**
@@ -215,7 +215,7 @@ export function mapError<E, A, E2>(f: (e: E) => E2, result: Result<E, A>): Resul
   return result.match({
     Ok: ({ value }) => ok(value),
     Err: ({ error }) => err(f(error))
-  });
+  }) as Result<E2, A>;
 }
 
 /**
@@ -224,8 +224,8 @@ export function mapError<E, A, E2>(f: (e: E) => E2, result: Result<E, A>): Resul
 export function bimap<E, A, E2, B>(error: (e: E) => E2, success: (a: A) => B, result: Result<E, A>): Result<E2, B> {
   return result.match({
     Ok: ({ value }) => ok(success(value)),
-    Err: ({ error: err }) => err(error(err))
-  });
+    Err: ({ error: e }) => err(error(e))
+  }) as Result<E2, B>;
 }
 
 /**
@@ -254,7 +254,7 @@ export function chainError<E, A, E2>(f: (e: E) => Result<E2, A>, result: Result<
 export function bichain<E, A, E2, B>(error: (e: E) => Result<E2, B>, success: (a: A) => Result<E2, B>, result: Result<E, A>): Result<E2, B> {
   return result.match({
     Ok: ({ value }) => success(value),
-    Err: ({ error: err }) => error(err)
+    Err: ({ error: e }) => error(e)
   });
 }
 
@@ -275,7 +275,7 @@ export function swap<E, A>(result: Result<E, A>): Result<A, E> {
   return result.match({
     Ok: ({ value }) => err(value),
     Err: ({ error }) => ok(error)
-  });
+  }) as Result<A, E>;
 }
 
 /**
@@ -384,32 +384,46 @@ const ResultFluentImpl: FluentImpl<any> = {
     Ok: ({ value }) => right(value),
     Err: ({ error }) => left(error)
   }),
-  pipe: (self, ...fns) => {
-    let result = self;
-    for (const fn of fns) {
-      result = result.map(fn);
-    }
-    return result;
-  }
+  pipe: (self, ...fns) =>
+    fns.reduce((acc, fn) =>
+      acc.match({
+        Ok: ({ value }) => ok(fn(value)),
+        Err: ({ error }) => err(error)
+      }),
+      self
+    )
 };
 
-// Apply fluent API to Result prototype
-applyFluentOps(Result.prototype, ResultFluentImpl);
+// Apply fluent API to concrete classes
+applyFluentOps(Ok.prototype as any, ResultFluentImpl);
+applyFluentOps(Err.prototype as any, ResultFluentImpl);
 
-// Add conversion methods
-Result.prototype.toObservableLite = function() {
+// Add conversion methods to concrete classes
+(Ok.prototype as any).toObservableLite = function() {
+  return toObservableLite(this);
+};
+(Err.prototype as any).toObservableLite = function() {
   return toObservableLite(this);
 };
 
-Result.prototype.toStatefulStream = function(initialState: any = {}) {
+(Ok.prototype as any).toStatefulStream = function(initialState: any = {}) {
+  return toStatefulStream(this, initialState);
+};
+(Err.prototype as any).toStatefulStream = function(initialState: any = {}) {
   return toStatefulStream(this, initialState);
 };
 
-Result.prototype.toMaybe = function() {
+(Ok.prototype as any).toMaybe = function() {
+  return toMaybe(this);
+};
+(Err.prototype as any).toMaybe = function() {
   return toMaybe(this);
 };
 
-Result.prototype.toEither = function() {
+(Ok.prototype as any).toEither = function() {
+  return toEither(this);
+};
+(Err.prototype as any).toEither = function() {
   return toEither(this);
 };
 
@@ -421,9 +435,6 @@ Result.prototype.toEither = function() {
  * Register Result typeclass instances
  */
 export function registerResultInstances(): void {
-export const ResultEq = deriveEqInstance({ kind: ResultK });
-export const ResultOrd = deriveOrdInstance({ kind: ResultK });
-export const ResultShow = deriveShowInstance({ kind: ResultK });
   if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
     const registry = (globalThis as any).__FP_REGISTRY;
     
@@ -435,13 +446,4 @@ export const ResultShow = deriveShowInstance({ kind: ResultK });
 }
 
 // Auto-register instances
-registerResultInstances(); 
-export function registerResultDerivations(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('ResultEq', ResultEq);
-    registry.register('ResultOrd', ResultOrd);
-    registry.register('ResultShow', ResultShow);
-  }
-}
-registerResultDerivations();
+registerResultInstances();

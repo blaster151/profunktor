@@ -516,8 +516,5 @@ export {
   demonstrateSharedState
 };
 
-// Run examples if this file is executed directly
-if (require.main === module) {
-  demonstrateSafeFusion();
-  demonstrateSharedState();
-}
+// Browser-compatible execution check
+// Note: Examples can be called directly: demonstrateSafeFusion(); demonstrateSharedState();

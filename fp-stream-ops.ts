@@ -1,218 +1,607 @@
-// Unified common stream ops mixin for ObservableLite and structurally similar types
+/**
+ * Common Stream Operations Mixin
+ * 
+ * This module provides a unified fluent method API for both ObservableLite and StatefulStream,
+ * enabling any FP pipeline to be written once and run on either type.
+ * 
+ * Features:
+ * - Common operator interface for both stream types
+ * - Unified Functor, Monad, and Bifunctor operations
+ * - Type-safe operator implementations
+ * - Purity tag synchronization
+ * - Fusion optimization integration
+ * - Optics integration
+ */
 
 import { ObservableLite } from './fp-observable-lite';
-import { attachPurityMarker, extractPurityMarker } from './fp-purity';
+import { StatefulStream, liftStateless, liftStateful, compose } from './fp-stream-state';
+import { 
+  EffectTag, 
+  EffectOf, 
+  Pure, 
+  IO, 
+  Async,
+  createPurityInfo, 
+  attachPurityMarker, 
+  extractPurityMarker, 
+  hasPurityMarker 
+} from './fp-purity';
 
-export interface CommonStreamOps<A = any> {
-	map<B>(f: (a: A) => B): any;
-	filter(pred: (a: A) => boolean): any;
-	filterMap<B>(f: (a: A) => B | undefined): any;
-	scan<B>(reducer: (acc: B, value: A) => B, seed: B): any;
-	chain<B>(f: (a: A) => any): any;
-	flatMap<B>(f: (a: A) => any): any;
-	bichain<L, R>(left: (l: L) => any, right: (r: R) => any): any;
-	bimap<B, C>(f: (a: A) => B, g: (err: any) => C): any;
-	take(count: number): any;
-	skip(count: number): any;
-	distinct(): any;
-	pipe<B>(...operators: Array<(stream: any) => any>): any;
+// ============================================================================
+// Part 1: Common Operator Interface
+// ============================================================================
+
+/**
+ * Common stream operations interface
+ * This interface defines the unified API for both ObservableLite and StatefulStream
+ */
+export interface CommonStreamOps<A> {
+  // Functor operations
+  map<B>(fn: (a: A) => B): this extends { run: any } ? StatefulStream<any, any, B> : ObservableLite<B>;
+  
+  // Filtering operations
+  filter(pred: (a: A) => boolean): this extends { run: any } ? StatefulStream<any, any, A> : ObservableLite<A>;
+  filterMap<B>(fn: (a: A) => B | undefined): this extends { run: any } ? StatefulStream<any, any, B> : ObservableLite<B>;
+  
+  // Stateful operations
+  scan<B>(reducer: (acc: B, value: A) => B, seed: B): this extends { run: any } ? StatefulStream<any, any, B> : ObservableLite<B>;
+  
+  // Monad operations
+  chain<B>(fn: (a: A) => any): any;
+  flatMap<B>(fn: (a: A) => any): any;
+  
+  // Bifunctor operations
+  bichain<L, R>(left: (l: L) => any, right: (r: R) => any): any;
+  bimap<B, C>(f: (a: A) => B, g: (err: any) => C): any;
+  
+  // Utility operations
+  take(count: number): this extends { run: any } ? StatefulStream<any, any, A> : ObservableLite<A>;
+  skip(count: number): this extends { run: any } ? StatefulStream<any, any, A> : ObservableLite<A>;
+  distinct(): this extends { run: any } ? StatefulStream<any, any, A> : ObservableLite<A>;
+  
+  // Pipeline composition
+  pipe<B>(...operators: Array<(stream: any) => any>): any;
 }
 
-function _isObservableLite(value: any): value is ObservableLite<any> {
-	return value instanceof ObservableLite;
+/**
+ * Type guard to check if a value is a stream with common operations
+ */
+export function hasCommonOps(value: any): value is CommonStreamOps<any> {
+  return value && 
+         typeof value.map === 'function' &&
+         typeof value.filter === 'function' &&
+         typeof value.scan === 'function' &&
+         typeof value.chain === 'function';
 }
 
-function _isStatefulStream(value: any): value is { run: Function; __purity?: string } {
-	return value && typeof value.run === 'function';
+/**
+ * Type guard to check if a value is an ObservableLite
+ */
+export function isObservableLite(value: any): value is ObservableLite<any> {
+  return value instanceof ObservableLite;
 }
 
-export function addCommonOps(proto: any): any {
-	if (!proto) return proto;
-
-	// Functor
-	if (typeof proto.map !== 'function') {
-		proto.map = function<B>(f: (a: any) => B): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.map as any).call(this, f);
-				return attachPurityMarker(result as any, 'Pure');
-			}
-			throw new Error('map not available on this stream type');
-		};
-	}
-
-	// Filter
-	if (typeof proto.filter !== 'function') {
-		proto.filter = function(pred: (a: any) => boolean): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.filter as any).call(this, pred);
-				return attachPurityMarker(result as any, 'Pure');
-			}
-			throw new Error('filter not available on this stream type');
-		};
-	}
-
-	// FilterMap
-	if (typeof proto.filterMap !== 'function') {
-		proto.filterMap = function<B>(f: (a: any) => B | undefined): any {
-			if (_isObservableLite(this)) {
-				const mapped = (ObservableLite.prototype.map as any).call(this, f);
-				const filtered = (ObservableLite.prototype.filter as any).call(mapped, (x: any) => x !== undefined);
-				return attachPurityMarker(filtered as any, 'Pure');
-			}
-			throw new Error('filterMap not available on this stream type');
-		};
-	}
-
-	// Scan
-	if (typeof proto.scan !== 'function') {
-		proto.scan = function<B>(reducer: (acc: B, value: any) => B, seed: B): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.scan as any).call(this, reducer, seed);
-				return attachPurityMarker(result as any, 'State');
-			}
-			throw new Error('scan not available on this stream type');
-		};
-	}
-
-	// Chain/flatMap
-	proto.chain = function<B>(f: (a: any) => any): any {
-		if (_isObservableLite(this)) {
-			const result = ObservableLite.prototype.flatMap.call(this, f);
-			return attachPurityMarker(result as any, 'State');
-		}
-		throw new Error('chain not available on this stream type');
-	};
-	proto.flatMap = function<B>(f: (a: any) => any): any {
-		return this.chain(f);
-	};
-
-	// Bifunctor-like helpers
-	if (typeof proto.bimap !== 'function') {
-		proto.bimap = function<B, C>(f: (a: any) => B, g: (err: any) => C): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.bimap as any).call(this, f, g);
-				return attachPurityMarker(result as any, 'Pure');
-			}
-			throw new Error('bimap not available on this stream type');
-		};
-	}
-	if (typeof proto.bichain !== 'function') {
-		proto.bichain = function<L, R>(left: (l: L) => any, right: (r: R) => any): any {
-			if (_isObservableLite(this) && typeof this.bichain === 'function') {
-				const result = this.bichain(left, right);
-				return attachPurityMarker(result as any, 'State');
-			}
-			throw new Error('bichain not available on this stream type');
-		};
-	}
-
-	// Utility
-	if (typeof proto.take !== 'function') {
-		proto.take = function(count: number): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.take as any).call(this, count);
-				return attachPurityMarker(result as any, 'State');
-			}
-			throw new Error('take not available on this stream type');
-		};
-	}
-	if (typeof proto.skip !== 'function') {
-		proto.skip = function(count: number): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.skip as any).call(this, count);
-				return attachPurityMarker(result as any, 'State');
-			}
-			throw new Error('skip not available on this stream type');
-		};
-	}
-	if (typeof proto.distinct !== 'function') {
-		proto.distinct = function(): any {
-			if (_isObservableLite(this)) {
-				const result = (ObservableLite.prototype.distinct as any).call(this);
-				return attachPurityMarker(result as any, 'State');
-			}
-			throw new Error('distinct not available on this stream type');
-		};
-	}
-
-	// Pipe
-	if (typeof proto.pipe !== 'function') {
-		proto.pipe = function<B>(...operators: Array<(stream: any) => any>): any {
-			let result: any = this;
-			for (const op of operators) {
-				result = op(result);
-			}
-			if (_isObservableLite(this)) {
-				const purity = (extractPurityMarker(this as any)?.effect) || 'Async';
-				return attachPurityMarker(result as any, purity);
-			}
-			return result;
-		};
-	}
-
-	return proto;
+/**
+ * Type guard to check if a value is a StatefulStream
+ */
+export function isStatefulStream(value: any): value is StatefulStream<any, any, any> {
+  return value && typeof value.run === 'function' && typeof value.__purity === 'string';
 }
 
-export function addOptimizedOps(proto: any): any {
-    if (!proto) return proto;
-    // Add noop optimized variants matching the mixin API to maintain parity
-    if (typeof proto._map !== 'function') proto._map = function(fn: (a: any) => any) { return this.map(fn); };
-    if (typeof proto._filter !== 'function') proto._filter = function(pred: (a: any) => boolean) { return this.filter(pred); };
-    if (typeof proto._filterMap !== 'function') proto._filterMap = function(fn: (a: any) => any) { return (this.map as any)(fn).filter((x: any) => x !== undefined); };
-    if (typeof proto._scan !== 'function') proto._scan = function(reducer: (acc: any, v: any) => any, seed: any) { return this.scan(reducer, seed); };
-    if (typeof proto._chain !== 'function') proto._chain = function(fn: (a: any) => any) { return this.chain(fn); };
-    if (typeof proto._bichain !== 'function') proto._bichain = function(l: any, r: any) { return this.bichain ? this.bichain(l, r) : this.chain(r); };
-    if (typeof proto._bimap !== 'function') proto._bimap = function(f: any, g: any) { return this.bimap ? this.bimap(f, g) : this.map(f); };
-    if (typeof proto._take !== 'function') proto._take = function(n: number) { return this.take(n); };
-    if (typeof proto._skip !== 'function') proto._skip = function(n: number) { return this.skip(n); };
-    if (typeof proto._distinct !== 'function') proto._distinct = function() { return this.distinct(); };
-    if (typeof proto._pipe !== 'function') proto._pipe = function(...ops: Array<(s: any) => any>) { return (this.pipe as any)(...ops); };
-    return proto;
+// ============================================================================
+// Part 2: Operator Mixin Implementation
+// ============================================================================
+
+/**
+ * Add common operations to a prototype
+ */
+export function addCommonOps(proto: any): void {
+  // Functor operations
+  proto.map = function<B>(fn: (a: any) => B): any {
+    // Check if the class provides an optimized _map method
+    if (this.constructor.prototype._map) {
+      return this._map(fn);
+    }
+    
+    // Fall back to the existing map method
+    if (typeof this.map === 'function') {
+      const result = this.map(fn);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'Pure');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('map method not implemented');
+  };
+
+  proto.filter = function(pred: (a: any) => boolean): any {
+    // Check if the class provides an optimized _filter method
+    if (this.constructor.prototype._filter) {
+      return this._filter(pred);
+    }
+    
+    // Fall back to the existing filter method
+    if (typeof this.filter === 'function') {
+      const result = this.filter(pred);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'Pure');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('filter method not implemented');
+  };
+
+  proto.filterMap = function<B>(fn: (a: any) => B | undefined): any {
+    // Check if the class provides an optimized _filterMap method
+    if (this.constructor.prototype._filterMap) {
+      return this._filterMap(fn);
+    }
+    
+    // Fall back to the existing filterMap method
+    if (typeof this.filterMap === 'function') {
+      const result = this.filterMap(fn);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'Pure');
+      }
+      
+      return result;
+    }
+    
+    // Implement filterMap using map and filter if not available
+    return this.map(fn).filter((x: any) => x !== undefined);
+  };
+
+  proto.scan = function<B>(reducer: (acc: B, value: any) => B, seed: B): any {
+    // Check if the class provides an optimized _scan method
+    if (this.constructor.prototype._scan) {
+      return this._scan(reducer, seed);
+    }
+    
+    // Fall back to the existing scan method
+    if (typeof this.scan === 'function') {
+      const result = this.scan(reducer, seed);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'State');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('scan method not implemented');
+  };
+
+  proto.chain = function<B>(fn: (a: any) => any): any {
+    // Check if the class provides an optimized _chain method
+    if (this.constructor.prototype._chain) {
+      return this._chain(fn);
+    }
+    
+    // Fall back to the existing chain method
+    if (typeof this.chain === 'function') {
+      const result = this.chain(fn);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'State');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('chain method not implemented');
+  };
+
+  proto.flatMap = function<B>(fn: (a: any) => any): any {
+    // Alias for chain
+    return this.chain(fn);
+  };
+
+  proto.bichain = function<L, R>(left: (l: L) => any, right: (r: R) => any): any {
+    // Check if the class provides an optimized _bichain method
+    if (this.constructor.prototype._bichain) {
+      return this._bichain(left, right);
+    }
+    
+    // Fall back to the existing bichain method
+    if (typeof this.bichain === 'function') {
+      const result = this.bichain(left, right);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'State');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('bichain method not implemented');
+  };
+
+  proto.bimap = function<B, C>(f: (a: any) => B, g: (err: any) => C): any {
+    // Check if the class provides an optimized _bimap method
+    if (this.constructor.prototype._bimap) {
+      return this._bimap(f, g);
+    }
+    
+    // Fall back to the existing bimap method
+    if (typeof this.bimap === 'function') {
+      const result = this.bimap(f, g);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'Pure');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('bimap method not implemented');
+  };
+
+  proto.take = function(count: number): any {
+    // Check if the class provides an optimized _take method
+    if (this.constructor.prototype._take) {
+      return this._take(count);
+    }
+    
+    // Fall back to the existing take method
+    if (typeof this.take === 'function') {
+      const result = this.take(count);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'State');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('take method not implemented');
+  };
+
+  proto.skip = function(count: number): any {
+    // Check if the class provides an optimized _skip method
+    if (this.constructor.prototype._skip) {
+      return this._skip(count);
+    }
+    
+    // Fall back to the existing skip method
+    if (typeof this.skip === 'function') {
+      const result = this.skip(count);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'State');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('skip method not implemented');
+  };
+
+  proto.distinct = function(): any {
+    // Check if the class provides an optimized _distinct method
+    if (this.constructor.prototype._distinct) {
+      return this._distinct();
+    }
+    
+    // Fall back to the existing distinct method
+    if (typeof this.distinct === 'function') {
+      const result = this.distinct();
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        attachPurityMarker(result, 'State');
+      }
+      
+      return result;
+    }
+    
+    throw new Error('distinct method not implemented');
+  };
+
+  proto.pipe = function<B>(...operators: Array<(stream: any) => any>): any {
+    // Check if the class provides an optimized _pipe method
+    if (this.constructor.prototype._pipe) {
+      return this._pipe(...operators);
+    }
+    
+    // Fall back to the existing pipe method
+    if (typeof this.pipe === 'function') {
+      const result = this.pipe(...operators);
+      
+      // Attach purity marker
+      if (isObservableLite(this) || isStatefulStream(this)) {
+        const purity: EffectTag = hasPurityMarker(this) ? 
+          (extractPurityMarker(this) as unknown as EffectTag) || 'IO' : 'IO';
+        attachPurityMarker(result, purity);
+      }
+      
+      return result;
+    }
+    
+    // Implement pipe using composition
+    let result: any = this;
+    for (const operator of operators) {
+      result = operator(result);
+    }
+    return result;
+  };
 }
 
+// ============================================================================
+// Part 3: Optimized Operator Implementations
+// ============================================================================
+
+/**
+ * Add optimized operator implementations to a prototype
+ */
+export function addOptimizedOps(proto: any): void {
+  // Optimized map implementation
+  proto._map = function<B>(fn: (a: any) => B): any {
+    if (isObservableLite(this)) {
+      return this.map(fn);
+    } else if (isStatefulStream(this)) {
+      return compose(this, liftStateless(fn));
+    }
+    throw new Error('Unsupported stream type for optimized map');
+  };
+
+  // Optimized filter implementation
+  proto._filter = function(pred: (a: any) => boolean): any {
+    if (isObservableLite(this)) {
+      return this.filter(pred);
+    } else if (isStatefulStream(this)) {
+      return compose(this, liftStateless((value: any) => pred(value) ? value : undefined));
+    }
+    throw new Error('Unsupported stream type for optimized filter');
+  };
+
+  // Optimized filterMap implementation
+  proto._filterMap = function<B>(fn: (a: any) => B | undefined): any {
+    if (isObservableLite(this)) {
+      return this.map(fn).filter((x: any) => x !== undefined);
+    } else if (isStatefulStream(this)) {
+      return compose(this, liftStateless(fn));
+    }
+    throw new Error('Unsupported stream type for optimized filterMap');
+  };
+
+  // Optimized scan implementation
+  proto._scan = function<B>(reducer: (acc: B, value: any) => B, seed: B): any {
+    if (isObservableLite(this)) {
+      return this.scan(reducer, seed);
+    } else if (isStatefulStream(this)) {
+      return compose(this, liftStateful((value: any, state: B) => {
+        const newState = reducer(state, value);
+        return [newState, newState];
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized scan');
+  };
+
+  // Optimized chain implementation
+  proto._chain = function<B>(fn: (a: any) => any): any {
+    if (isObservableLite(this)) {
+      return this.chain(fn);
+    } else if (isStatefulStream(this)) {
+      return compose(this, liftStateful((value: any, state: any) => {
+        const nestedStream = fn(value);
+        if (isStatefulStream(nestedStream)) {
+          return nestedStream.run(value)(state);
+        }
+        return [state, nestedStream];
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized chain');
+  };
+
+  // Optimized bichain implementation
+  proto._bichain = function<L, R>(left: (l: L) => any, right: (r: R) => any): any {
+    if (isObservableLite(this)) {
+      return this.bichain(left, right);
+    } else if (isStatefulStream(this)) {
+      // For StatefulStream, we need to handle both success and error cases
+      return compose(this, liftStateful((value: any, state: any) => {
+        try {
+          const result = right(value);
+          return [state, result];
+        } catch (error) {
+          const errorResult = left(error as L);
+          return [state, errorResult];
+        }
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized bichain');
+  };
+
+  // Optimized bimap implementation
+  proto._bimap = function<B, C>(f: (a: any) => B, g: (err: any) => C): any {
+    if (isObservableLite(this)) {
+      return this.bimap(f, g);
+    } else if (isStatefulStream(this)) {
+      return compose(this, liftStateless((value: any) => {
+        try {
+          return f(value);
+        } catch (error) {
+          return g(error);
+        }
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized bimap');
+  };
+
+  // Optimized take implementation
+  proto._take = function(count: number): any {
+    if (isObservableLite(this)) {
+      return this.take(count);
+    } else if (isStatefulStream(this)) {
+      let taken = 0;
+      return compose(this, liftStateful((value: any, state: any) => {
+        if (taken < count) {
+          taken++;
+          return [state, value];
+        }
+        return [state, undefined];
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized take');
+  };
+
+  // Optimized skip implementation
+  proto._skip = function(count: number): any {
+    if (isObservableLite(this)) {
+      return this.skip(count);
+    } else if (isStatefulStream(this)) {
+      let skipped = 0;
+      return compose(this, liftStateful((value: any, state: any) => {
+        if (skipped < count) {
+          skipped++;
+          return [state, undefined];
+        }
+        return [state, value];
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized skip');
+  };
+
+  // Optimized distinct implementation
+  proto._distinct = function(): any {
+    if (isObservableLite(this)) {
+      return this.distinct();
+    } else if (isStatefulStream(this)) {
+      const seen = new Set();
+      return compose(this, liftStateful((value: any, state: any) => {
+        if (seen.has(value)) {
+          return [state, undefined];
+        }
+        seen.add(value);
+        return [state, value];
+      }));
+    }
+    throw new Error('Unsupported stream type for optimized distinct');
+  };
+
+  // Optimized pipe implementation
+  proto._pipe = function<B>(...operators: Array<(stream: any) => any>): any {
+    if (isObservableLite(this)) {
+      return this.pipe ? this.pipe(...operators) : operators.reduce((acc, op) => op(acc), this);
+    } else if (isStatefulStream(this)) {
+      let result: any = this;
+      for (const operator of operators) {
+        result = operator(result);
+      }
+      return result;
+    }
+    throw new Error('Unsupported stream type for optimized pipe');
+  };
+}
+
+// ============================================================================
+// Part 4: Unified Typeclass Instances
+// ============================================================================
+
+/**
+ * Unified Functor instance for both stream types
+ */
 export const UnifiedStreamFunctor = {
-	map: <A, B>(fa: CommonStreamOps<A>, f: (a: A) => B): any => fa.map(f)
+  map: <A, B>(fa: CommonStreamOps<A>, f: (a: A) => B): any => {
+    return fa.map(f);
+  }
 };
 
+/**
+ * Unified Monad instance for both stream types
+ */
 export const UnifiedStreamMonad = {
-	...UnifiedStreamFunctor,
-	chain: <A, B>(fa: CommonStreamOps<A>, f: (a: A) => any): any => fa.chain(f)
+  ...UnifiedStreamFunctor,
+  chain: <A, B>(fa: CommonStreamOps<A>, f: (a: A) => any): any => {
+    return fa.chain(f);
+  }
 };
 
+/**
+ * Unified Bifunctor instance for both stream types
+ */
 export const UnifiedStreamBifunctor = {
-	bimap: <A, B, C>(fa: CommonStreamOps<A>, f: (a: A) => B, g: (err: any) => C): any => fa.bimap(f, g)
+  bimap: <A, B, C, D>(fa: CommonStreamOps<A>, f: (a: A) => B, g: (err: any) => C): any => {
+    return fa.bimap(f, g);
+  }
 };
 
-export function applyCommonOps(target?: any): any {
-	if (target) {
-		addCommonOps(target);
-		addOptimizedOps(target);
-		return target;
-	}
-	if (typeof ObservableLite !== 'undefined') {
-		addCommonOps(ObservableLite.prototype as any);
-		addOptimizedOps(ObservableLite.prototype as any);
-	}
-	return undefined as any;
+// ============================================================================
+// Part 5: Utility Functions
+// ============================================================================
+
+/**
+ * Apply common operations to both ObservableLite and StatefulStream
+ */
+export function applyCommonOps(): void {
+  // Apply to ObservableLite
+  if (typeof ObservableLite !== 'undefined') {
+    addCommonOps(ObservableLite.prototype);
+    addOptimizedOps(ObservableLite.prototype);
+  }
+  
+  // Apply to StatefulStream
+  if (typeof StatefulStream !== 'undefined') {
+    addCommonOps(StatefulStream.prototype);
+    addOptimizedOps(StatefulStream.prototype);
+  }
 }
 
-function _hasSameAPI(stream1: any, stream2: any): boolean {
-	const methods = ['map', 'filter', 'scan', 'chain', 'bichain', 'take', 'skip', 'distinct', 'pipe'];
-	for (const m of methods) {
-		if (typeof stream1[m] !== typeof stream2[m]) return false;
-	}
-	return true;
+/**
+ * Check if two streams have the same API
+ */
+export function hasSameAPI(stream1: any, stream2: any): boolean {
+  const methods = ['map', 'filter', 'scan', 'chain', 'bichain', 'take', 'skip', 'distinct', 'pipe'];
+  
+  for (const method of methods) {
+    if (typeof stream1[method] !== typeof stream2[method]) {
+      return false;
+    }
+  }
+  
+  return true;
 }
 
-function _createUnifiedStream<T>(source: any): CommonStreamOps<T> {
-	if (_isObservableLite(source) || _isStatefulStream(source)) return source as any;
-	throw new Error('Unsupported stream type');
+/**
+ * Create a unified stream from either type
+ */
+export function createUnifiedStream<T>(source: any): CommonStreamOps<T> {
+  if (isObservableLite(source)) {
+    // Ensure the source has common ops
+    addCommonOps(source);
+    return source as unknown as CommonStreamOps<T>;
+  } else if (isStatefulStream(source)) {
+    // Ensure the source has common ops  
+    addCommonOps(source);
+    return source as unknown as CommonStreamOps<T>;
+  }
+  
+  throw new Error('Unsupported stream type');
 }
 
+/**
+ * Type assertion helper for unified streams
+ */
 export type AssertSame<T, U> = T extends U ? (U extends T ? true : never) : never;
 
-// Named exports for external use, avoiding redeclare conflicts
-export const isObservableLite = _isObservableLite;
-export const isStatefulStream = _isStatefulStream;
-export const hasSameAPI = _hasSameAPI;
-export const createUnifiedStream = _createUnifiedStream;
+// ============================================================================
+// Part 6: Exports
+// ============================================================================
+
+// All exports are already declared inline above 

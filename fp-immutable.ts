@@ -28,9 +28,7 @@ import {
 } from './fp-typeclasses-hkt';
 
 import {
-  EffectTag, EffectOf, Pure, IO, Async, Effect,
-  isPure, isIO, isAsync, getEffectTag,
-  PurityContext, PurityError, PurityResult,
+  EffectTag, EffectOf, Pure, IO, Async,
   createPurityInfo, attachPurityMarker, extractPurityMarker, hasPurityMarker
 } from './fp-purity';
 
@@ -40,6 +38,11 @@ import {
   deriveOrdInstance, 
   deriveShowInstance 
 } from './fp-derivation-helpers';
+
+/** Unary HKT for readonly arrays (Immutable arrays) */
+export interface ImmutableArrayK extends Kind1 {
+  readonly type: ReadonlyArray<this['arg0']>; // aka readonly A[]
+}
 
 // ============================================================================
 // Part 1: Core Type-Level Definitions
@@ -323,18 +326,25 @@ export function updateImmutableObject<T extends object, K extends keyof T>(
  * // tuple remains unchanged
  * ```
  */
-export function updateImmutableTuple<T extends readonly any[], I extends keyof T>(
+// helper to make a writable copy of a readonly tuple
+type Mutable<T extends readonly any[]> = { -readonly [K in keyof T]: T[K] };
+
+export function updateImmutableTuple<T extends readonly any[]>(
   tuple: Immutable<T>,
-  index: I,
-  value: Immutable<T[I]>
+  index: number,                        // ① use a number
+  value: Immutable<T[number]>           // ③ accept immutable element
 ): Immutable<T> {
   if (index < 0 || index >= tuple.length) {
-    throw new Error(`Index ${String(index)} out of bounds for tuple of length ${tuple.length}`);
+    throw new Error(`Index ${index} out of bounds for tuple of length ${tuple.length}`);
   }
-  
-  const newTuple = [...tuple] as T;
-  newTuple[index] = value;
-  return Object.freeze(newTuple) as Immutable<T>;
+
+  // make a mutable clone to perform the write
+  const clone = [...tuple] as Mutable<T>; // ② writable view of the tuple
+
+  // write the value, coerce back to the element type
+  clone[index] = value as unknown as T[number]; // ③ reconcile types
+
+  return Object.freeze(clone) as Immutable<T>;
 }
 
 /**
@@ -349,24 +359,35 @@ export function updateImmutableTuple<T extends readonly any[], I extends keyof T
  * // merged: { readonly a: number; readonly b: { readonly c: number; readonly d: number; }; readonly e: number; }
  * ```
  */
+type PlainObject = Record<string, unknown>;
+
+function isPlainObject(x: unknown): x is PlainObject {
+  return typeof x === 'object' && x !== null && !Array.isArray(x);
+}
+
 export function mergeImmutableObjects<T extends object, U extends object>(
   obj1: Immutable<T>,
   obj2: Immutable<U>
 ): Immutable<T & U> {
-  const merged = { ...obj1 };
-  
-  for (const [key, value] of Object.entries(obj2)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      merged[key as keyof (T & U)] = mergeImmutableObjects(
-        merged[key as keyof (T & U)] as object,
-        value as object
-      ) as (T & U)[keyof (T & U)];
+  // start from a shallow clone we can write into
+  const out: PlainObject = { ...(obj1 as unknown as PlainObject) };
+
+  // iterate string keys (what JS actually gives us)
+  for (const k of Object.keys(obj2 as unknown as PlainObject)) {
+    const v = (obj2 as unknown as PlainObject)[k];
+    const a = out[k];
+
+    if (isPlainObject(a) && isPlainObject(v)) {
+      // recurse on plain objects only
+      out[k] = mergeImmutableObjects(a as Immutable<PlainObject>, v as Immutable<PlainObject>);
     } else {
-      merged[key as keyof (T & U)] = value as (T & U)[keyof (T & U)];
+      // replace (arrays & scalars just overwrite)
+      out[k] = v;
     }
   }
-  
-  return Object.freeze(merged) as Immutable<T & U>;
+
+  // freeze result and coerce once at the boundary
+  return Object.freeze(out) as unknown as Immutable<T & U>;
 }
 
 /**
@@ -475,23 +496,54 @@ export function deepFreeze<T>(obj: T): Immutable<T> {
  * const isFrozen = isDeeplyFrozen(frozen); // true
  * ```
  */
-export function isDeeplyFrozen<T>(obj: T): obj is Immutable<T> {
-  if (obj === null || obj === undefined || typeof obj !== 'object') {
-    return true;
-  }
-  
-  if (!Object.isFrozen(obj)) {
-    return false;
-  }
-  
-  for (const key of Object.getOwnPropertyNames(obj)) {
-    const value = (obj as any)[key];
-    if (value && typeof value === 'object' && !isDeeplyFrozen(value)) {
-      return false;
+export function isDeeplyFrozen<T>(obj: T): obj is T & Immutable<T> {
+  const seen = new WeakSet<object>();
+
+  const check = (x: unknown): boolean => {
+    if (x === null) return true;
+    const t = typeof x;
+    if (t !== "object" && t !== "function") return true; // primitives
+    const o = x as Record<string, unknown>;
+
+    // avoid cycles
+    if (typeof o === "object") {
+      if (seen.has(o)) return true;
+      if (!Object.isFrozen(o)) return false;
+      seen.add(o);
     }
-  }
-  
-  return true;
+
+    // Arrays
+    if (Array.isArray(o)) {
+      for (const v of o) if (!check(v)) return false;
+      return true;
+    }
+
+    // Map
+    if (o instanceof Map) {
+      let ok = true;
+      o.forEach((v, k) => {
+        if (ok && (!check(k) || !check(v))) ok = false;
+      });
+      return ok;
+    }
+
+    // Set
+    if (o instanceof Set) {
+      let ok = true;
+      o.forEach((v) => {
+        if (ok && !check(v)) ok = false;
+      });
+      return ok;
+    }
+
+    // Plain objects (and functions: no own enumerable children typically)
+    for (const key of Object.getOwnPropertyNames(o)) {
+      if (!check((o as any)[key])) return false;
+    }
+    return true;
+  };
+
+  return check(obj);
 }
 
 // ============================================================================
@@ -501,28 +553,36 @@ export function isDeeplyFrozen<T>(obj: T): obj is Immutable<T> {
 /**
  * ImmutableArray derived instances
  */
-export const ImmutableArrayInstances = deriveInstances({
-  functor: true,
-  applicative: true,
-  monad: true,
-  customMap: <A, B>(fa: Immutable<A[]>, f: (a: A) => B): Immutable<B[]> => {
-    return Object.freeze(fa.map(f)) as Immutable<B[]>;
-  },
-  customChain: <A, B>(fa: Immutable<A[]>, f: (a: A) => Immutable<B[]>): Immutable<B[]> => {
-    const result: B[] = [];
-    for (const a of fa) {
-      const fb = f(a);
-      for (const b of fb) {
-        result.push(b);
-      }
-    }
-    return Object.freeze(result) as Immutable<B[]>;
-  }
-});
+// 1) Define a Kind for readonly/immutable arrays
+export interface ImmutableArrayK extends Kind1 {
+  readonly type: ReadonlyArray<this['arg0']>; // aka Immutable<this['arg0'][]> 
+}
 
-export const ImmutableArrayFunctor = ImmutableArrayInstances.functor;
-export const ImmutableArrayApplicative = ImmutableArrayInstances.applicative;
-export const ImmutableArrayMonad = ImmutableArrayInstances.monad;
+// 2) Primitive ops (no mutation; always return frozen copies)
+const imap = <A, B>(fa: ReadonlyArray<A>, f: (a: A) => B): ReadonlyArray<B> =>
+  Object.freeze(fa.map(f));
+
+const iof = <A>(a: A): ReadonlyArray<A> =>
+  Object.freeze([a]);
+
+const iap = <A, B>(ff: ReadonlyArray<(a: A) => B>, fa: ReadonlyArray<A>): ReadonlyArray<B> => {
+  const out: B[] = [];
+  for (const f of ff) for (const a of fa) out.push(f(a));
+  return Object.freeze(out);
+};
+
+const ichain = <A, B>(fa: ReadonlyArray<A>, f: (a: A) => ReadonlyArray<B>): ReadonlyArray<B> => {
+  const out: B[] = [];
+  for (const a of fa) for (const b of f(a)) out.push(b);
+  return Object.freeze(out);
+};
+
+// 3) Actual instances (same export names as before)
+export const ImmutableArrayFunctor = deriveFunctor<ImmutableArrayK>(imap);
+export const ImmutableArrayApplicative = deriveApplicative<ImmutableArrayK>(iof, iap);
+export const ImmutableArrayMonad = deriveMonad<ImmutableArrayK>(iof, ichain);
+
+
 
 /**
  * ImmutableArray standard typeclass instances
@@ -550,35 +610,67 @@ export const ImmutableArrayShow = deriveShowInstance({
     `ImmutableArray(${JSON.stringify(a)})`
 });
 
-/**
- * Immutable Traversable instance (manual due to complexity)
- */
-export const ImmutableArrayTraversable: Traversable<ArrayK> = {
-  ...ImmutableArrayFunctor!,
-  sequence: <A>(fas: Immutable<A[][]>): Immutable<A[]> => {
-    // Simplified implementation - in practice would need proper applicative
-    return Object.freeze(fas.flat()) as Immutable<A[]>;
+// HKT for readonly arrays
+export interface ImmutableArrayK extends Kind1 {
+  readonly type: ReadonlyArray<this['arg0']>;
+}
+
+// Foldable that matches the interface
+
+// Promise-only specialization (works if your code uses G = PromiseK)
+export const ImmutableArrayTraversable: Traversable<ImmutableArrayK> = {
+  ...ImmutableArrayFunctor,
+
+  traverse: <G extends Kind1, A, B>(
+    fa: Apply<ImmutableArrayK,[A]>,
+    f: (a:A) => Apply<G,[B]>
+  ): Apply<G,[Apply<ImmutableArrayK,[B]>]> => {
+    // Treat G as PromiseK at runtime; TS sees Apply<G,[...]>.
+    const ps = (fa as ReadonlyArray<A>).map(a => f(a) as unknown as Promise<B>);
+    return Promise.all(ps).then(xs => Object.freeze(xs) as ReadonlyArray<B>) as unknown as
+      Apply<G,[Apply<ImmutableArrayK,[B]>]>;
   },
-  traverse: <F extends Kind1, A, B>(
-    F: Applicative<F>,
-    fa: Immutable<A[]>,
-    f: (a: A) => Apply<F, [B]>
-  ): Apply<F, [Immutable<B[]>]> => {
-    // Simplified implementation - in practice would need proper applicative
-    return F.of(Object.freeze(fa.map(a => (f(a) as any).value)) as Immutable<B[]>) as any;
-  }
 };
+// Switch to this when you can update your Traversable interface in hk-typeclasses
+// Traversable that takes an Applicative<G>
+// export const ImmutableArrayTraversable: Traversable<ImmutableArrayK> = {
+//   ...ImmutableArrayFunctor,
+//   traverse: <G extends Kind1, A, B>(
+//     App: Applicative<G>,
+//     fa: Apply<ImmutableArrayK, [A]>,
+//     f: (a: A) => Apply<G, [B]>
+//   ): Apply<G, [Apply<ImmutableArrayK, [B]>]> => {
+//     const arr = fa as ReadonlyArray<A>;
+//     // classic list traverse via Applicative
+//     // start with G.of([])
+//     let acc = App.of(Object.freeze([]) as ReadonlyArray<B>) as Apply<G, [ReadonlyArray<B>]>;
+
+//     // acc <*> f(a), accumulating immutably
+//     for (const a of arr) {
+//       acc = App.ap(
+//         App.map(acc, (bs: ReadonlyArray<B>) => (b: B) =>
+//           Object.freeze([...bs, b]) as ReadonlyArray<B>
+//         ),
+//         f(a)
+//       );
+//     }
+
+//     // acc already has type Apply<G, [ReadonlyArray<B>]>, which is Apply<G, [Apply<ImmutableArrayK, [B]>]>
+//     return acc as Apply<G, [Apply<ImmutableArrayK, [B]>]>;
+//   },
+// };
+
+
 
 /**
  * Immutable Foldable instance (manual due to complexity)
  */
-export const ImmutableArrayFoldable: Foldable<ArrayK> = {
-  reduce: <A, B>(fa: Immutable<A[]>, f: (b: B, a: A) => B, b: B): B => {
-    return fa.reduce(f, b);
-  },
-  foldMap: <M, A>(M: any, fa: Immutable<A[]>, f: (a: A) => M): M => {
-    return fa.reduce((acc, a) => M.concat(acc, f(a)), M.empty());
-  }
+export const ImmutableArrayFoldable: Foldable<ImmutableArrayK> = {
+  foldr: <A, B>(fa: ReadonlyArray<A>, f: (a: A, b: B) => B, z: B): B =>
+    fa.reduceRight((acc, a) => f(a, acc), z),
+
+  foldl: <A, B>(fa: ReadonlyArray<A>, f: (b: B, a: A) => B, z: B): B =>
+    fa.reduce((acc, a) => f(acc, a), z),
 };
 
 // ============================================================================
@@ -601,7 +693,7 @@ export function matchImmutableArray<T, R>(
   arr: Immutable<T[]>,
   patterns: {
     Empty: () => R;
-    NonEmpty: (head: T, tail: Immutable<T[]>) => R;
+    NonEmpty: (head: Immutable<T>, tail: Immutable<T[]>) => R;
   }
 ): R {
   if (arr.length === 0) {
@@ -624,19 +716,33 @@ export function matchImmutableArray<T, R>(
  * });
  * ```
  */
-export function matchImmutableObject<T extends object, R>(
+function omitImmutableKey<T extends object, K extends keyof T>(
   obj: Immutable<T>,
+  key: K
+): Immutable<Omit<T, K>> {
+  const out: Partial<Record<keyof T, unknown>> = {};
+  for (const k in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, k) && k !== (key as any)) {
+      (out as any)[k] = (obj as any)[k];
+    }
+  }
+  return Object.freeze(out) as unknown as Immutable<Omit<T, K>>; // single, quarantined cast
+}
+
+export function matchImmutableObject<T extends object, K extends keyof T, R>(
+  obj: Immutable<T>,
+  key: K,
   patterns: {
-    HasA: (a: T['a'], rest: Immutable<Omit<T, 'a'>>) => R;
-    NoA: (rest: Immutable<T>) => R;
+    Has: (value: Immutable<T[K]>, rest: Immutable<Omit<T, K>>) => R;
+    Missing: (rest: Immutable<T>) => R;
   }
 ): R {
-  if ('a' in obj) {
-    const { a, ...rest } = obj;
-    return patterns.HasA(a as T['a'], Object.freeze(rest) as Immutable<Omit<T, 'a'>>);
-  } else {
-    return patterns.NoA(obj);
+  if (Object.prototype.hasOwnProperty.call(obj, key)) {
+    const value = (obj as any)[key] as Immutable<T[K]>;
+    const rest = omitImmutableKey(obj, key);
+    return patterns.Has(value, rest);
   }
+  return patterns.Missing(obj);
 }
 
 /**
@@ -695,14 +801,18 @@ export type ImmutableEqual<T, U> = Immutable<T> extends Immutable<U>
 /**
  * Create an immutable copy of a value
  */
-export function toImmutable<T>(value: T): Immutable<T> {
+export function toImmutable<T extends readonly any[]>(value: T): Immutable<T>;
+export function toImmutable<T extends object>(value: T): Immutable<T>;
+export function toImmutable<T>(value: T): Immutable<T>;
+export function toImmutable(value: any): any {
   if (Array.isArray(value)) {
-    return immutableArray(...value);
-  } else if (value && typeof value === 'object') {
-    return immutableObject(value);
-  } else {
-    return value as Immutable<T>;
+    // Ensure elements are immutable before passing to immutableArray
+    return immutableArray(...(value as any[]).map(toImmutable)) as Immutable<typeof value>;
   }
+  if (value !== null && typeof value === 'object') {
+    return immutableObject(value) as Immutable<typeof value>;
+  }
+  return value as Immutable<typeof value>;
 }
 
 /**
@@ -721,7 +831,7 @@ export function toMutable<T>(value: Immutable<T>): T {
 /**
  * Check if a value is immutable at runtime
  */
-export function isImmutable<T>(value: T): value is Immutable<T> {
+export function isImmutable<T>(value: T): value is T & Immutable<T> {
   if (value === null || value === undefined || typeof value !== 'object') {
     return true;
   }
@@ -733,10 +843,20 @@ export function isImmutable<T>(value: T): value is Immutable<T> {
  * Create an immutable value with purity tracking
  */
 export function createImmutable<T>(
+  value: T
+): ImmutableWithPurity<T, 'Pure'>;
+export function createImmutable<T, P extends EffectTag>(
   value: T,
-  effect: EffectTag = 'Pure'
-): ImmutableWithPurity<T> {
-  return createImmutableWithPurity(value, effect);
+  effect: P
+): ImmutableWithPurity<T, P>;
+
+// Implementation
+export function createImmutable<T, P extends EffectTag = 'Pure'>(
+  value: T,
+  effect?: P
+): ImmutableWithPurity<T, P> {
+  const eff = (effect ?? 'Pure') as P;
+  return createImmutableWithPurity<T, P>(value, eff);
 }
 
 /**

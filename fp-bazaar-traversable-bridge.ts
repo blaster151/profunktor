@@ -26,7 +26,7 @@ export function toBazaarFromTraversable<T extends Kind1>(
   return <A, B>() =>
     <F extends Kind1>(F: Applicative<F>, k: (a: A) => Apply<F, [B]>) =>
       (ta: Apply<T, [A]>) =>
-        T.traverse(F, k, ta) as Apply<F, [Apply<T, [B]>]>;
+        T.traverse(ta, k) as Apply<F, [Apply<T, [B]>]>;
 }
 
 /**
@@ -53,7 +53,7 @@ export function runTraversalViaApplicative<T extends Kind1, F extends Kind1, A, 
   k: (a: A) => Apply<F, [B]>,
   ta: Apply<T, [A]>
 ): Apply<F, [Apply<T, [B]>]> {
-  return T.traverse(F, k, ta) as any;
+  return T.traverse(ta, k) as any;
 }
 
 // Tiny Id applicative (handy for sanity checks)

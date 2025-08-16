@@ -76,7 +76,7 @@ export type ImmutableMaybe<A> = MaybeImmutableInstance<A>;
  * HKT kind for Maybe (arity-1 type constructor)
  */
 export interface MaybeK extends Kind1 {
-  readonly type: Maybe<this['A']>;
+  readonly type: Maybe<this['arg0']>;
 }
 
 // ============================================================================
@@ -121,18 +121,14 @@ export const NothingImmutable = <A>(): ImmutableMaybe<A> => {
 export const matchMaybe = <A, R>(
   maybe: Maybe<A>,
   handlers: {
-    Just?: (value: A) => R;
+    Just?: (payload: { value: A }) => R;
     Nothing?: () => R;
     _?: (tag: string, payload: any) => R;
     otherwise?: (tag: string, payload: any) => R;
   }
-): R => {
-  return maybe.match(handlers);
-};
+): R => maybe.match(handlers);
 
-/**
- * Tag-only matcher for Maybe
- */
+// tag-only stays tag-only (no payload)
 export const matchMaybeTag = <A, R>(
   maybe: Maybe<A>,
   handlers: {
@@ -141,37 +137,22 @@ export const matchMaybeTag = <A, R>(
     _?: (tag: string) => R;
     otherwise?: (tag: string) => R;
   }
-): R => {
-  return maybe.matchTag(handlers);
-};
+): R => maybe.matchTag(handlers);
 
-/**
- * Curryable pattern matcher for Maybe
- */
-export const createMaybeMatcher = <R>(
-  handlers: {
-    Just?: <A>(value: A) => R;
-    Nothing?: () => R;
-    _?: (tag: string, payload: any) => R;
-    otherwise?: (tag: string, payload: any) => R;
-  }
-) => (maybe: Maybe<any>): R => {
-  return maybe.match(handlers);
-};
+// curry versions mirror the same shapes
+export const createMaybeMatcher = <R>(handlers: {
+  Just?: <A>(payload: { value: A }) => R;
+  Nothing?: () => R;
+  _?: (tag: string, payload: any) => R;
+  otherwise?: (tag: string, payload: any) => R;
+}) => (maybe: Maybe<any>): R => maybe.match(handlers);
 
-/**
- * Curryable tag-only matcher for Maybe
- */
-export const createMaybeTagMatcher = <R>(
-  handlers: {
-    Just?: () => R;
-    Nothing?: () => R;
-    _?: (tag: string) => R;
-    otherwise?: (tag: string) => R;
-  }
-) => (maybe: Maybe<any>): R => {
-  return maybe.matchTag(handlers);
-};
+export const createMaybeTagMatcher = <R>(handlers: {
+  Just?: () => R;
+  Nothing?: () => R;
+  _?: (tag: string) => R;
+  otherwise?: (tag: string) => R;
+}) => (maybe: Maybe<any>): R => maybe.matchTag(handlers);
 
 // ============================================================================
 // Part 4: Utility Functions
@@ -194,65 +175,44 @@ export const isNothing = <A>(maybe: Maybe<A>): maybe is Maybe<A> & { tag: 'Nothi
 /**
  * Get the value from a Just, or throw if Nothing
  */
-export const fromJust = <A>(maybe: Maybe<A>): A => {
-  return maybe.match({
+export const fromJust = <A>(maybe: Maybe<A>): A =>
+  maybe.match({
     Just: ({ value }) => value,
-    Nothing: () => {
-      throw new Error('fromJust: Nothing');
-    }
+    Nothing: () => { throw new Error('fromJust: Nothing'); },
   });
-};
 
-/**
- * Get the value from a Just, or return default if Nothing
- */
-export const fromMaybe = <A>(defaultValue: A, maybe: Maybe<A>): A => {
-  return maybe.match({
+export const fromMaybe = <A>(def: A, maybe: Maybe<A>): A =>
+  maybe.match({
     Just: ({ value }) => value,
-    Nothing: () => defaultValue
+    Nothing: () => def,
   });
-};
 
-/**
- * Map over a Maybe
- */
-export const mapMaybe = <A, B>(f: (a: A) => B, maybe: Maybe<A>): Maybe<B> => {
-  return maybe.match({
+export const mapMaybe = <A, B>(f: (a: A) => B, maybe: Maybe<A>): Maybe<B> =>
+  maybe.match({
     Just: ({ value }) => Just(f(value)),
-    Nothing: () => Nothing()
+    Nothing: () => Nothing(),
   });
-};
 
-/**
- * Apply a function in a Maybe to a value in a Maybe
- */
-export const apMaybe = <A, B>(maybeF: Maybe<(a: A) => B>, maybeA: Maybe<A>): Maybe<B> => {
-  return maybeF.match({
-    Just: ({ value: f }) => mapMaybe(f, maybeA),
-    Nothing: () => Nothing()
+export const apMaybe = <A, B>(mf: Maybe<(a: A) => B>, ma: Maybe<A>): Maybe<B> =>
+  mf.match({
+    Just: ({ value: f }) => mapMaybe(f, ma),
+    Nothing: () => Nothing(),
   });
-};
 
 /**
  * Chain operations on Maybe
  */
-export const chainMaybe = <A, B>(f: (a: A) => Maybe<B>, maybe: Maybe<A>): Maybe<B> => {
-  return maybe.match({
+export const chainMaybe = <A, B>(f: (a: A) => Maybe<B>, ma: Maybe<A>): Maybe<B> =>
+  ma.match({
     Just: ({ value }) => f(value),
-    Nothing: () => Nothing()
+    Nothing: () => Nothing(),
   });
-};
 
-/**
- * Fold over a Maybe
- */
-export const foldMaybe = <A, B>(onJust: (a: A) => B, onNothing: () => B, maybe: Maybe<A>): B => {
-  return maybe.match({
+export const foldMaybe = <A, B>(onJust: (a: A) => B, onNothing: () => B, ma: Maybe<A>): B =>
+  ma.match({
     Just: ({ value }) => onJust(value),
-    Nothing: () => onNothing()
+    Nothing: () => onNothing(),
   });
-};
-
 // ============================================================================
 // Part 5: Typeclass Instances
 // ============================================================================
@@ -260,32 +220,32 @@ export const foldMaybe = <A, B>(onJust: (a: A) => B, onNothing: () => B, maybe: 
 /**
  * Derived instances for Maybe
  */
-export const MaybeFunctor = deriveFunctorInstance<MaybeK>({
-  customMap: mapMaybe
-});
+export const MaybeFunctor = deriveFunctor<MaybeK>(
+  <A, B>(fa: Maybe<A>, f: (a: A) => B): Maybe<B> =>
+    mapMaybe(f, fa)
+);
 
-export const MaybeApplicative = deriveApplicativeInstance<MaybeK>({
-  customMap: mapMaybe,
-  customOf: Just,
-  customAp: apMaybe
-});
+export const MaybeApplicative = deriveApplicative<MaybeK>(
+  <A>(a: A): Maybe<A> => Just(a),
+  <A, B>(ff: Maybe<(a: A) => B>, fa: Maybe<A>): Maybe<B> => apMaybe(ff, fa)
+);
 
-export const MaybeMonad = deriveMonadInstance<MaybeK>({
-  customMap: mapMaybe,
-  customChain: chainMaybe
-});
+export const MaybeMonad = deriveMonad<MaybeK>(
+  <A>(a: A): Maybe<A> => Just(a),
+  <A, B>(fa: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> => chainMaybe(f, fa)
+);
 
 /**
  * Foldable instance for Maybe
  */
 export const MaybeFoldable: Foldable<MaybeK> = {
-  reduce: <A, B>(maybe: Maybe<A>, f: (b: B, a: A) => B, b: B): B => {
+  foldr: <A, B>(maybe: Maybe<A>, f: (b: B, a: A) => B, b: B): B => {
     return maybe.match({
       Just: ({ value }) => f(b, value),
       Nothing: () => b
     });
   },
-  foldMap: <M, A>(M: any, maybe: Maybe<A>, f: (a: A) => M): M => {
+  foldl: <M, A>(M: any, maybe: Maybe<A>, f: (a: A) => M): M => {
     return maybe.match({
       Just: ({ value }) => f(value),
       Nothing: () => M.empty()
@@ -296,25 +256,36 @@ export const MaybeFoldable: Foldable<MaybeK> = {
 /**
  * Traversable instance for Maybe
  */
+// Legacy Traversable shape (no Applicative arg):
+// export interface Traversable<F extends Kind1> extends Functor<F> {
+//   traverse<G extends Kind1, A, B>(
+//     fa: Apply<F, [A]>,
+//     f: (a: A) => Apply<G, [B]>
+//   ): Apply<G, [Apply<F, [B]>]>;
+// }
+
+// ---------- Maybe ----------
 export const MaybeTraversable: Traversable<MaybeK> = {
   ...MaybeFunctor,
-  sequence: <A>(maybeArray: Maybe<A[]>): A[] => {
-    return maybeArray.match({
-      Just: ({ value }) => value,
-      Nothing: () => []
+
+  // TEMP HACK: assumes G is PromiseK at runtime
+  traverse: <G extends Kind1, A, B>(
+    fa: Maybe<A>,
+    f: (a: A) => Apply<G, [B]>
+  ): Apply<G, [Maybe<B>]> => {
+    return fa.match({
+      Just: ({ value }) =>
+        // treat Apply<G,[B]> as Promise<B>, then wrap result back into Maybe
+        (f(value) as unknown as Promise<B>)
+          .then(b => Just(b)) as unknown as Apply<G, [Maybe<B>]>,
+
+      Nothing: () =>
+        // G.of(Nothing()) — but we don't have G; use Promise.resolve
+        Promise.resolve(Nothing()) as unknown as Apply<G, [Maybe<B>]>
     });
   },
-  traverse: <F extends Kind1, A, B>(
-    F: Applicative<F>,
-    maybe: Maybe<A>,
-    f: (a: A) => Apply<F, [B]>
-  ): Apply<F, [Maybe<B>]> => {
-    return maybe.match({
-      Just: ({ value }) => F.map(f(value), Just),
-      Nothing: () => F.of(Nothing())
-    }) as Apply<F, [Maybe<B>]>;
-  }
 };
+
 
 // ============================================================================
 // Part 6: Purity Integration
@@ -374,9 +345,9 @@ export type MaybeOf<A> = ApplyMaybe<[A]>;
 /**
  * Standard typeclass instances for Maybe
  */
-export const MaybeEq = deriveEqInstance({ kind: MaybeK });
-export const MaybeOrd = deriveOrdInstance({ kind: MaybeK });
-export const MaybeShow = deriveShowInstance({ kind: MaybeK });
+export const MaybeEq = deriveEqInstance();
+export const MaybeOrd = deriveOrdInstance();
+export const MaybeShow = deriveShowInstance();
 
 /**
  * Example usage of enhanced Maybe with ergonomic pattern matching

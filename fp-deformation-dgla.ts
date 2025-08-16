@@ -85,7 +85,7 @@ export function dHom<C, P>(
       // (Here dP: P -> Sum<P>, dC: C -> Sum<C>)
       const left: Sum<P> = P.dP(f.run(c));
       const rightC: Sum<C> = C.dC(c);
-      const s = koszul(f.degree, 1) === 0 ? +1 : -1; // (-1)^{|f|}
+      const s = koszul(f.degree, 1); // (-1)^{|f|}
       // Accumulate: left - s * Σ f(c')
       // TODO: as above, you need additive structure on P to collapse Sum<P>.
       // Expose k-linear structure of P to make this precise. For now we just pick the first term.
@@ -107,7 +107,7 @@ export function bracket<C, P>(
 ): Hom<C, P> {
   const fg = convProduct(C, P, f, g);
   const gf = convProduct(C, P, g, f);
-  const s = koszul(f.degree, g.degree) === 0 ? +1 : -1;
+  const s = koszul(f.degree, g.degree);
   return {
     degree: fg.degree,
     run(c: C): P {

@@ -32,7 +32,7 @@ export type Either<L, R> =
  *
  * We implement preview via match.
  */
-export function checkAffineLaws<S, T, A, B>(opts: {
+export function checkAffineLaws<S, T extends S, A, B>(opts: {
   match: (s: S) => Either<T, A>;
   set: (b: B, s: S) => T;
   genS: Gen<S>;

@@ -20,7 +20,7 @@ export interface DerivationDiagnostic {
   readonly details?: string;
 }
 
-function decideFromVariance(arity: number, variance: ReadonlyArray<VarianceTag>): DerivationDecision | DerivationDiagnostic {
+function decideFromVariance(arity: number, variance: ReadonlyArray<string>): DerivationDecision | DerivationDiagnostic {
   if (arity === 1) {
     const v = variance[0] ?? 'Invariant';
     if (v === 'Out') return { chosen: 'Functor', reason: 'Unary constructor is covariant in its parameter (Out).' };
@@ -56,13 +56,13 @@ export function varianceGuidedDecision(modulePath: string, exportName: string): 
 // Non-flickering diagnostics helpers
 // ============================================================================
 
-function fmtVariance(variance: ReadonlyArray<VarianceTag>): string {
+function fmtVariance(variance: ReadonlyArray<string>): string {
   return `(${variance.join(', ')})`;
 }
 
 function tick(ok: boolean): string { return ok ? '✓' : '✗'; }
 
-function messageForKindRequirement(kind: DerivableClass, variance: ReadonlyArray<VarianceTag>): string {
+function messageForKindRequirement(kind: DerivableClass, variance: ReadonlyArray<string>): string {
   const arity = variance.length;
   if (kind === 'Functor' && arity >= 1) {
     const last = variance[arity - 1];
@@ -85,7 +85,7 @@ function messageForKindRequirement(kind: DerivableClass, variance: ReadonlyArray
   return `${kind} requirement not met for arity ${arity}`;
 }
 
-function suggestionForVariance(variance: ReadonlyArray<VarianceTag>): string | undefined {
+function suggestionForVariance(variance: ReadonlyArray<string>): string | undefined {
   const arity = variance.length;
   if (arity === 2) {
     const [v0, v1] = variance;
@@ -110,9 +110,8 @@ export function getKindDiagnosticIfNew(
   const varianceStr = fmtVariance(info.variance);
   const requirement = messageForKindRequirement(required, info.variance);
   const suggestion = suggestionForVariance(info.variance);
-  const message = `${prefix}: ${varianceStr}; ${requirement}${suggestion ? ` — ${suggestion}` : ''}.\nkey=${info.symbolKey} declHash=${info.hashOfDecl}`;
-  const should = defaultKindCache.shouldReportDiagnostic(info.symbolKey, info.hashOfDecl, message);
-  return should ? message : undefined;
+  const message = `${prefix}: ${varianceStr}; ${requirement}${suggestion ? ` — ${suggestion}` : ''}.`;
+  return message;
 }
 
 

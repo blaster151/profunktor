@@ -52,13 +52,13 @@ export function adjunctionCofree<F extends Kind1>(
 }
 
 // Registration helpers to derive Monad/Comonad instances (exposed for registry integration)
-export function deriveFreeMonad<F extends Kind1>(F: Functor<F>) {
-  const adj = adjunctionFree(F);
+export function deriveFreeMonad<F extends Kind1>(F: Functor<F>, algebra: <A>(fa: Apply<F, [A]>) => A) {
+  const adj = adjunctionFree(F, algebra);
   return monadFromAdjunction(adj as any, { map: <A, B>(fa: Free<F, A>, f: (a: A) => B) => FreePure<F, B>(f((fa as any).value)) as any } as Functor<any>, { map: <A, B>(fa: any, f: (a: A) => B) => fa } as Functor<any>);
 }
 
-export function deriveCofreeComonad<F extends Kind1>(F: Functor<F>) {
-  const adj = adjunctionCofree(F);
+export function deriveCofreeComonad<F extends Kind1>(F: Functor<F>, coalgebra: <A>(a: A) => Apply<F, [A]>) {
+  const adj = adjunctionCofree(F, coalgebra);
   return comonadFromAdjunction(adj as any, { map: <A, B>(fa: Cofree<F, A>, f: (a: A) => B) => ({ head: f(fa.head), tail: F.map(fa.tail, (w: any) => ({ head: f(w.head), tail: F.map(w.tail, (t: any) => t) as any })) as any }) as any } as Functor<any>, { map: <A, B>(fa: any, f: (a: A) => B) => fa } as Functor<any>);
 }
 

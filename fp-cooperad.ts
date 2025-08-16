@@ -2,7 +2,8 @@
 // Cooperad-style comultiplication over planar rooted trees via ALL admissible cuts.
 // Δ(t) = Σ_c P^c(t) ⊗ R^c(t), with P^c a forest, R^c the trunk.
 
-import { Tree, Forest, admissibleCuts, keyOf, keyForest, pretty, t, leaf } from "./fp-cooperad-trees";
+import type { Tree, Forest } from "./fp-cooperad-trees";
+import { admissibleCuts, keyOf, keyForest, pretty, t, leaf } from "./fp-cooperad-trees";
 
 // A tiny formal-sum encoding (coefficients are 1 for now)
 export type Tensor<A, B> = readonly [A, B];
@@ -54,26 +55,28 @@ function equalMultiset<A>(xs: ReadonlyArray<Pair<A>>, ys: ReadonlyArray<Pair<A>>
 // here we just concat forests (free commutative monoid would need sorting; planar keeps order).
 function twiceLeft<A>(tr: Tree<A>): Array<Pair<A>> {
   // (Δ ⊗ id) ∘ Δ : expand trunk again, concat forests
-  const out: Array<Pair<A>> = [];
+  const results: Array<Pair<A>> = [];
   for (const [P1, R1] of delta(tr)) {
     for (const [P2, R2] of delta(R1)) {
-      out.push([([...P1, ...P2] as Forest<A>), R2]);
+      const mergedForest: Forest<A> = [...P1, ...P2];
+      results.push([mergedForest, R2]);
     }
   }
-  return out;
+  return results;
 }
 
 function twiceRight<A>(tr: Tree<A>): Array<Pair<A>> {
   // (id ⊗ Δ) ∘ Δ : expand trunk; same as twiceLeft in this encoding
   // (Because Δ only acts on the right tensor in our Pair<Forest,Tree> view)
   // This mirrors twiceLeft—kept separate to emphasize the law we intend.
-  const out: Array<Pair<A>> = [];
+  const results: Array<Pair<A>> = [];
   for (const [P1, R1] of delta(tr)) {
     for (const [P2, R2] of delta(R1)) {
-      out.push([([...P1, ...P2] as Forest<A>), R2]);
+      const mergedForest: Forest<A> = [...P1, ...P2];
+      results.push([mergedForest, R2]);
     }
   }
-  return out;
+  return results;
 }
 
 export function checkCoassocOn<A>(tr: Tree<A>, show = (a: A) => String(a)): boolean {
@@ -82,8 +85,8 @@ export function checkCoassocOn<A>(tr: Tree<A>, show = (a: A) => String(a)): bool
   return equalMultiset(twiceLeft(tr), twiceRight(tr), show);
 }
 
-// --- tiny demo / smoke tests if run directly
-if (require.main === module) {
+// Browser-compatible demo function
+export function demoCooperad() {
   const ex1 = t("f", [leaf("x")]);
   const ex2 = t("f", [t("g", [leaf("x"), leaf("y")]), leaf("z")]);
 

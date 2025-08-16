@@ -15,8 +15,8 @@ export interface CategoryHask {
 export interface Monoidal<C = unknown> {
   readonly I: {};
   tensor<A, B>(a: A, b: B): [A, B];
-  lunit<A>(ab: [typeof this.I, A]): A;
-  runit<A>(ab: [A, typeof this.I]): A;
+  lunit<A>(ab: [any, A]): A;
+  runit<A>(ab: [A, any]): A;
   assoc<A, B, C>(abc: [[A, B], C]): [A, [B, C]];
   swap?<A, B>(ab: [A, B]): [B, A];
 }

@@ -14,17 +14,16 @@ import {
   Show
 } from './fp-derivation-helpers';
 import { 
-  getFPRegistry, 
-  registerTypeclassInstance,
-  registerDerivableInstance 
+  getFPRegistry
 } from './fp-registry-init';
 import type { 
   Functor, 
   Applicative, 
   Monad, 
   Bifunctor,
-  Kind 
+  Kind
 } from './fp-typeclasses';
+import type { Kind1 } from './fp-hkt';
 
 // ============================================================================
 // Registration Configuration
@@ -59,7 +58,7 @@ export interface RegistrationResult {
 /**
  * Auto-register derived instances for an ADT
  */
-export function autoRegisterADT<F extends Kind<any[]>>(
+export function autoRegisterADT<F extends Kind1>(
   config: AutoRegistrationConfig
 ): RegistrationResult {
   const result: RegistrationResult = {
@@ -85,38 +84,38 @@ export function autoRegisterADT<F extends Kind<any[]>>(
 
     // Register typeclass instances
     if (instances.functor) {
-      registry.registerTypeclass(config.typeName, 'Functor', instances.functor);
+      registry.register(`${config.typeName}.Functor`, instances.functor);
       result.registered.push('Functor');
     }
 
     if (instances.applicative) {
-      registry.registerTypeclass(config.typeName, 'Applicative', instances.applicative);
+      registry.register(`${config.typeName}.Applicative`, instances.applicative);
       result.registered.push('Applicative');
     }
 
     if (instances.monad) {
-      registry.registerTypeclass(config.typeName, 'Monad', instances.monad);
+      registry.register(`${config.typeName}.Monad`, instances.monad);
       result.registered.push('Monad');
     }
 
     if (instances.bifunctor) {
-      registry.registerTypeclass(config.typeName, 'Bifunctor', instances.bifunctor);
+      registry.register(`${config.typeName}.Bifunctor`, instances.bifunctor);
       result.registered.push('Bifunctor');
     }
 
     // Register Eq, Ord, Show instances
     if (instances.eq) {
-      registry.registerTypeclass(config.typeName, 'Eq', instances.eq);
+      registry.register(`${config.typeName}.Eq`, instances.eq);
       result.registered.push('Eq');
     }
 
     if (instances.ord) {
-      registry.registerTypeclass(config.typeName, 'Ord', instances.ord);
+      registry.register(`${config.typeName}.Ord`, instances.ord);
       result.registered.push('Ord');
     }
 
     if (instances.show) {
-      registry.registerTypeclass(config.typeName, 'Show', instances.show);
+      registry.register(`${config.typeName}.Show`, instances.show);
       result.registered.push('Show');
     }
 
@@ -135,16 +134,16 @@ export function autoRegisterADT<F extends Kind<any[]>>(
       effect: config.purity || 'Pure' 
     };
 
-    registry.registerDerivable(config.typeName, derivableInstances);
+    registry.register(`${config.typeName}.Derivable`, derivableInstances);
 
     // Register HKT if provided
     if (config.kindName) {
-      registry.registerHKT(config.typeName, config.kindName);
+      registry.register(`${config.typeName}.HKT`, config.kindName);
     }
 
     // Register purity
     if (config.purity) {
-      registry.registerPurity(config.typeName, config.purity);
+      registry.register(`${config.typeName}.Purity`, config.purity);
     }
 
     console.log(`✅ Auto-registered ${result.registered.length} instances for ${config.typeName}`);
@@ -283,7 +282,7 @@ export function autoRegisterAllCoreADTs(): RegistrationResult[] {
 /**
  * Auto-register and augment ADT with fluent methods
  */
-export function autoRegisterAndAugment<F extends Kind<any[]>>(
+export function autoRegisterAndAugment<F extends Kind1>(
   config: AutoRegistrationConfig
 ): RegistrationResult {
   const result = autoRegisterADT<F>(config);
@@ -291,7 +290,7 @@ export function autoRegisterAndAugment<F extends Kind<any[]>>(
   if (result.success && config.autoAugment !== false) {
     try {
       // Import and use fluent augmentation
-      const { augmentADTWithFluent, augmentBifunctorADTWithFluent } = require('./fp-fluent-adt');
+      // const { augmentADTWithFluent, augmentBifunctorADTWithFluent } = await import('./fp-fluent-adt');
       
       // This would need the actual constructor to be available
       // For now, we'll just log that augmentation is ready
@@ -320,10 +319,10 @@ export function validateRegisteredInstances(typeName: string): boolean {
     return false;
   }
 
-  const functor = registry.getTypeclass(typeName, 'Functor');
-  const monad = registry.getTypeclass(typeName, 'Monad');
-  const eq = registry.getTypeclass(typeName, 'Eq');
-  const show = registry.getTypeclass(typeName, 'Show');
+  const functor = registry.get(`${typeName}.Functor`);
+  const monad = registry.get(`${typeName}.Monad`);
+  const eq = registry.get(`${typeName}.Eq`);
+  const show = registry.get(`${typeName}.Show`);
 
   let valid = true;
 

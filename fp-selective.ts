@@ -39,12 +39,12 @@ export const OptionSelective: Selective<OptionK> = {
 // Helpers
 export function whenS<F extends Kind1>(S: Selective<F>) {
   return (fc: Apply<F, [boolean]>, fa: Apply<F, [void]>): Apply<F, [void]> =>
-    S.select(S.map(fc as any, (b: boolean) => (b ? (Left<void, void>(undefined) as any) : (Right<void, void>(undefined) as any))) as any, S.map(fa as any, () => (_: void) => undefined) as any) as any;
+    S.select(S.map(fc as any, (b: boolean) => (b ? (Left<void>(undefined) as any) : (Right<void>(undefined) as any))) as any, S.map(fa as any, () => (_: void) => undefined) as any) as any;
 }
 
 export function ifS<F extends Kind1, A>(S: Selective<F>) {
   return (fb: Apply<F, [boolean]>, ft: Apply<F, [A]>, ff: Apply<F, [A]>): Apply<F, [A]> =>
-    S.select(S.map(fb as any, (b: boolean) => (b ? (Right<any, A>(undefined as any) as any) : (Left<any, A>(undefined as any) as any))) as any, S.map(ff as any, (x: A) => (_: any) => x) as any) as any;
+    S.select(S.map(fb as any, (b: boolean) => (b ? (Right<A>(undefined as any) as any) : (Left<any>(undefined as any) as any))) as any, S.map(ff as any, (x: A) => (_: any) => x) as any) as any;
 }
 
 // Branch on Either in F

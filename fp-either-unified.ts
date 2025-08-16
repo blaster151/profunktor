@@ -443,3 +443,17 @@ export type IsEitherPure<T> = EffectOfEither<T> extends 'Pure' ? true : false;
  * 2. Apply Law: Apply<EitherK, [L, R]> works correctly
  * 3. Typeclass Law: typeclasses work with EitherK
  */ 
+
+// ============================================================================
+// Part 8: Additional Exports
+// ============================================================================
+
+export const mapLeftEither = mapLeft;
+
+export const getOrElse = <L, R>(onLeft: (l: L) => R, either: Either<L, R>): R =>
+  matchEither(either, {
+    Left: (l: L) => onLeft(l),
+    Right: (r: R) => r
+  });
+
+export { EitherK } from './fp-hkt';

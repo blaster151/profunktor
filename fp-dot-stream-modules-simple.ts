@@ -317,11 +317,7 @@ function demonstrateIllegalEscalation() {
   console.log("Type-level validation:", "Would catch violations at compile time");
 }
 
-// Run the demonstration
-if (require.main === module) {
-  demonstrateMultiplicityTracking();
-  demonstrateMultiplicityComposition();
-  demonstrateIllegalEscalation();
-}
+// Browser-compatible execution check
+// Note: Examples can be called directly: demonstrateMultiplicityTracking(); demonstrateMultiplicityComposition(); demonstrateIllegalEscalation();
 
 // Intentionally no exports to avoid duplicate identifiers; use fp-dot-stream-modules-complete.ts

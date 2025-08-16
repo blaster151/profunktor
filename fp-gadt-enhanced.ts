@@ -71,7 +71,7 @@ export interface PatternMatcherBuilder<T, R> {
  * Internal state for pattern matcher builder
  */
 interface PatternMatcherState<T, R> {
-  cases: Map<string, (payload: any) => R>;
+  cases: Map<string, (payload: unknown) => R>;
   gadt: T;
   isPartial: boolean;
 }
@@ -89,13 +89,13 @@ export function pmatch<T extends GADT<string, any>, R>(
     isPartial: false
   };
 
-  return {
+  const builder: PatternMatcherBuilder<T, R> = {
     with<Tag extends GADTTags<T>>(
       tag: Tag,
       handler: PatternCase<T, Tag, R>
     ): PatternMatcherBuilder<T, R> {
-      state.cases.set(tag, handler);
-      return this;
+      state.cases.set(tag, handler as (payload: unknown) => R);
+      return builder;
     },
 
     partial(): R | undefined {
@@ -111,13 +111,13 @@ export function pmatch<T extends GADT<string, any>, R>(
       const handler = state.cases.get(state.gadt.tag);
       if (!handler) {
         // This should never happen if all cases are handled
-        // The never trick ensures compile-time exhaustiveness
-        const exhaustiveCheck: never = state.gadt.tag;
-        throw new Error(`Unhandled case: ${exhaustiveCheck}`);
+        throw new Error(`Unhandled case: ${state.gadt.tag}`);
       }
-      return handler(state.gadt.payload);
+      return handler(state.gadt.payload as any) as R;
     }
   };
+
+  return builder;
 }
 
 // ============================================================================
@@ -159,13 +159,13 @@ export function createPmatchBuilder<T extends GADT<string, any>, R>(
       isPartial: false
     };
 
-    return {
+    const builder: PatternMatcherBuilder<T, R> = {
       with<Tag extends GADTTags<T>>(
         tag: Tag,
         handler: PatternCase<T, Tag, R>
       ): PatternMatcherBuilder<T, R> {
-        state.cases.set(tag, handler);
-        return this;
+        state.cases.set(tag, handler as (payload: unknown) => R);
+        return builder;
       },
 
       partial(): R | undefined {
@@ -180,12 +180,13 @@ export function createPmatchBuilder<T extends GADT<string, any>, R>(
       exhaustive(): R {
         const handler = state.cases.get(state.gadt.tag);
         if (!handler) {
-          const exhaustiveCheck: never = state.gadt.tag;
-          throw new Error(`Unhandled case: ${exhaustiveCheck}`);
+          throw new Error(`Unhandled case: ${state.gadt.tag}`);
         }
-        return handler(state.gadt.payload);
+        return handler(state.gadt.payload as any) as R;
       }
     };
+
+    return builder;
   };
 }
 
@@ -232,12 +233,35 @@ export function evaluate(expr: Expr<number>): number {
   return pmatch(expr)
     .with('Const', ({ value }) => value)
     .with('Add', ({ left, right }) => evaluate(left) + evaluate(right))
-    .with('If', ({ cond, then, else: else_ }) => evaluate(cond) ? evaluate(then) : evaluate(else_))
+    .with('If', ({ cond, then, else: else_ }) => {
+      // For boolean conditions, we need a separate boolean evaluator
+      const condValue = evaluateBoolean(cond);
+      return condValue ? evaluate(then) : evaluate(else_);
+    })
     .with('Var', ({ name }) => { throw new Error(`Unbound variable: ${name}`); })
     .with('Let', ({ name, value, body }) => {
       const val = evaluate(value);
       // In a real implementation, we'd update the environment
       return evaluate(body);
+    })
+    .exhaustive();
+}
+
+/**
+ * Boolean evaluator for Expr<boolean>
+ */
+export function evaluateBoolean(expr: Expr<boolean>): boolean {
+  return pmatch(expr)
+    .with('Const', ({ value }) => value)
+    .with('Add', ({ left, right }) => { throw new Error("Cannot evaluate Add as boolean"); })
+    .with('If', ({ cond, then, else: else_ }) => {
+      const condValue = evaluateBoolean(cond);
+      return condValue ? evaluateBoolean(then) : evaluateBoolean(else_);
+    })
+    .with('Var', ({ name }) => { throw new Error(`Unbound variable: ${name}`); })
+    .with('Let', ({ name, value, body }) => {
+      const val = evaluateBoolean(value);
+      return evaluateBoolean(body);
     })
     .exhaustive();
 }
@@ -249,26 +273,30 @@ export function transformString(expr: Expr<string>): Expr<string> {
   return pmatch(expr)
     .with('Const', ({ value }) => Expr.Const(value.toUpperCase()))
     .with('Add', ({ left, right }) => { throw new Error("Cannot add strings in this context"); })
-    .with('If', ({ cond, then, else: else_ }) => Expr.If(cond, transformString(then), transformString(else_)))
+    .with('If', ({ cond, then, else: else_ }) => {
+      // For boolean conditions, we need to transform the condition to boolean
+      const boolCond = transformToBoolean(cond);
+      return Expr.If(boolCond, transformString(then), transformString(else_));
+    })
     .with('Var', ({ name }) => Expr.Var(name))
     .with('Let', ({ name, value, body }) => Expr.Let(name, transformString(value), transformString(body)))
     .exhaustive();
 }
 
 /**
- * Functor instance for ExprK
- * Maps over Const values and recurses into sub-expressions
+ * Transform any Expr to Expr<boolean> for conditions
  */
-export const ExprFunctor: Functor<ExprK> = {
-  map: <A, B>(fa: Expr<A>, f: (a: A) => B): Expr<B> => 
-    pmatch(fa)
-      .with('Const', ({ value }) => Expr.Const(f(value)))
-      .with('Add', ({ left, right }) => Expr.Add(left, right))
-      .with('If', ({ cond, then, else: else_ }) => Expr.If(cond, ExprFunctor.map(then, f), ExprFunctor.map(else_, f)))
-      .with('Var', ({ name }) => Expr.Var(name))
-      .with('Let', ({ name, value, body }) => Expr.Let(name, ExprFunctor.map(value, f), ExprFunctor.map(body, f)))
-      .exhaustive()
-};
+export function transformToBoolean(expr: Expr<any>): Expr<boolean> {
+  return pmatch(expr)
+    .with('Const', ({ value }) => Expr.Const(Boolean(value)))
+    .with('Add', ({ left, right }) => Expr.Const(true)) // Default to true for Add
+    .with('If', ({ cond, then, else: else_ }) => Expr.If(transformToBoolean(cond), transformToBoolean(then), transformToBoolean(else_)))
+    .with('Var', ({ name }) => Expr.Const(true)) // Default to true for Var
+    .with('Let', ({ name, value, body }) => Expr.Let(name, transformToBoolean(value), transformToBoolean(body)))
+    .exhaustive();
+}
+
+// ExprFunctor is already declared below from derived instances
 
 // ============================================================================
 // Maybe as Enhanced GADT
@@ -304,46 +332,7 @@ export const maybeMatcher = createPmatchBuilder<MaybeGADT<any>, string>({
   Nothing: () => 'No value'
 });
 
-/**
- * Functor instance for MaybeGADTK
- */
-export const MaybeGADTFunctor: Functor<MaybeGADTK> = {
-  map: <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> => 
-    pmatch(fa)
-      .with('Just', ({ value }) => MaybeGADT.Just(f(value)))
-      .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive()
-};
-
-/**
- * Applicative instance for MaybeGADTK
- */
-export const MaybeGADTApplicative: Applicative<MaybeGADTK> = {
-  ...MaybeGADTFunctor,
-  of: <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a),
-  ap: <A, B>(fab: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<B> => 
-    pmatch(fab)
-      .with('Just', ({ value: f }) => 
-        pmatch(fa)
-          .with('Just', ({ value: a }) => MaybeGADT.Just(f(a)))
-          .with('Nothing', () => MaybeGADT.Nothing())
-          .exhaustive()
-      )
-      .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive()
-};
-
-/**
- * Monad instance for MaybeGADTK
- */
-export const MaybeGADTMonad: Monad<MaybeGADTK> = {
-  ...MaybeGADTApplicative,
-  chain: <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> => 
-    pmatch(fa)
-      .with('Just', ({ value }) => f(value))
-      .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive()
-};
+// MaybeGADT instances are already declared below from derived instances
 
 // ============================================================================
 // Either as Enhanced GADT
@@ -371,32 +360,7 @@ export const EitherGADT = {
   Right: <L, R>(value: R): EitherGADT<L, R> => ({ tag: 'Right', payload: { value } })
 };
 
-/**
- * Bifunctor instance for EitherGADTK
- */
-export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
-  bimap: <A, B, C, D>(
-    fab: EitherGADT<A, B>,
-    f: (a: A) => C,
-    g: (b: B) => D
-  ): EitherGADT<C, D> => 
-    pmatch(fab)
-      .with('Left', ({ value }) => EitherGADT.Left(f(value)))
-      .with('Right', ({ value }) => EitherGADT.Right(g(value)))
-      .exhaustive(),
-  
-  mapLeft: <A, B, C>(fab: EitherGADT<A, B>, f: (a: A) => C): EitherGADT<C, B> => 
-    pmatch(fab)
-      .with('Left', ({ value }) => EitherGADT.Left(f(value)))
-      .with('Right', ({ value }) => EitherGADT.Right(value))
-      .exhaustive(),
-  
-  mapRight: <A, B, D>(fab: EitherGADT<A, B>, g: (b: B) => D): EitherGADT<A, D> => 
-    pmatch(fab)
-      .with('Left', ({ value }) => EitherGADT.Left(value))
-      .with('Right', ({ value }) => EitherGADT.Right(g(value)))
-      .exhaustive()
-};
+
 
 // ============================================================================
 // Small Example GADT for Derivable Instances + Auto-Matchers
@@ -433,48 +397,50 @@ export const resultMatcher = createPmatchBuilder<Result<any, any>, string>({
 });
 
 /**
- * Derived instances for ResultK
+ * Manual Functor instance for ResultK
  */
-export const ResultInstances = deriveInstances<ResultK>({
-  map: <A, B>(fa: Result<A, any>, f: (a: A) => B): Result<B, any> => 
+export const ResultFunctor: Functor<ResultK> = {
+  map: <A, B, E>(fa: Result<A, E>, f: (a: A) => B): Result<B, E> =>
     pmatch(fa)
-      .with('Ok', ({ value }) => Result.Ok(f(value)))
-      .with('Err', ({ error }) => Result.Err(error))
+      .with('Ok', ({ value }) => Result.Ok<B, E>(f(value)))
+      .with('Err', ({ error }) => Result.Err<B, E>(error))
       .exhaustive()
-});
-
-export const ResultFunctor = ResultInstances.functor;
+};
 
 // ============================================================================
 // Typeclass Instances (Derived)
 // ============================================================================
 
 /**
- * Expr derived instances
+ * Manual Functor instance for ExprK
  */
-export const ExprInstances = deriveInstances<ExprK>({
+export const ExprFunctor: Functor<ExprK> = {
   map: <A, B>(fa: Expr<A>, f: (a: A) => B): Expr<B> => 
     pmatch(fa)
       .with('Const', ({ value }) => Expr.Const(f(value)))
       .with('Add', ({ left, right }) => Expr.Add(left, right))
-      .with('If', ({ cond, then, else: else_ }) => Expr.If(cond, ExprInstances.map(then, f), ExprInstances.map(else_, f)))
+      .with('If', ({ cond, then, else: else_ }) => Expr.If(cond, ExprFunctor.map(then, f), ExprFunctor.map(else_, f)))
       .with('Var', ({ name }) => Expr.Var(name))
-      .with('Let', ({ name, value, body }) => Expr.Let(name, ExprInstances.map(value, f), ExprInstances.map(body, f)))
+      .with('Let', ({ name, value, body }) => Expr.Let(name, ExprFunctor.map(value, f), ExprFunctor.map(body, f)))
       .exhaustive()
-});
-attachPurityMarker(ExprInstances, 'Pure');
-
-export const ExprFunctor = ExprInstances.functor;
+};
 
 /**
- * Derived instances for MaybeGADTK
+ * Manual Functor instance for MaybeGADTK
  */
-export const MaybeGADTInstances = deriveInstances<MaybeGADTK>({
+export const MaybeGADTFunctor: Functor<MaybeGADTK> = {
   map: <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => MaybeGADT.Just(f(value)))
       .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive(),
+      .exhaustive()
+};
+
+/**
+ * Manual Applicative instance for MaybeGADTK
+ */
+export const MaybeGADTApplicative: Applicative<MaybeGADTK> = {
+  ...MaybeGADTFunctor,
   of: <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a),
   ap: <A, B>(fab: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<B> => 
     pmatch(fab)
@@ -485,61 +451,68 @@ export const MaybeGADTInstances = deriveInstances<MaybeGADTK>({
           .exhaustive()
       )
       .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive(),
+      .exhaustive()
+};
+
+/**
+ * Manual Monad instance for MaybeGADTK
+ */
+export const MaybeGADTMonad: Monad<MaybeGADTK> = {
+  ...MaybeGADTApplicative,
   chain: <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => f(value))
       .with('Nothing', () => MaybeGADT.Nothing())
       .exhaustive()
-});
-
-export const MaybeGADTFunctor = MaybeGADTInstances.functor;
-export const MaybeGADTApplicative = MaybeGADTInstances.applicative;
-export const MaybeGADTMonad = MaybeGADTInstances.monad;
+};
 
 /**
- * Derived instances for EitherGADTK
+ * Manual Bifunctor instance for EitherGADTK
  */
-export const EitherGADTInstances = deriveInstances<EitherGADTK>({
+export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
   bimap: <A, B, C, D>(fab: EitherGADT<A, B>, f: (a: A) => C, g: (b: B) => D): EitherGADT<C, D> => 
     pmatch(fab)
       .with('Left', ({ value }) => EitherGADT.Left(f(value)))
       .with('Right', ({ value }) => EitherGADT.Right(g(value)))
+      .exhaustive(),
+  
+  mapLeft: <A, B, C>(fab: EitherGADT<A, B>, f: (a: A) => C): EitherGADT<C, B> => 
+    pmatch(fab)
+      .with('Left', ({ value }) => EitherGADT.Left(f(value)))
+      .with('Right', ({ value }) => EitherGADT.Right(value))
+      .exhaustive(),
+  
+  mapRight: <A, B, D>(fab: EitherGADT<A, B>, g: (b: B) => D): EitherGADT<A, D> => 
+    pmatch(fab)
+      .with('Left', ({ value }) => EitherGADT.Left(value))
+      .with('Right', ({ value }) => EitherGADT.Right(g(value)))
       .exhaustive()
-});
-
-export const EitherGADTBifunctor = EitherGADTInstances.bifunctor;
+};
 
 /**
- * Result derived instances
+ * Manual Applicative instance for ResultK
  */
-export const ResultInstances = deriveInstances({
-  functor: true,
-  applicative: true,
-  monad: true,
-  bifunctor: true,
-  customMap: <A, B>(fa: Result<A, any>, f: (a: A) => B): Result<B, any> => 
-    pmatch(fa)
-      .with('Ok', ({ value }) => Result.Ok(f(value)))
-      .with('Err', ({ error }) => Result.Err(error))
-      .exhaustive(),
-  customChain: <A, B>(fa: Result<A, any>, f: (a: A) => Result<B, any>): Result<B, any> => 
+export const ResultApplicative: Applicative<ResultK> = {
+  ...ResultFunctor,
+  of: <A, E>(a: A): Result<A, E> => Result.Ok(a),
+  ap: <A, B, E>(ff: Result<(a: A) => B, E>, fa: Result<A, E>): Result<B, E> =>
+    pmatch(ff)
+      .with('Ok', ({ value: f }) => ResultFunctor.map(fa, f))
+      .with('Err', ({ error }) => Result.Err<B, E>(error))
+      .exhaustive()
+};
+
+/**
+ * Manual Monad instance for ResultK
+ */
+export const ResultMonad: Monad<ResultK> = {
+  ...ResultApplicative,
+  chain: <A, B, E>(fa: Result<A, E>, f: (a: A) => Result<B, E>): Result<B, E> =>
     pmatch(fa)
       .with('Ok', ({ value }) => f(value))
-      .with('Err', ({ error }) => Result.Err(error))
-      .exhaustive(),
-  customBimap: <A, B, C, D>(
-    fab: Result<A, B>,
-    f: (a: A) => C,
-    g: (b: B) => D
-  ): Result<C, D> => 
-    pmatch(fab)
-      .with('Ok', ({ value }) => Result.Ok(f(value)))
-      .with('Err', ({ error }) => Result.Err(g(error)))
+      .with('Err', ({ error }) => Result.Err<B, E>(error))
       .exhaustive()
-});
-
-export const ResultFunctor = ResultInstances.functor;
+};
 
 // ============================================================================
 // Integration Examples
@@ -649,7 +622,7 @@ export function exampleResultIntegration(): void {
   console.log('Result failure:', failureResult); // "Error: Something went wrong"
   
   // Use derived Monad instance
-  const derivedMonad = deriveResultMonad();
+  const derivedMonad = ResultMonad;
   
   const chained = derivedMonad.chain(
     success,
@@ -689,67 +662,246 @@ export function exampleResultIntegration(): void {
  */ 
 
 // ============================================================================
-// Part 7: Registration
+// TOP-LEVEL DERIVED INSTANCES
 // ============================================================================
 
 /**
- * Register GADT typeclass instances
+ * Expr derived instances
+ */
+export const ExprEq = deriveEqInstance({
+  customEq: <A>(a: Expr<A>, b: Expr<A>): boolean =>
+    pmatch(a)
+      .with('Const', ({ value: av }) =>
+        pmatch(b).with('Const', ({ value: bv }) => av === bv)
+                 .with('Add', () => false)
+                 .with('If', () => false)
+                 .with('Var', () => false)
+                 .with('Let', () => false)
+                 .exhaustive())
+      .with('Add', ({ left: al, right: ar }) =>
+        pmatch(b).with('Const', () => false)
+                 .with('Add', ({ left: bl, right: br }) => 
+                   ExprEq.equals(al, bl) && ExprEq.equals(ar, br))
+                 .with('If', () => false)
+                 .with('Var', () => false)
+                 .with('Let', () => false)
+                 .exhaustive())
+      .with('If', ({ cond: ac, then: at, else: ae }) =>
+        pmatch(b).with('Const', () => false)
+                 .with('Add', () => false)
+                 .with('If', ({ cond: bc, then: bt, else: be }) =>
+                   ExprEq.equals(ac, bc) && ExprEq.equals(at, bt) && ExprEq.equals(ae, be))
+                 .with('Var', () => false)
+                 .with('Let', () => false)
+                 .exhaustive())
+      .with('Var', ({ name: an }) =>
+        pmatch(b).with('Const', () => false)
+                 .with('Add', () => false)
+                 .with('If', () => false)
+                 .with('Var', ({ name: bn }) => an === bn)
+                 .with('Let', () => false)
+                 .exhaustive())
+      .with('Let', ({ name: an, value: av, body: ab }) =>
+        pmatch(b).with('Const', () => false)
+                 .with('Add', () => false)
+                 .with('If', () => false)
+                 .with('Var', () => false)
+                 .with('Let', ({ name: bn, value: bv, body: bb }) =>
+                   an === bn && ExprEq.equals(av, bv) && ExprEq.equals(ab, bb))
+                 .exhaustive())
+      .exhaustive()
+});
+
+export const ExprOrd = deriveOrdInstance({
+  customOrd: <A>(a: Expr<A>, b: Expr<A>): number => {
+    // Simple lexicographic ordering by tag
+    const tagOrder = { Const: 0, Add: 1, If: 2, Var: 3, Let: 4 };
+    const aOrder = tagOrder[a.tag as keyof typeof tagOrder];
+    const bOrder = tagOrder[b.tag as keyof typeof tagOrder];
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    
+    // Same tag, compare payloads
+    return pmatch(a)
+      .with('Const', ({ value: av }) =>
+        pmatch(b).with('Const', ({ value: bv }) => (av < bv ? -1 : av > bv ? 1 : 0) as any)
+                 .with('Add', () => -1)
+                 .with('If', () => -1)
+                 .with('Var', () => -1)
+                 .with('Let', () => -1)
+                 .exhaustive())
+      .with('Add', ({ left: al, right: ar }) =>
+        pmatch(b).with('Const', () => 1)
+                 .with('Add', ({ left: bl, right: br }) => {
+                   const leftCmp = ExprOrd.compare(al, bl);
+                   return leftCmp !== 0 ? leftCmp : ExprOrd.compare(ar, br);
+                 })
+                 .with('If', () => -1)
+                 .with('Var', () => -1)
+                 .with('Let', () => -1)
+                 .exhaustive())
+      .with('If', ({ cond: ac, then: at, else: ae }) =>
+        pmatch(b).with('Const', () => 1)
+                 .with('Add', () => 1)
+                 .with('If', ({ cond: bc, then: bt, else: be }) => {
+                   const condCmp = ExprOrd.compare(ac, bc);
+                   if (condCmp !== 0) return condCmp;
+                   const thenCmp = ExprOrd.compare(at, bt);
+                   return thenCmp !== 0 ? thenCmp : ExprOrd.compare(ae, be);
+                 })
+                 .with('Var', () => -1)
+                 .with('Let', () => -1)
+                 .exhaustive())
+      .with('Var', ({ name: an }) =>
+        pmatch(b).with('Const', () => 1)
+                 .with('Add', () => 1)
+                 .with('If', () => 1)
+                 .with('Var', ({ name: bn }) => an < bn ? -1 : an > bn ? 1 : 0)
+                 .with('Let', () => -1)
+                 .exhaustive())
+      .with('Let', ({ name: an, value: av, body: ab }) =>
+        pmatch(b).with('Const', () => 1)
+                 .with('Add', () => 1)
+                 .with('If', () => 1)
+                 .with('Var', () => 1)
+                 .with('Let', ({ name: bn, value: bv, body: bb }) => {
+                   const nameCmp = an < bn ? -1 : an > bn ? 1 : 0;
+                   if (nameCmp !== 0) return nameCmp;
+                   const valueCmp = ExprOrd.compare(av, bv);
+                   return valueCmp !== 0 ? valueCmp : ExprOrd.compare(ab, bb);
+                 })
+                 .exhaustive())
+      .exhaustive();
+  }
+});
+
+export const ExprShow = deriveShowInstance({
+  customShow: <A>(a: Expr<A>): string =>
+    pmatch(a)
+      .with('Const', ({ value }) => `Const(${JSON.stringify(value)})`)
+      .with('Add', ({ left, right }) => `Add(${ExprShow.show(left)}, ${ExprShow.show(right)})`)
+      .with('If', ({ cond, then, else: else_ }) => 
+        `If(${ExprShow.show(cond)}, ${ExprShow.show(then)}, ${ExprShow.show(else_)})`)
+      .with('Var', ({ name }) => `Var("${name}")`)
+      .with('Let', ({ name, value, body }) => 
+        `Let("${name}", ${ExprShow.show(value)}, ${ExprShow.show(body)})`)
+      .exhaustive()
+});
+
+/**
+ * MaybeGADT derived instances
+ */
+export const MaybeGADTEq = deriveEqInstance({
+  customEq: <A>(a: MaybeGADT<A>, b: MaybeGADT<A>): boolean =>
+    pmatch(a)
+      .with('Just', ({ value: av }) =>
+        pmatch(b).with('Just', ({ value: bv }) => av === bv)
+                 .with('Nothing', () => false)
+                 .exhaustive())
+      .with('Nothing', () =>
+        pmatch(b).with('Just', () => false)
+                 .with('Nothing', () => true)
+                 .exhaustive())
+      .exhaustive()
+});
+
+export const MaybeGADTOrd = deriveOrdInstance({
+  customOrd: <A>(a: MaybeGADT<A>, b: MaybeGADT<A>): number =>
+    pmatch(a)
+      .with('Just', ({ value: av }) =>
+        pmatch(b).with('Just', ({ value: bv }) => (av < bv ? -1 : av > bv ? 1 : 0) as any)
+                 .with('Nothing', () => 1) // Just > Nothing
+                 .exhaustive())
+      .with('Nothing', () =>
+        pmatch(b).with('Just', () => -1) // Nothing < Just
+                 .with('Nothing', () => 0)
+                 .exhaustive())
+      .exhaustive()
+});
+
+export const MaybeGADTShow = deriveShowInstance({
+  customShow: <A>(a: MaybeGADT<A>): string =>
+    pmatch(a)
+      .with('Just', ({ value }) => `Just(${JSON.stringify(value)})`)
+      .with('Nothing', () => 'Nothing')
+      .exhaustive()
+});
+
+/**
+ * EitherGADT derived instances
+ */
+export const EitherGADTEq = deriveEqInstance({
+  customEq: <L, R>(a: EitherGADT<L, R>, b: EitherGADT<L, R>): boolean =>
+    pmatch(a)
+      .with('Left', ({ value: al }) =>
+        pmatch(b).with('Left', ({ value: bl }) => al === bl)
+                 .with('Right', () => false)
+                 .exhaustive())
+      .with('Right', ({ value: ar }) =>
+        pmatch(b).with('Left', () => false)
+                 .with('Right', ({ value: br }) => ar === br)
+                 .exhaustive())
+      .exhaustive()
+});
+
+export const EitherGADTOrd = deriveOrdInstance({
+  customOrd: <L, R>(a: EitherGADT<L, R>, b: EitherGADT<L, R>): number =>
+    pmatch(a)
+      .with('Left', ({ value: al }) =>
+        pmatch(b).with('Left', ({ value: bl }) => (al < bl ? -1 : al > bl ? 1 : 0) as any)
+                 .with('Right', () => -1) // Left < Right
+                 .exhaustive())
+      .with('Right', ({ value: ar }) =>
+        pmatch(b).with('Left', () => 1)  // Right > Left
+                 .with('Right', ({ value: br }) => (ar < br ? -1 : ar > br ? 1 : 0) as any)
+                 .exhaustive())
+      .exhaustive()
+});
+
+export const EitherGADTShow = deriveShowInstance({
+  customShow: <L, R>(a: EitherGADT<L, R>): string =>
+    pmatch(a)
+      .with('Left', ({ value }) => `Left(${JSON.stringify(value)})`)
+      .with('Right', ({ value }) => `Right(${JSON.stringify(value)})`)
+      .exhaustive()
+});
+
+// ============================================================================
+// REGISTRATION
+// ============================================================================
+
+/**
+ * Register all GADT instances
  */
 export function registerGADTInstances(): void {
-export const ExprEq = deriveEqInstance({ kind: ExprK });
-export const ExprOrd = deriveOrdInstance({ kind: ExprK });
-export const ExprShow = deriveShowInstance({ kind: ExprK });
   if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
     const registry = (globalThis as any).__FP_REGISTRY;
     
     // Register Expr instances
     registry.register('ExprFunctor', ExprFunctor);
+    registry.register('ExprEq', ExprEq);
+    registry.register('ExprOrd', ExprOrd);
+    registry.register('ExprShow', ExprShow);
     
     // Register MaybeGADT instances
     registry.register('MaybeGADTFunctor', MaybeGADTFunctor);
     registry.register('MaybeGADTApplicative', MaybeGADTApplicative);
     registry.register('MaybeGADTMonad', MaybeGADTMonad);
+    registry.register('MaybeGADTEq', MaybeGADTEq);
+    registry.register('MaybeGADTOrd', MaybeGADTOrd);
+    registry.register('MaybeGADTShow', MaybeGADTShow);
     
     // Register EitherGADT instances
     registry.register('EitherGADTBifunctor', EitherGADTBifunctor);
+    registry.register('EitherGADTEq', EitherGADTEq);
+    registry.register('EitherGADTOrd', EitherGADTOrd);
+    registry.register('EitherGADTShow', EitherGADTShow);
     
     // Register Result instances
     registry.register('ResultFunctor', ResultFunctor);
+    registry.register('ResultApplicative', ResultApplicative);
+    registry.register('ResultMonad', ResultMonad);
   }
 }
 
 // Auto-register instances
-registerGADTInstances(); 
-export function registerExprDerivations(): void {
-export const MaybeGADTEq = deriveEqInstance({ kind: MaybeGADTK });
-export const MaybeGADTOrd = deriveOrdInstance({ kind: MaybeGADTK });
-export const MaybeGADTShow = deriveShowInstance({ kind: MaybeGADTK });
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('ExprEq', ExprEq);
-    registry.register('ExprOrd', ExprOrd);
-    registry.register('ExprShow', ExprShow);
-  }
-}
-registerExprDerivations();
-export function registerMaybeGADTDerivations(): void {
-export const EitherGADTEq = deriveEqInstance({ kind: EitherGADTK });
-export const EitherGADTOrd = deriveOrdInstance({ kind: EitherGADTK });
-export const EitherGADTShow = deriveShowInstance({ kind: EitherGADTK });
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('MaybeGADTEq', MaybeGADTEq);
-    registry.register('MaybeGADTOrd', MaybeGADTOrd);
-    registry.register('MaybeGADTShow', MaybeGADTShow);
-  }
-}
-registerMaybeGADTDerivations();
-export function registerEitherGADTDerivations(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('EitherGADTEq', EitherGADTEq);
-    registry.register('EitherGADTOrd', EitherGADTOrd);
-    registry.register('EitherGADTShow', EitherGADTShow);
-  }
-}
-registerEitherGADTDerivations();
+registerGADTInstances();

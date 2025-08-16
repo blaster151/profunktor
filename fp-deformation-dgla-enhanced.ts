@@ -102,7 +102,7 @@ export function dHom<C, P>(
       
       // Compute (-1)^{|f|} * Σ f(c') where dC(c) = Σ c'
       const rightC: Sum<C> = C.dC(c);
-      const s = koszul(f.degree, 1) === 0 ? +1 : -1; // (-1)^{|f|}
+      const s = koszul(f.degree, 1); // (-1)^{|f|}
       
       let rightSum = P.zero();
       for (const { coef, term: cPrime } of rightC) {
@@ -146,7 +146,7 @@ export function bracket<C, P>(
     run(c: C): P {
       const fg = convProduct(C, P, f, g);
       const gf = convProduct(C, P, g, f);
-      const s = koszul(f.degree, g.degree) === 0 ? +1 : -1;
+      const s = koszul(f.degree, g.degree);
       
       const fgResult = fg.run(c);
       const gfResult = gf.run(c);
@@ -179,8 +179,8 @@ export function isMaurerCartan<C, P>(
     const dAlphaC = dAlpha.run(c);
     
     // Compute 1/2 [α, α](c)
-    const bracket = bracket(C, P, alpha, alpha);
-    const bracketC = bracket.run(c);
+    const bracketResult = bracket(C, P, alpha, alpha);
+    const bracketC = bracketResult.run(c);
     const halfBracket = P.scale(0.5, bracketC);
     
     // Check: d(α)(c) + 1/2 [α, α](c) = 0

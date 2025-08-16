@@ -27,29 +27,49 @@ import {
   deriveOrdInstance, 
   deriveShowInstance 
 } from './fp-derivation-helpers';
+import { attachPurityMarker } from './fp-purity';
 
 /**
  * MaybeGADT derived instances
  */
-export const MaybeGADTInstances = deriveInstances({
-  functor: true,
-  applicative: true,
-  monad: true,
-  customMap: <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> => 
-    matchMaybe(fa, {
-      Just: (value) => MaybeGADT.Just(f(value)),
-      Nothing: () => MaybeGADT.Nothing()
-    }),
-  customChain: <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> => 
-    matchMaybe(fa, {
-      Just: (value) => f(value),
-      Nothing: () => MaybeGADT.Nothing()
-    })
-});
 
-export const MaybeGADTFunctor = MaybeGADTInstances.functor;
-export const MaybeGADTApplicative = MaybeGADTInstances.applicative;
-export const MaybeGADTMonad = MaybeGADTInstances.monad;
+
+const maybeMap = <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> =>
+  matchMaybe(fa, {
+    Just: (value) => MaybeGADT.Just(f(value)),
+    Nothing: () => MaybeGADT.Nothing()
+  });
+
+const maybeOf = <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a);
+
+const maybeAp = <A, B>(ff: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<B> =>
+  matchMaybe(ff, {
+    Nothing: () => MaybeGADT.Nothing(),
+    Just: (f) =>
+      matchMaybe(fa, {
+        Nothing: () => MaybeGADT.Nothing(),
+        Just: (a) => MaybeGADT.Just(f(a))
+      })
+  });
+
+const maybeChain = <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> =>
+  matchMaybe(fa, {
+    Just: (value) => f(value),
+    Nothing: () => MaybeGADT.Nothing()
+  });
+
+// 2) Actual instances (choose one style)
+
+// (a) Via your derive* helpers:
+export const MaybeGADTFunctor: Functor<MaybeGADTK> =
+  deriveFunctor<MaybeGADTK>(maybeMap);
+
+export const MaybeGADTApplicative: Applicative<MaybeGADTK> =
+  deriveApplicative<MaybeGADTK>(maybeOf, maybeAp);
+
+export const MaybeGADTMonad: Monad<MaybeGADTK> =
+  deriveMonad<MaybeGADTK>(maybeOf, maybeChain);
+
 
 /**
  * MaybeGADT standard typeclass instances
@@ -99,20 +119,23 @@ export const MaybeGADTShow = deriveShowInstance({
 /**
  * EitherGADT derived instances
  */
-export const EitherGADTInstances = deriveInstances({
-  bifunctor: true,
-  customBimap: <A, B, C, D>(
+export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
+  bimap: <A, B, C, D>(
     fab: EitherGADT<A, B>,
     f: (a: A) => C,
     g: (b: B) => D
-  ): EitherGADT<C, D> => 
+  ): EitherGADT<C, D> =>
     matchEither(fab, {
-      Left: (value) => EitherGADT.Left(f(value)),
-      Right: (value) => EitherGADT.Right(g(value))
-    })
-});
+      Left:  (value) => EitherGADT.Left<C, D>(f(value)),
+      Right: (value) => EitherGADT.Right<C, D>(g(value)),
+    }),
 
-export const EitherGADTBifunctor = EitherGADTInstances.bifunctor;
+  mapLeft:  <A, B, C>(fab: EitherGADT<A, B>, f: (a: A) => C): EitherGADT<C, B> =>
+    EitherGADTBifunctor.bimap(fab, f, (b) => b),
+
+  mapRight: <A, B, D>(fab: EitherGADT<A, B>, g: (b: B) => D): EitherGADT<A, D> =>
+    EitherGADTBifunctor.bimap(fab, (a) => a, g),
+};
 
 /**
  * EitherGADT standard typeclass instances
@@ -166,16 +189,24 @@ export const EitherGADTShow = deriveShowInstance({
 /**
  * Derived instances for ListGADTK
  */
-export const ListGADTInstances = deriveInstances<ListGADTK>({
-  map: <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> => 
+// Make sure your matchList unwraps the payload object:
+// Cons: ({ head, tail }) => k.Cons(head, tail)
+const mapList = <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> =>
+  matchList(fa, {
+    Nil: () => ListGADT.Nil(),
+    Cons: (head, tail) => ListGADT.Cons(f(head), mapList(tail, f))
+  });
+
+export const ListGADTFunctor: Functor<ListGADTK> = {
+  map: <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> =>
     matchList(fa, {
       Nil: () => ListGADT.Nil(),
-      Cons: (head, tail) => ListGADT.Cons(f(head), ListGADTInstances.map(tail, f))
+      Cons: (head, tail) => ListGADT.Cons(f(head), ListGADTFunctor.map(tail, f))
     })
-});
-attachPurityMarker(ListGADTInstances, 'Pure');
+};
 
-export const ListGADTFunctor = ListGADTInstances.functor;
+attachPurityMarker(ListGADTFunctor, 'Pure');
+
 
 /**
  * ListGADT standard typeclass instances
@@ -320,6 +351,14 @@ export const Expr = {
     ({ tag: 'Let', payload: { name, value, body } })
 };
 
+function evalBool(e: Expr<boolean>): boolean {
+  switch (e.tag) {
+    case 'Const': return e.payload.value;
+    case 'If':    return evalBool(e.payload.cond) ? evalBool(e.payload.then) : evalBool(e.payload.else);
+    default:      throw new Error('boolean ops not implemented');
+  }
+}
+
 /**
  * Type-safe evaluator for Expr<number>
  */
@@ -330,7 +369,7 @@ export function evaluate(expr: Expr<number>): number {
     case 'Add':
       return evaluate(expr.payload.left) + evaluate(expr.payload.right);
     case 'If':
-      return evaluate(expr.payload.cond) ? evaluate(expr.payload.then) : evaluate(expr.payload.else);
+      return evalBool(expr.payload.cond) ? evaluate(expr.payload.then) : evaluate(expr.payload.else);
     case 'Var':
       throw new Error(`Unbound variable: ${expr.payload.name}`);
     case 'Let':
@@ -432,41 +471,16 @@ export const EitherGADT = {
  * Type-safe pattern matcher for EitherGADT
  */
 export function matchEither<L, R, B>(
-  either: EitherGADT<L, R>,
-  cases: {
-    Left: (value: L) => B;
-    Right: (value: R) => B;
-  }
+  e: EitherGADT<L, R>,
+  k: { Left: (value: L) => B; Right: (value: R) => B }
 ): B {
-  return match(either, cases);
+  return match(e as any, {
+    Left: ({ value }) => k.Left(value),
+    Right: ({ value }) => k.Right(value),
+  });
 }
 
-/**
- * Bifunctor instance for EitherGADT
- */
-export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
-  bimap: <A, B, C, D>(
-    fab: EitherGADT<A, B>,
-    f: (a: A) => C,
-    g: (b: B) => D
-  ): EitherGADT<C, D> => 
-    matchEither(fab, {
-      Left: (value) => EitherGADT.Left(f(value)),
-      Right: (value) => EitherGADT.Right(g(value))
-    }),
-  
-  mapLeft: <A, B, C>(fab: EitherGADT<A, B>, f: (a: A) => C): EitherGADT<C, B> => 
-    matchEither(fab, {
-      Left: (value) => EitherGADT.Left(f(value)),
-      Right: (value) => EitherGADT.Right(value)
-    }),
-  
-  mapRight: <A, B, D>(fab: EitherGADT<A, B>, g: (b: B) => D): EitherGADT<A, D> => 
-    matchEither(fab, {
-      Left: (value) => EitherGADT.Left(value),
-      Right: (value) => EitherGADT.Right(g(value))
-    })
-};
+// EitherGADTBifunctor is already declared above from derived instances
 
 // ============================================================================
 // Advanced GADT Examples
@@ -498,25 +512,16 @@ export const ListGADT = {
  * Type-safe pattern matcher for ListGADT
  */
 export function matchList<A, B>(
-  list: ListGADT<A>,
-  cases: {
-    Nil: () => B;
-    Cons: (head: A, tail: ListGADT<A>) => B;
-  }
+  xs: ListGADT<A>,
+  k: { Nil: () => B; Cons: (head: A, tail: ListGADT<A>) => B }
 ): B {
-  return match(list, cases);
+  return match(xs, {
+    Nil: () => k.Nil(),
+    Cons: ({ head, tail }) => k.Cons(head, tail),
+  });
 }
 
-/**
- * Functor instance for ListGADT
- */
-export const ListGADTFunctor: Functor<ListGADTK> = {
-  map: <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> => 
-    matchList(fa, {
-      Nil: () => ListGADT.Nil(),
-      Cons: (head, tail) => ListGADT.Cons(f(head), ListGADTFunctor.map(tail, f))
-    })
-};
+// ListGADTFunctor is already declared above from derived instances
 
 // ============================================================================
 // Typed Folds (Catamorphisms) - Extra Credit
@@ -548,7 +553,7 @@ export function fold<A, Tag extends string, Payload, R>(
  * Example: Fold for Expr to evaluate to number
  */
 export function foldExprToNumber(expr: Expr<number>): number {
-  return fold(expr, {
+  return fold(expr as any, {
     Const: (payload) => payload.value,
     Add: (payload) => foldExprToNumber(payload.left) + foldExprToNumber(payload.right),
     If: (payload) => foldExprToNumber(payload.cond) ? foldExprToNumber(payload.then) : foldExprToNumber(payload.else),
@@ -650,7 +655,7 @@ export function exampleMaybeGADT(): void {
   // Test the derived instance
   const result = derivedMaybeMonad.chain(
     MaybeGADT.Just(5),
-    (x) => x > 3 ? MaybeGADT.Just(x * 2) : MaybeGADT.Nothing()
+    (x: number) => x > 3 ? MaybeGADT.Just(x * 2) : MaybeGADT.Nothing()
   );
   
   console.log('Derived MaybeGADT Monad:', result); // Just(10)

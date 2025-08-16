@@ -47,7 +47,7 @@ export type TagHandler<Tag extends string, Payload, Result> =
  * Handlers object for pattern matching
  */
 export type MatchHandlers<Spec extends ConstructorSpec, Result> = {
-  [K in keyof Spec]?: TagHandler<K, ReturnType<Spec[K]>, Result>;
+  [K in keyof Spec & string]?: TagHandler<K, ReturnType<Spec[K]>, Result>;
 } & {
   _?: (tag: string, payload: any) => Result;
   otherwise?: (tag: string, payload: any) => Result;
@@ -57,7 +57,7 @@ export type MatchHandlers<Spec extends ConstructorSpec, Result> = {
  * Tag-only handlers for .matchTag
  */
 export type TagOnlyHandlers<Spec extends ConstructorSpec, Result> = {
-  [K in keyof Spec]?: () => Result;
+  [K in keyof Spec & string]?: () => Result;
 } & {
   _?: (tag: string) => Result;
   otherwise?: (tag: string) => Result;
@@ -137,7 +137,7 @@ export interface EnhancedADTInstance<Spec extends ConstructorSpec> {
  */
 export interface ImmutableADTInstance<Spec extends ConstructorSpec> 
   extends EnhancedADTInstance<Spec> {
-  readonly __immutableBrand: unique symbol;
+  readonly __immutableBrand: symbol;
 }
 
 // ============================================================================
@@ -147,8 +147,7 @@ export interface ImmutableADTInstance<Spec extends ConstructorSpec>
 /**
  * Enhanced sum type builder with pattern matching
  */
-export interface EnhancedSumTypeBuilder<Spec extends ConstructorSpec> 
-  extends BaseSumTypeBuilder<Spec> {
+export interface EnhancedSumTypeBuilder<Spec extends ConstructorSpec> {
   
   /**
    * Create an instance with pattern matching capabilities
@@ -216,7 +215,7 @@ export function createSumType<Spec extends ConstructorSpec>(
     }
     
     match<Result>(handlers: MatchHandlers<Spec, Result>): Result {
-      const handler = handlers[this.tag];
+      const handler = handlers[this.tag as keyof typeof handlers];
       const fallback = handlers._ || handlers.otherwise;
       
       if (handler) {
@@ -230,7 +229,7 @@ export function createSumType<Spec extends ConstructorSpec>(
     }
     
     matchTag<Result>(handlers: TagOnlyHandlers<Spec, Result>): Result {
-      const handler = handlers[this.tag];
+      const handler = handlers[this.tag as keyof typeof handlers];
       const fallback = handlers._ || handlers.otherwise;
       
       if (handler) {
@@ -260,7 +259,7 @@ export function createSumType<Spec extends ConstructorSpec>(
   
   // Create immutable variant
   class ImmutableADT extends EnhancedADT implements ImmutableADTInstance<Spec> {
-    readonly __immutableBrand: unique symbol = {} as unique symbol;
+    readonly __immutableBrand = Symbol('immutable');
   }
   
   // Enhanced builder methods
@@ -316,8 +315,7 @@ export function createSumType<Spec extends ConstructorSpec>(
 /**
  * Enhanced product type builder with pattern matching
  */
-export interface EnhancedProductTypeBuilder<Fields extends ProductFields> 
-  extends BaseProductTypeBuilder<Fields> {
+export interface EnhancedProductTypeBuilder<Fields extends ProductFields> {
   
   /**
    * Create an instance with pattern matching capabilities
@@ -375,7 +373,7 @@ export interface EnhancedProductTypeInstance<Fields extends ProductFields> {
  */
 export interface ImmutableProductTypeInstance<Fields extends ProductFields> 
   extends EnhancedProductTypeInstance<Fields> {
-  readonly __immutableBrand: unique symbol;
+  readonly __immutableBrand: symbol;
 }
 
 /**
@@ -421,7 +419,7 @@ export function createProductType<Fields extends ProductFields>(
   
   // Create immutable variant
   class ImmutableProduct extends EnhancedProduct implements ImmutableProductTypeInstance<Fields> {
-    readonly __immutableBrand: unique symbol = {} as unique symbol;
+    readonly __immutableBrand = Symbol('immutable');
   }
   
   // Enhanced builder methods

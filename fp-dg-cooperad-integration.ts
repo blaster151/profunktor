@@ -200,10 +200,18 @@ export function validateCoLeibnizLaw<A>(
   
   for (const term of testTerms) {
     // Check: Δ(d(t)) = (d ⊗ id + id ⊗ d)(Δ(t))
-    const leftSide = dgCooperad.delta(dgCooperad.d(term));
+    const dTerm = dgCooperad.d(term);
+    let leftSide: Sum<[A, A]> = [];
+    
+    // Collect all terms from d(term) and apply delta to each
+    for (const { coef, term: dTermValue } of dTerm) {
+      const deltaResult = dgCooperad.delta(dTermValue);
+      leftSide = [...leftSide, ...deltaResult.map(({ coef: c, term }) => ({ coef: coef * c, term }))];
+    }
+    
     const rightSide = computeCoLeibnizRightSide(dgCooperad, term);
     
-    if (!sumsEqual(leftSide, rightSide, dgCooperad.key)) {
+    if (!sumsEqual(leftSide, rightSide, (pair: [A, A]) => `${dgCooperad.key(pair[0])}-${dgCooperad.key(pair[1])}`)) {
       failures.push(`Co-Leibniz failed for term: ${dgCooperad.key(term)}`);
     }
   }
@@ -222,20 +230,20 @@ function computeCoLeibnizRightSide<A>(
   term: A
 ): Sum<[A, A]> {
   const delta = dgCooperad.delta(term);
-  const result: Sum<[A, A]> = [];
+  let result: Array<{ coef: number; term: [A, A] }> = [];
   
   for (const { coef, term: [x, y] } of delta) {
     // (d ⊗ id)(x, y)
     const dx = dgCooperad.d(x);
     for (const { coef: a, term: dxTerm } of dx) {
-      result.push({ coef: coef * a, term: [dxTerm, y] });
+      result = [...result, { coef: coef * a, term: [dxTerm, y] }];
     }
     
     // (id ⊗ d)(x, y) with sign
     const dy = dgCooperad.d(y);
     const sign = (-1) ** (dgCooperad.degree(x) % 2);
     for (const { coef: b, term: dyTerm } of dy) {
-      result.push({ coef: coef * sign * b, term: [x, dyTerm] });
+      result = [...result, { coef: coef * sign * b, term: [x, dyTerm] }];
     }
   }
   

@@ -607,7 +607,5 @@ export {
   OptimizationOpportunities
 };
 
-// Run the demonstration
-if (require.main === module) {
-  demonstrateStreamPipeline();
-}
+// Browser-compatible execution check
+// Note: Examples can be called directly: demonstrateStreamPipeline();

@@ -11,8 +11,11 @@ import {
   Apply, Type, TypeArgs, KindArity, KindResult,
   ArrayK, MaybeK, EitherK, TupleK, FunctionK, PromiseK, SetK, MapK, ListK,
   ReaderK, WriterK, StateK,
-  Maybe, Either, List, Reader, Writer, State
+  List, Reader, Writer, State
 } from './fp-hkt';
+
+import { Maybe, Just, Nothing, matchMaybe } from './fp-maybe-unified';
+import { Either, Left, Right, matchEither } from './fp-either-unified';
 
 import {
   EffectTag, EffectOf, Pure, IO, Async,
@@ -118,17 +121,15 @@ export function ArrayMonoid<T>(): MonoidWithEffect<T[], 'Pure'> {
  */
 export function MaybeMonoid<A>(innerMonoid: Monoid<A>): MonoidWithEffect<Maybe<A>, 'Pure'> {
   return {
-    empty: Maybe.Just(innerMonoid.empty),
+    empty: Just(innerMonoid.empty),
     concat: (a: Maybe<A>, b: Maybe<A>) => {
-      if (a.isJust && b.isJust) {
-        return Maybe.Just(innerMonoid.concat(a.value, b.value));
-      } else if (a.isJust) {
-        return a;
-      } else if (b.isJust) {
-        return b;
-      } else {
-        return Maybe.Nothing();
-      }
+      return matchMaybe(a, {
+        Just: (aVal: A) => matchMaybe(b, {
+          Just: (bVal: A) => Just(innerMonoid.concat(aVal, bVal)),
+          Nothing: () => a
+        }),
+        Nothing: () => b
+      });
     },
     __effect: 'Pure'
   };
@@ -142,17 +143,18 @@ export function EitherMonoid<L, R>(
   rightMonoid: Monoid<R>
 ): MonoidWithEffect<Either<L, R>, 'Pure'> {
   return {
-    empty: Either.Right(rightMonoid.empty),
+    empty: Right(rightMonoid.empty),
     concat: (a: Either<L, R>, b: Either<L, R>) => {
-      if (a.isLeft && b.isLeft) {
-        return Either.Left(leftMonoid.concat(a.value, b.value));
-      } else if (a.isLeft) {
-        return a;
-      } else if (b.isLeft) {
-        return b;
-      } else {
-        return Either.Right(rightMonoid.concat(a.value, b.value));
-      }
+      return matchEither(a, {
+        Left: (aVal: L) => matchEither(b, {
+          Left: (bVal: L) => Left(leftMonoid.concat(aVal, bVal)),
+          Right: () => a
+        }),
+        Right: (aVal: R) => matchEither(b, {
+          Left: () => b,
+          Right: (bVal: R) => Right(rightMonoid.concat(aVal, bVal))
+        })
+      });
     },
     __effect: 'Pure'
   };
@@ -291,11 +293,12 @@ export const ArrayMonoidK: MonoidK<ArrayK> = {
  * MonoidK for Maybe
  */
 export const MaybeMonoidK: MonoidK<MaybeK> = {
-  empty: Maybe.Nothing() as any,
+  empty: Nothing() as any,
   concat: <A>(a: Maybe<A>, b: Maybe<A>): Maybe<A> => {
-    if (a.isJust) return a;
-    if (b.isJust) return b;
-    return Maybe.Nothing();
+    return matchMaybe(a, {
+      Just: () => a,
+      Nothing: () => b
+    });
   }
 };
 
@@ -341,44 +344,5 @@ export function extractMonoidPurityMarker<A, E extends EffectTag>(
 }
 
 // ============================================================================
-// Part 7: Export All
-// ============================================================================
-
-export {
-  // Core types
-  Monoid,
-  MonoidK,
-  MonoidWithEffect,
-  
-  // Built-in monoids
-  SumMonoid,
-  ProductMonoid,
-  AnyMonoid,
-  AllMonoid,
-  StringMonoid,
-  ArrayMonoid,
-  MaybeMonoid,
-  EitherMonoid,
-  
-  // Law validation
-  validateMonoidLaws,
-  testMonoidLaws,
-  
-  // Utilities
-  monoidFromSemigroup,
-  FirstMonoid,
-  LastMonoid,
-  MinMonoid,
-  MaxMonoid,
-  
-  // HKT instances
-  ArrayMonoidK,
-  MaybeMonoidK,
-  
-  // Purity utilities
-  EffectOfMonoid,
-  IsMonoidPure,
-  IsMonoidImpure,
-  attachMonoidPurityMarker,
-  extractMonoidPurityMarker
-}; 
+// Part 7: All exports are already inline above
+// ============================================================================ 

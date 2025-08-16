@@ -345,7 +345,7 @@ export class BoundaryTracker {
       OpaqueEffect: 0
     };
     
-    for (const analysis of this.boundaries.values()) {
+    for (const analysis of Array.from(this.boundaries.values())) {
       distribution[analysis.boundary]++;
     }
     
@@ -355,7 +355,7 @@ export class BoundaryTracker {
   private findOpportunities(): OptimizationOpportunity[] {
     const opportunities: OptimizationOpportunity[] = [];
     
-    for (const analysis of this.boundaries.values()) {
+    for (const analysis of Array.from(this.boundaries.values())) {
       if (analysis.optimizationPotential > 0.5) {
         opportunities.push({
           type: analysis.boundary === 'Staged' ? 'staging' : 'fusion',
