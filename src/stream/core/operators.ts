@@ -11,12 +11,8 @@
 
 import {
   StateFn, StatefulStream, StateMonoid, PureOp, EvalOp,
-  isStatefulStream, isPureStream
+  isPureStream
 } from './types';
-
-import {
-  EffectTag, Pure, State
-} from '../../../fp-purity';
 
 // ============================================================================
 // Core Composition Operators
@@ -232,11 +228,11 @@ export function fanOut<S, A, B, C>(
 /**
  * Fan-in: combine multiple streams into one
  */
-export function fanIn<S, A, B, C>(
-  f: StatefulStream<A, S, C>,
-  g: StatefulStream<B, S, C>,
-  combine: (a: A, b: B) => C
-): StatefulStream<[A, B], S, C> {
+export function fanIn<S, A, B, O>(
+  f: StatefulStream<A, S, O>,
+  g: StatefulStream<B, S, O>,
+  combine: (a: O, b: O) => O
+): StatefulStream<[A, B], S, O> {
   return {
     run: ([a, b]) => (state) => {
       const [s1, c1] = f.run(a)(state);

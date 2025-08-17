@@ -13,7 +13,8 @@ import type { Kind1 } from './fp-hkt';
 // Skip full purity types here
 
 import { Lens, Prism, Optional, lens, prism, optional } from './fp-optics';
-import { Traversal, traversal, composeLensLens } from './fp-optics';
+import { composeLensLens } from './fp-optics-adapter';
+import { traversal, Traversal } from './fp-optics-traversal';
 type FocusOf<O, S> = any;
 // local alias for readability only; keep it local (not exported)
 const _prismTo = prism as unknown as <T, V extends string>(variant: V) => Prism<T, T, any, any>;

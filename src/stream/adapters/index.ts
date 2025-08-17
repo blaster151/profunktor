@@ -6,11 +6,12 @@
  * - Maybe ↔ StatefulStream (degenerate state)
  * - Either ↔ StatefulStream (error channel)
  * 
+
  * Tests to confirm round-tripping works correctly.
  */
 
-import { StatefulStream, isStatefulStream } from '../core/types';
-import { compose, liftStateless, liftStateful } from '../core/operators';
+import { StatefulStream } from '../core/types';
+import { compose, liftStateless } from '../core/operators';
 
 // Import existing ADTs
 import { ObservableLite } from '../../../fp-observable-lite';
@@ -56,7 +57,7 @@ export function toObservableLite<I, S, O>(
  * Note: This creates a stateless stream that processes each value
  */
 export function fromObservableLite<A, B>(
-  observable: ObservableLite<A>,
+  _observable: ObservableLite<A>,
   processor: (input: A, state: void) => [void, B]
 ): StatefulStream<A, void, B> {
   return {
@@ -207,8 +208,8 @@ export function eitherProcessor<L, R, L2, R2>(
     run: (either) => () => [
       undefined,
       matchEither(either, {
-        Left: ({ value }) => Left(leftProcessor(value)),
-        Right: ({ value }) => Right(rightProcessor(value))
+        Left: (value: L) => Left(leftProcessor(value)),
+        Right: (value: R) => Right(rightProcessor(value))
       })
     ],
     __brand: 'StatefulStream',
@@ -224,13 +225,13 @@ export function testEitherRoundTrip<L, R>(either: Either<L, R>): boolean {
   const result = toEither(stream, undefined, undefined, (e) => e);
   
   return matchEither(either, {
-    Left: ({ value }) => matchEither(result, {
-      Left: ({ value: resultValue }) => value === resultValue,
+    Left: (value: L) => matchEither(result, {
+      Left: (resultValue: L) => value === resultValue,
       Right: () => false
     }),
-    Right: ({ value }) => matchEither(result, {
+    Right: (value: R) => matchEither(result, {
       Left: () => false,
-      Right: ({ value: resultValue }) => value === resultValue
+      Right: (resultValue: R) => value === resultValue
     })
   });
 }
@@ -273,8 +274,8 @@ export function eitherHandler<L, R, O>(
     run: (either) => () => [
       undefined,
       matchEither(either, {
-        Left: ({ value }) => errorHandler(value),
-        Right: ({ value }) => successHandler(value)
+        Left: (value: L) => errorHandler(value),
+        Right: (value: R) => successHandler(value)
       })
     ],
     __brand: 'StatefulStream',

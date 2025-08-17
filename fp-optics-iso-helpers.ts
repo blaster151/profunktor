@@ -4,7 +4,7 @@
  */
 
 import { Kind1, Apply } from './fp-hkt';
-import { Functor, Applicative } from './fp-typeclasses-hkt';
+import { Applicative } from './fp-typeclasses-hkt';
 
 // -------------------- Store (comonad-ish) and Lens iso --------------------
 

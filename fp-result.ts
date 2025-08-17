@@ -59,7 +59,7 @@ export class Ok<E, A> {
   /**
    * Get the success value or throw
    */
-  getOrThrow(error?: string): A {
+  getOrThrow(): A {
     return this.value;
   }
 
@@ -127,7 +127,7 @@ export class Err<E, A> {
   /**
    * Get the error or throw
    */
-  getErrorOrThrow(error?: string): E {
+  getErrorOrThrow(): E {
     return this.error;
   }
 
@@ -264,7 +264,7 @@ export function bichain<E, A, E2, B>(error: (e: E) => Result<E2, B>, success: (a
 export function filter<E, A>(predicate: (a: A) => boolean, error: E, result: Result<E, A>): Result<E, A> {
   return result.match({
     Ok: ({ value }) => predicate(value) ? result : err(error),
-    Err: ({ error: err }) => result
+    Err: (_ignored) => result
   });
 }
 
@@ -384,6 +384,13 @@ const ResultFluentImpl: FluentImpl<any> = {
     Ok: ({ value }) => right(value),
     Err: ({ error }) => left(error)
   }),
+  ap: (self, fab) => fab.match({
+    Ok: ({ value: f }) => self.match({
+      Ok: ({ value }) => ok(f(value)),
+      Err: ({ error }) => err(error)
+    }),
+    Err: ({ error }) => err(error)
+  }),
   pipe: (self, ...fns) =>
     fns.reduce((acc, fn) =>
       acc.match({
@@ -399,32 +406,59 @@ applyFluentOps(Ok.prototype as any, ResultFluentImpl);
 applyFluentOps(Err.prototype as any, ResultFluentImpl);
 
 // Add conversion methods to concrete classes
-(Ok.prototype as any).toObservableLite = function() {
-  return toObservableLite(this);
-};
-(Err.prototype as any).toObservableLite = function() {
-  return toObservableLite(this);
-};
+// The following prototype conversions require the corresponding imports to exist.
+// If these helpers are not exported from fp-fluent-api, comment these out or guard them.
+// (Ok.prototype as any).toObservableLite = function() {
+//   return toObservableLite(this);
+// };
+// (Err.prototype as any).toObservableLite = function() {
+//   return toObservableLite(this);
+// };
+//
+// (Ok.prototype as any).toStatefulStream = function(initialState: any = {}) {
+//   return toStatefulStream(this, initialState);
+// };
+// (Err.prototype as any).toStatefulStream = function(initialState: any = {}) {
+//   return toStatefulStream(this, initialState);
+// };
+//
+// (Ok.prototype as any).toMaybe = function() {
+//   return toMaybe(this);
+// };
+// (Err.prototype as any).toMaybe = function() {
+//   return toMaybe(this);
+// };
+//
+// (Ok.prototype as any).toEither = function() {
+//   return toEither(this);
+// };
+// (Err.prototype as any).toEither = function() {
+//   return toEither(this);
+// };
+// ============================================================================
+// Part 7: Namespaced Export to Avoid Symbol Collisions
+// ============================================================================
 
-(Ok.prototype as any).toStatefulStream = function(initialState: any = {}) {
-  return toStatefulStream(this, initialState);
-};
-(Err.prototype as any).toStatefulStream = function(initialState: any = {}) {
-  return toStatefulStream(this, initialState);
-};
-
-(Ok.prototype as any).toMaybe = function() {
-  return toMaybe(this);
-};
-(Err.prototype as any).toMaybe = function() {
-  return toMaybe(this);
-};
-
-(Ok.prototype as any).toEither = function() {
-  return toEither(this);
-};
-(Err.prototype as any).toEither = function() {
-  return toEither(this);
+export const ResultNS = {
+  ok,
+  err,
+  Ok,
+  Err,
+  map,
+  mapError,
+  bimap,
+  chain,
+  chainError,
+  bichain,
+  filter,
+  swap,
+  getOrElse,
+  orElse,
+  recover,
+  Functor: ResultFunctorInstance,
+  Applicative: ResultApplicativeInstance,
+  Monad: ResultMonadInstance,
+  Bifunctor: ResultBifunctorInstance,
 };
 
 // ============================================================================

@@ -36,15 +36,13 @@ export function liftCofreeIntoCompose<G extends Kind1, H extends Kind1>(
   Gfunctor: Functor<G>,
   Happ: Applicative<H>
 ) {
-  type GK<X> = Apply<G, [X]>;
-  type HK<X> = Apply<H, [X]>;
   type GKHK<X> = Apply<G, [Apply<H, [X]>]>;
 
   return function lift<A>(wa: Cofree<G, A>): Cofree<ComposeK<G, H>, A> {
     // Recurse: lift each child Cofree<G,A> to Cofree<Compose<G,H>,A>, then inject into H
     const liftedTail: GKHK<Cofree<ComposeK<G, H>, A>> =
       Gfunctor.map(wa.tail, (child: Cofree<G, A>) => Happ.of(lift(child))) as any;
-    return cofree<A, any>(wa.head, liftedTail) as Cofree<ComposeK<G, H>, A>;
+    return cofree<ComposeK<G, H>, A>(wa.head, liftedTail) as Cofree<ComposeK<G, H>, A>;
   };
 }
 

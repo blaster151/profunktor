@@ -9,7 +9,7 @@
  */
 
 import { Kind1, Apply } from './fp-hkt';
-import { Applicative, Traversable, Functor } from './fp-typeclasses-hkt';
+import { Applicative, Traversable } from './fp-typeclasses-hkt';
 
 // Bazaar<A,B,S,T> ~ forall F. Applicative F => (A -> F<B>) -> S -> F<T>
 export type Bazaar<A, B, S, T> =

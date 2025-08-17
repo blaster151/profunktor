@@ -9,7 +9,7 @@
 import { Kind1, Apply, ArrayK } from './fp-hkt';
 import { Functor } from './fp-typeclasses-hkt';
 import { Cofree, cofree, CofreeK, mapCofree } from './fp-free';
-import { Either as EitherT, Left, Right, matchEither, isLeft } from './fp-either-unified';
+import { Either as EitherT, Left, Right, matchEither } from './fp-either-unified';
 
 // Minimal Comonad interface (align with your existing one if you export elsewhere)
 export interface Comonad<W extends Kind1> {

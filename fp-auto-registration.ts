@@ -9,20 +9,10 @@ import {
   deriveInstances, 
   DerivationConfig, 
   DerivedInstances,
-  Eq,
-  Ord,
-  Show
 } from './fp-derivation-helpers';
 import { 
   getFPRegistry
 } from './fp-registry-init';
-import type { 
-  Functor, 
-  Applicative, 
-  Monad, 
-  Bifunctor,
-  Kind
-} from './fp-typeclasses';
 import type { Kind1 } from './fp-hkt';
 
 // ============================================================================

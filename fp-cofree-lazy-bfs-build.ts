@@ -30,29 +30,27 @@ export function unfoldLazyCofreeBFS<F extends Kind1, A>(
   root: A,
   nextLayer: (parents: A[], depth: number) => A[][]
 ): LazyCofree<F, A> {
-  // Node whose tail "knows" which level it belongs to, and its index in that level.
   const nodeWithLevel = (head: A, depth: number, levelHeads: A[], indexInLevel: number): LazyCofree<F, A> => ({
     head,
     tail: () => {
-      // For the whole level, ask for children partitioned *per parent*.
       const groups: A[][] = nextLayer(levelHeads, depth) ?? [];
       const myKids: A[] = groups[indexInLevel] ?? [];
 
-      // Compute the *next* level (flattened) and my offset in that flattened list.
       let offset = 0;
       for (let i = 0; i < indexInLevel; i++) offset += (groups[i]?.length ?? 0);
       const nextLevelHeads: A[] = ([] as A[]).concat(...groups);
 
-      // Build my children nodes; each child closes over nextLevelHeads with its absolute index.
-      const childNodes: LazyCofree<F, A>[] = myKids.map((h, j) =>
-        nodeWithLevel(h, depth + 1, nextLevelHeads, offset + j)
-      );
+      // zip children with absolute indices
+      const pairs: ReadonlyArray<readonly [A, number]> =
+        myKids.map((h, j) => [h, offset + j] as const);
 
-      // Tail is F<LazyCofree<F,A>> injected from array.
-      return From.fromArray(childNodes) as Apply<F, [LazyCofree<F, A>]>;
+      // lift into F and map to child nodes
+      const kidsF = From.fromArray(pairs) as Apply<F, [readonly [A, number]]>;
+      return F.map(kidsF, ([h, idx]) =>
+        nodeWithLevel(h, depth + 1, nextLevelHeads, idx)
+      ) as Apply<F, [LazyCofree<F, A>]>;
     }
   });
 
-  // Seed at depth 0, level [root], index 0
   return nodeWithLevel(root, 0, [root], 0);
 }

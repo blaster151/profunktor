@@ -18,7 +18,7 @@ export async function testParTraverseIf<F extends Kind1, A, B, S, T>(
 ): Promise<B[]> {
   const plan = makeParTraverseIf(baz, s, predAsync, kAsync, { concurrency: 4, preserveOrder: true });
   const stream = compilePlanToStream(runEffect, F, asyncF, bracket, plan);
-  const out = await (stream as any).compile.fold<B[]>([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
+    const out = await (stream as any).compile.fold([] as B[], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
   return out;
 }
 
@@ -40,10 +40,10 @@ export async function testFilterRewriteEquivalenceId<F extends Kind1, A, B, S, T
 ): Promise<boolean> {
   const plan0 = { tag: 'Seq', steps: [ { tag: 'FilterA', pA: pA as any, baz: baz as any, s: s as any } as any, { tag: 'Traverse', baz: baz as any, s: s as any, k: k as any } as any ] } as any;
   const s0 = compilePlanToStream(runEffect, F, asyncF, bracket, plan0);
-  const out0 = await (s0 as any).compile.fold<B[]>([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
+    const out0 = await (s0 as any).compile.fold([] as B[], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
   const plan1 = optimizePlan(plan0, { fuse: true });
   const s1 = compilePlanToStream(runEffect, F, asyncF, bracket, plan1);
-  const out1 = await (s1 as any).compile.fold<B[]>([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
+    const out1 = await (s1 as any).compile.fold([] as B[], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
   return JSON.stringify(out0) === JSON.stringify(out1);
 }
 

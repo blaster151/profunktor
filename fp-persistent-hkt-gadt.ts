@@ -23,7 +23,7 @@ import {
   Functor, Applicative, Monad, Bifunctor, Traversable, Foldable,
   deriveFunctor, deriveApplicative, deriveMonad,
   lift2, composeK, sequence, traverse,
-  map, chain, ap, of
+  mapLast1, mapLast2, mapLast3
 } from './fp-typeclasses-hkt';
 
 import {
@@ -38,11 +38,11 @@ import {
   Expr, ExprK, evaluate, transformString, ExprFunctor,
   MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor, deriveResultMonad
+  Result, ResultK, ResultFunctor
 } from './fp-gadt-enhanced';
 
 import {
-  DeepImmutable, ImmutableArray
+  Immutable, immutableArray
 } from './fp-immutable';
 
 import {
@@ -316,7 +316,10 @@ export function mapToGADT<K, V>(map: PersistentMap<K, V>): MapGADT<K, V> {
   if (map.isEmpty()) {
     return MapGADT.Empty();
   } else {
-    const entries = Array.from(map.entries());
+    const entries: [K, V][] = [];
+    map.forEach((value, key) => {
+      entries.push([key, value]);
+    });
     const [key, value] = entries[0];
     const rest = PersistentMap.fromEntries(entries.slice(1));
     return MapGADT.NonEmpty(key, value, rest);
@@ -340,7 +343,10 @@ export function setToGADT<A>(set: PersistentSet<A>): SetGADT<A> {
   if (set.isEmpty()) {
     return SetGADT.Empty();
   } else {
-    const values = Array.from(set);
+    const values: A[] = [];
+    set.forEach(value => {
+      values.push(value);
+    });
     const element = values[0];
     const rest = PersistentSet.fromArray(values.slice(1));
     return SetGADT.NonEmpty(element, rest);
@@ -364,7 +370,7 @@ export function gadtToSet<A>(gadt: SetGADT<A>): PersistentSet<A> {
 /**
  * Derived instances for PersistentListHKT
  */
-export const PersistentListInstances = deriveInstances<PersistentListHKT>({
+export const PersistentListInstances = {
   map: <A, B>(fa: Apply<PersistentListHKT, [A]>, f: (a: A) => B): Apply<PersistentListHKT, [B]> => {
     return (fa as PersistentList<A>).map(f) as Apply<PersistentListHKT, [B]>;
   },
@@ -374,42 +380,80 @@ export const PersistentListInstances = deriveInstances<PersistentListHKT>({
   ap: <A, B>(fab: Apply<PersistentListHKT, [(a: A) => B]>, fa: Apply<PersistentListHKT, [A]>): Apply<PersistentListHKT, [B]> => {
     const functions = fab as PersistentList<(a: A) => B>;
     const values = fa as PersistentList<A>;
-    return functions.ap(values) as Apply<PersistentListHKT, [B]>;
+    // Since PersistentList doesn't have ap, we need to implement it manually
+    const result: B[] = [];
+    functions.forEach(fn => {
+      values.forEach(val => {
+        result.push(fn(val));
+      });
+    });
+    return PersistentList.fromArray(result) as Apply<PersistentListHKT, [B]>;
   },
   chain: <A, B>(fa: Apply<PersistentListHKT, [A]>, f: (a: A) => Apply<PersistentListHKT, [B]>): Apply<PersistentListHKT, [B]> => {
-    return (fa as PersistentList<A>).chain(f as any) as Apply<PersistentListHKT, [B]>;
+    return (fa as PersistentList<A>).flatMap(a => f(a) as PersistentList<B>) as Apply<PersistentListHKT, [B]>;
   }
-});
+};
 
-export const PersistentListFunctor = PersistentListInstances.functor;
-export const PersistentListApplicative = PersistentListInstances.applicative;
-export const PersistentListMonad = PersistentListInstances.monad;
+export const PersistentListFunctor: Functor<PersistentListHKT> = {
+  map: PersistentListInstances.map
+};
+
+export const PersistentListApplicative: Applicative<PersistentListHKT> = {
+  map: PersistentListInstances.map,
+  of: PersistentListInstances.of,
+  ap: PersistentListInstances.ap
+};
+
+export const PersistentListMonad: Monad<PersistentListHKT> = {
+  map: PersistentListInstances.map,
+  of: PersistentListInstances.of,
+  ap: PersistentListInstances.ap,
+  chain: PersistentListInstances.chain
+};
 
 /**
  * Derived instances for PersistentMapHKT
  */
-export const PersistentMapInstances = deriveInstances<PersistentMapHKT>({
+export const PersistentMapInstances = {
   map: <A, B>(fa: Apply<PersistentMapHKT, [any, A]>, f: (a: A) => B): Apply<PersistentMapHKT, [any, B]> => {
     return (fa as PersistentMap<any, A>).map(f) as Apply<PersistentMapHKT, [any, B]>;
   },
   bimap: <A, B, C, D>(fab: Apply<PersistentMapHKT, [A, B]>, f: (a: A) => C, g: (b: B) => D): Apply<PersistentMapHKT, [C, D]> => {
-    return (fab as PersistentMap<A, B>).bimap(f, g) as Apply<PersistentMapHKT, [C, D]>;
+    const map = fab as PersistentMap<A, B>;
+    const result = PersistentMap.empty<C, D>();
+    map.forEach((value, key) => {
+      result.set(f(key), g(value));
+    });
+    return result as Apply<PersistentMapHKT, [C, D]>;
   }
-});
+};
 
-export const PersistentMapFunctor = PersistentMapInstances.functor;
-export const PersistentMapBifunctor = PersistentMapInstances.bifunctor;
+export const PersistentMapFunctor: Functor<PersistentMapHKT> = {
+  map: PersistentMapInstances.map
+};
+
+export const PersistentMapBifunctor: Bifunctor<PersistentMapHKT> = {
+  bimap: PersistentMapInstances.bimap,
+  mapLeft: <A, B, C>(fab: Apply<PersistentMapHKT, [A, B]>, f: (a: A) => C): Apply<PersistentMapHKT, [C, B]> => {
+    return PersistentMapInstances.bimap(fab, f, (b: B) => b);
+  },
+  mapRight: <A, B, D>(fab: Apply<PersistentMapHKT, [A, B]>, g: (b: B) => D): Apply<PersistentMapHKT, [A, D]> => {
+    return PersistentMapInstances.bimap(fab, (a: A) => a, g);
+  }
+};
 
 /**
  * Derived instances for PersistentSetHKT
  */
-export const PersistentSetInstances = deriveInstances<PersistentSetHKT>({
+export const PersistentSetInstances = {
   map: <A, B>(fa: Apply<PersistentSetHKT, [A]>, f: (a: A) => B): Apply<PersistentSetHKT, [B]> => {
     return (fa as PersistentSet<A>).map(f) as Apply<PersistentSetHKT, [B]>;
   }
-});
+};
 
-export const PersistentSetFunctor = PersistentSetInstances.functor;
+export const PersistentSetFunctor: Functor<PersistentSetHKT> = {
+  map: PersistentSetInstances.map
+};
 
 // ============================================================================
 // Part 7: Integration with Derivable Instances
@@ -456,7 +500,7 @@ export function mapList<A, B>(
   fa: Apply<PersistentListHKT, [A]>,
   f: (a: A) => B
 ): Apply<PersistentListHKT, [B]> {
-  return map(PersistentListFunctor, fa, f);
+  return mapLast1(PersistentListFunctor)(fa, f);
 }
 
 /**
@@ -466,7 +510,7 @@ export function chainList<A, B>(
   fa: Apply<PersistentListHKT, [A]>,
   f: (a: A) => Apply<PersistentListHKT, [B]>
 ): Apply<PersistentListHKT, [B]> {
-  return chain(PersistentListMonad, fa, f);
+  return PersistentListMonad.chain(fa, f);
 }
 
 /**
@@ -476,14 +520,14 @@ export function apList<A, B>(
   fab: Apply<PersistentListHKT, [(a: A) => B]>,
   fa: Apply<PersistentListHKT, [A]>
 ): Apply<PersistentListHKT, [B]> {
-  return ap(PersistentListApplicative, fab, fa);
+  return PersistentListApplicative.ap(fab, fa);
 }
 
 /**
  * Type-safe of operation for PersistentListHKT
  */
 export function ofList<A>(a: A): Apply<PersistentListHKT, [A]> {
-  return of(PersistentListApplicative, a);
+  return PersistentListApplicative.of(a);
 }
 
 /**
@@ -493,7 +537,7 @@ export function mapMap<K, A, B>(
   fa: Apply<PersistentMapHKT, [K, A]>,
   f: (a: A) => B
 ): Apply<PersistentMapHKT, [K, B]> {
-  return map(PersistentMapFunctor, fa, f);
+  return mapLast2(PersistentMapBifunctor)(fa, f);
 }
 
 /**
@@ -514,7 +558,7 @@ export function mapSet<A, B>(
   fa: Apply<PersistentSetHKT, [A]>,
   f: (a: A) => B
 ): Apply<PersistentSetHKT, [B]> {
-  return map(PersistentSetFunctor, fa, f);
+  return mapLast1(PersistentSetFunctor)(fa, f);
 }
 
 // ============================================================================
@@ -651,31 +695,6 @@ export function preserveImmutability<T>(value: T): T {
   return value;
 }
 
-// ============================================================================
-// Part 11: Derived Instances for Persistent Collections
-// ============================================================================
-
-/**
- * Derived instances for PersistentListHKT
- */
-export const PersistentListHKTEq = deriveEqInstance({ kind: PersistentListHKT });
-export const PersistentListHKTOrd = deriveOrdInstance({ kind: PersistentListHKT });
-export const PersistentListHKTShow = deriveShowInstance({ kind: PersistentListHKT });
-
-/**
- * Derived instances for PersistentMapHKT
- */
-export const PersistentMapHKTEq = deriveEqInstance({ kind: PersistentMapHKT });
-export const PersistentMapHKTOrd = deriveOrdInstance({ kind: PersistentMapHKT });
-export const PersistentMapHKTShow = deriveShowInstance({ kind: PersistentMapHKT });
-
-/**
- * Derived instances for PersistentSetHKT
- */
-export const PersistentSetHKTEq = deriveEqInstance({ kind: PersistentSetHKT });
-export const PersistentSetHKTOrd = deriveOrdInstance({ kind: PersistentSetHKT });
-export const PersistentSetHKTShow = deriveShowInstance({ kind: PersistentSetHKT });
-
 /**
  * Type-safe operation that preserves immutability
  */
@@ -713,31 +732,4 @@ export function safeOperation<A, B>(
  * 2. GADT Law: ListGADT<A> provides correct type narrowing
  * 3. Safety Law: All operations maintain type safety
  * 4. Branding Law: Immutability branding is preserved
- */ 
-export function registerPersistentListHKTDerivations(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('PersistentListHKTEq', PersistentListHKTEq);
-    registry.register('PersistentListHKTOrd', PersistentListHKTOrd);
-    registry.register('PersistentListHKTShow', PersistentListHKTShow);
-  }
-}
-registerPersistentListHKTDerivations();
-export function registerPersistentMapHKTDerivations(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('PersistentMapHKTEq', PersistentMapHKTEq);
-    registry.register('PersistentMapHKTOrd', PersistentMapHKTOrd);
-    registry.register('PersistentMapHKTShow', PersistentMapHKTShow);
-  }
-}
-registerPersistentMapHKTDerivations();
-export function registerPersistentSetHKTDerivations(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    registry.register('PersistentSetHKTEq', PersistentSetHKTEq);
-    registry.register('PersistentSetHKTOrd', PersistentSetHKTOrd);
-    registry.register('PersistentSetHKTShow', PersistentSetHKTShow);
-  }
-}
-registerPersistentSetHKTDerivations();
+ */

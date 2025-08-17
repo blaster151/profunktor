@@ -15,10 +15,7 @@ export interface Functor<F extends Kind1> {
 }
 
 import { NaturalTransformation } from '../../fp-nat';
-import {
-  Cofree, cofree, mapCofree,
-  Free, FreePure, FreeImpure
-} from '../../fp-free';
+import { Cofree, Free, FreePure, FreeImpure } from '../../fp-free';
 
 // ---------- liftCofree via a natural transformation F ~> H ----------
 // Cofree<F, A> = { head: A; tail: F<Cofree<F, A>> }

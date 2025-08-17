@@ -1,13 +1,15 @@
 // fp-commutative-applicative.ts
 // CommutativeApplicative witness + common instances and planner hook notes
 
-import { Kind1, Apply } from './fp-hkt';
+import { Kind1 } from './fp-hkt';
 import { Applicative } from './fp-typeclasses-hkt';
 
 export interface CommutativeApplicative<F extends Kind1> extends Applicative<F> {}
 
 // Const applicative is commutative when its Monoid is commutative
-export function ConstCommutative<F extends Kind1>(): null { return null; }
+export const ConstCommutative = <F extends Kind1>(
+  A: Applicative<F>
+): CommutativeApplicative<F> => A as CommutativeApplicative<F>;
 
 // Validation applicative is commutative when the Semigroup is commutative
 export interface Semigroup<E> { concat: (x: E, y: E) => E }

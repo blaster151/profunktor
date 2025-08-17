@@ -1,3 +1,4 @@
+import { fusibilityStats } from './src/fusionReachability';
 /**
  * Typeclass-Driven Optimization System
  * 
@@ -782,7 +783,6 @@ export function optimizePipeline(
   // Optional reachability tracing
   try {
     // Defer import to avoid module cycles and keep optional
-    const { fusibilityStats } = require('./src/fusionReachability');
     if ((context as any).enableTracing && (context as any).traceToConsole) {
       const { operators, reachablePairs } = fusibilityStats();
       // eslint-disable-next-line no-console

@@ -19,10 +19,7 @@ export interface Functor<F extends Kind1> {
   map<A, B>(fa: Apply<F, [A]>, f: (a: A) => B): Apply<F, [B]>;
 }
 
-import {
-  Free, FreePure, FreeImpure,
-  Cofree, mapCofree, extractCofree
-} from '../../fp-free';
+import { Free, FreePure, FreeImpure, Cofree, extractCofree } from '../../fp-free';
 
 // ---------- PairK: product functor with fixed environment S ----------
 export interface PairK<F extends Kind1, G extends Kind1, S> extends Kind1 {

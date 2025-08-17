@@ -1,16 +1,28 @@
 /**
  * Unified ADT Registry
+ *
+ * Centralized registry for unified ADTs + typeclass instances.
+ */
+/**
+ * Unified ADT Registry
  * 
  * This module provides a centralized registry for all unified ADTs
  * with automatic integration with derivable instances and purity tracking.
  */
 
+
 import {
   // Unified ADT imports
-  MaybeUnified, Maybe, MaybeK, Just, Nothing, matchMaybe,
-  EitherUnified, Either, EitherK, Left, Right, matchEither,
-  ResultUnified, Result, ResultK, Ok, Err, matchResult
+  MaybeUnified, Maybe, MaybeK, Just, Nothing, matchMaybe
 } from './fp-maybe-unified';
+
+import {
+  EitherUnified, Either, EitherK, Left, Right, matchEither
+} from './fp-either-unified';
+
+import {
+  ResultUnified, Result, ResultK, Ok, Err, matchResult
+} from './fp-result';
 
 import {
   // Typeclass imports
