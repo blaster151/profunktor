@@ -406,6 +406,8 @@ export function createTupleMatcher<T extends readonly any[], R>(
 
 /**
  * Readonly-aware GADT pattern matcher
+ * Delegates to pmatch(gadt) but enforces Immutable payloads.
+ * Exhaustive: throws if a tag is not handled at runtime.
  */
 export function pmatchReadonly<T extends GADT<string, any>, R>(
   gadt: T,
@@ -413,11 +415,20 @@ export function pmatchReadonly<T extends GADT<string, any>, R>(
     [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }
 ): R {
-  return pmatch(gadt) as R;
+  const b = pmatch<T, R>(gadt);
+  // Register all handlers (keys are constrained by the mapped type).
+  (Object.keys(patterns) as Array<GADTTags<T>>).forEach((tag) => {
+    // The base pmatch builder type is `.with<Tag extends GADTTags<T>>(tag, handler)`.
+    // We must coerce the handler to the builder's expected `(payload: GADTPayload<T, Tag>) => R`
+    // but we promise immutability via the Immutable<RHS> type on our public API.
+    b.with(tag as any, (patterns as any)[tag]);
+  });
+  return b.exhaustive();
 }
 
 /**
  * Readonly-aware GADT pattern matcher with partial support
+ * Returns undefined when no handler is present.
  */
 export function pmatchReadonlyPartial<T extends GADT<string, any>, R>(
   gadt: T,
@@ -425,12 +436,15 @@ export function pmatchReadonlyPartial<T extends GADT<string, any>, R>(
     [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }>
 ): R | undefined {
-  const handler = patterns[gadt.tag as keyof typeof patterns];
+  const handler = patterns[gadt.tag as GADTTags<T>] as
+    | ((p: Immutable<GADTPayload<T, any>>) => R)
+    | undefined;
   return handler ? handler(gadt.payload as any) : undefined;
 }
 
 /**
  * Curryable readonly GADT pattern matcher
+ * Returns a total function if all tags are provided.
  */
 export function createReadonlyGADTMatcher<T extends GADT<string, any>, R>(
   patterns: {
@@ -660,3 +674,39 @@ export function matchExhaustive<T extends object, R>(
  * 3. Exhaustiveness Law: Compile-time exhaustiveness checking
  * 4. Composition Law: Nested patterns maintain type safety
  */ 
+
+// ============================================================================
+// Builder API Exports
+// ============================================================================
+
+// Export the new fluent builder utilities
+export {
+  createReadonlyArrayBuilder,
+  createListBuilder,
+  createMapBuilder,
+  createSetBuilder,
+  createReadonlyArrayMatcher as createReadonlyArrayMatcherFluent,
+  createListMatcher,
+  createMapMatcher,
+  createSetMatcher,
+  // NEW: derivation helpers
+  fromArrayCases,
+  fromListCases,
+  fromMapCases,
+  fromSetCases,
+  populateFromCases,
+  type ArrayCases,
+  type ListCases,
+  type MapCases,
+  type SetCases,
+  type MatcherBuilder,
+  type BuilderState
+} from './src/fp-readonly-builder';
+
+// Export readonly-aware GADT pattern matching
+export {
+  createReadonlyPmatchBuilder,
+  pmatchReadonlyK,
+  type ReadonlyPmatchBuilder,
+  type Kindlike
+} from './src/fp-gadt-readonly';

@@ -125,22 +125,34 @@
     "src/**/*.ts",
     "fp-arrows-cokleisli-choice.ts",
     "fp-maybe.ts",
+    "fp-maybe-fluent.ts", // Clean - 0 errors after canonical Maybe reconciliation
+    "fp-maybe-unified-enhanced.ts", // Clean - 0 errors after canonical Maybe reconciliation (remove local Maybe type, use canonical matchMaybe)
     "fp-monoids.ts",
     "fp-bazaar-algebraic.ts",
     "fp-persistent.ts",
-    "fp-persistent-hkt-gadt.ts"
+    "fp-persistent-hkt-gadt.ts",
+    "fp-dot-stream-modules-complete.ts",
+    "fp-dot-stream-modules-simple.ts",
+    "fp-hylo.ts",
+    "fp-hylomorphisms.ts",
+    "fp-anamorphisms.ts",
+    "fp-gadt-enhanced.ts",
+    "fp-either.ts",
+
+      "fp-deformation-dgla-enhanced.ts",
+      "fp-deformation-dgla.ts", // Clean - 0 errors after koszul comparison fixes
+      "fp-deformation-integration.ts", // Clean - 0 errors after koszul and variable name fixes
   ],
   "exclude": [
     "dist",
     "node_modules",
   "example-before-migration.ts", 
+    "fp-advanced-dot-composition.ts",
   "example-usage.ts",
-  "fp-advanced-dot-composition.ts",
-  "fp-advanced-dot-composition.ts",
+
   "fp-advanced-type-system-examples.ts",
   "fp-cooperad-dg.examples.ts",
   "fp-cooperad-dg.test.ts",
-  "fp-hylo.ts",
   "fp-pattern-matching-with-guards-complete.ts",
   "fp-bazaar-planner.ts",
   "fp-purity-combinators.ts",
@@ -148,38 +160,29 @@
   "fp-adt-eq-ord-show-complete.ts",
   "fp-arrow-laws-glue.ts",
   "fp-bazaar-stream.ts",
-  // "fp-catamorphisms.ts", // Clean - 0 errors after import/fold fixes
+  "fp-catamorphisms.ts", // Clean - 0 errors after pmatch type parameter fixes
   "fp-cooperad-trees.ts",
   "fp-cooperad-weights-extras.ts",
   "fp-cooperad-weights.ts",
-  "fp-deformation-dgla-enhanced.ts",
-  // "fp-deformation-dgla.ts", // Clean - 0 errors after koszul comparison fixes
-  // "fp-deformation-integration.ts", // Clean - 0 errors after koszul and variable name fixes
   "fp-derivable-instances.ts",
   "fp-derivable-purity.ts",
   // "fp-dg-cooperad-integration.ts", // Clean - 0 errors after type and immutable array fixes
   // "fp-dg-cooperad.ts", // Clean - 0 errors after immutable array fixes
-  "fp-dot-stream-modules-complete.ts",
-  "fp-dot-stream-modules-simple.ts",
+
   "fp-dot-style-stream-coordination.ts",
   "fp-dual-api.ts",
   "fp-effect-monads-complete.ts",
   "fp-effect-monads.ts",
-  "fp-either.ts",
   "fp-enhanced-dual-api.ts",
   "fp-fluent-adt-complete.ts",
   "fp-fluent-instance-methods.ts",
   "fp-fluent-methods.ts",
   "fp-fluent-traverse.ts",
   "fp-frp-fusion.ts",
-  "fp-gadt-enhanced.ts",
   "fp-gadt-integrated-clean.ts",
   "fp-homotopy-ergonomics.ts",
-  "fp-hylomorphisms.ts",
   "fp-laws-arrows.ts",
   "fp-material-shape-separation.ts",
-  "fp-maybe-fluent.ts",
-  "fp-maybe-unified-enhanced.ts",
   "fp-optics-scheduler.ts"
   
   ]

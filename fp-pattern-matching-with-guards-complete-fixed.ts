@@ -438,7 +438,16 @@ export type HasGuardedFallback<Handlers> =
 /**
  * Utility type to check if a handler configuration might be non-exhaustive at runtime
  */
-export type IsRuntimeExhaustive<Tag extends string, Payload, Handlers> = true;
+export type IsRuntimeExhaustive<Tag extends string, Payload, Handlers> = {
+  [K in Tag]: Handlers extends { [P in K]: infer H }
+    ? H extends GuardedPattern<Payload, any>[]
+      ? H extends never[] ? false : true
+      : H extends { patterns?: GuardedPattern<Payload, any>[]; fallback?: any }
+        ? H extends { patterns: never[]; fallback?: never } ? false : true
+        : true
+      : true
+    : false;
+};
 
 // ============================================================================
 // Part 9: Logical Combinators

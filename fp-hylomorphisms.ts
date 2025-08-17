@@ -79,14 +79,6 @@ export type Hylo<Result, T extends GADT<string, any>, Seed> = {
  * @param seed - Initial seed value
  * @returns Result of applying algebra to coalgebra-generated GADT
  */
-export function hylo<R, TNode extends GADT<string, any>, Seed>(
-  alg: (g: TNode) => R,         // fold (cata) algebra
-  coalg: (seed: Seed) => TNode,      // unfold (ana) coalgebra
-  seed: Seed
-): R {
-  return alg(coalg(seed)); // Basic implementation - recursive version follows
-}
-
 /**
  * Recursive hylomorphism that handles complex seed structures
  * Each recursive call feeds the next seed into coalg then alg
@@ -247,7 +239,7 @@ export type DerivableHylo<R, TNode extends GADT<string, any>, Seed> = {
 export function deriveHylo<R, TNode extends GADT<string, any>, Seed>(
   hyloDef: DerivableHylo<R, TNode, Seed>
 ): (seed: Seed) => R {
-  return (seed: Seed) => hylo(hyloDef.alg, hyloDef.coalg, seed);
+  return (seed: Seed) => hyloDef.alg(hyloDef.coalg(seed));
 }
 
 /**
@@ -258,7 +250,7 @@ export function createHyloBuilder<R, TNode extends GADT<string, any>, Seed>(
   coalg: (seed: Seed) => TNode
 ) {
   return function(seed: Seed): R {
-    return hylo(alg, coalg, seed);
+    return alg(coalg(seed));
   };
 }
 
@@ -285,7 +277,7 @@ export function hyloExprK<A, Seed, Result>(
   alg: (expr: Apply<ExprK, [A]>) => Result,
   coalg: (seed: Seed) => Apply<ExprK, [A]>
 ): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+  return (seed: Seed) => alg(coalg(seed));
 }
 
 /**
@@ -295,7 +287,7 @@ export function hyloMaybeK<A, Seed, Result>(
   alg: (maybe: Apply<MaybeGADTK, [A]>) => Result,
   coalg: (seed: Seed) => Apply<MaybeGADTK, [A]>
 ): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+  return (seed: Seed) => alg(coalg(seed));
 }
 
 /**
@@ -305,7 +297,7 @@ export function hyloEitherK<L, R, Seed, Result>(
   alg: (either: Apply<EitherGADTK, [L, R]>) => Result,
   coalg: (seed: Seed) => Apply<EitherGADTK, [L, R]>
 ): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+  return (seed: Seed) => alg(coalg(seed));
 }
 
 // ============================================================================
@@ -388,7 +380,7 @@ export function hyloList<A, Seed, Result>(
   alg: (list: ListGADT<A>) => Result,
   coalg: (seed: Seed) => ListGADT<A>
 ): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+  return (seed: Seed) => alg(coalg(seed));
 }
 
 // ============================================================================
@@ -418,7 +410,7 @@ export function rangeSumHylo(n: number): number {
     }
   };
   
-  return hylo(sumAlgebra, countdownCoalgebra, n);
+  return sumAlgebra(countdownCoalgebra(n));
 }
 
 /**
@@ -559,7 +551,7 @@ export function createRangeSumHylo(): (start: number, end: number) => number {
     }
   };
   
-  return (start: number, end: number) => hylo(sumAlgebra, rangeCoalgebra, { start, end });
+  return (start: number, end: number) => sumAlgebra(rangeCoalgebra({ start, end }));
 }
 
 /**

@@ -190,7 +190,7 @@ export const SetGADT = {
 // ============================================================================
 
 /**
- * Pattern matcher for ListGADT
+ * Pattern matcher for ListGADT (rebuilt on top of pmatch builder)
  */
 export function matchList<A, R>(
   gadt: ListGADT<A>,
@@ -199,14 +199,14 @@ export function matchList<A, R>(
     Cons: (payload: { head: A; tail: PersistentList<A> }) => R;
   }
 ): R {
-  return pmatch(gadt)
-    .with('Nil', () => patterns.Nil())
-    .with('Cons', p => patterns.Cons(p))
-    .exhaustive() as R;
+  return pmatchList<A, R>(gadt)
+    .with('Nil', patterns.Nil)
+    .with('Cons', patterns.Cons)
+    .exhaustive();
 }
 
 /**
- * Pattern matcher for MapGADT
+ * Pattern matcher for MapGADT (rebuilt on top of pmatch builder)
  */
 export function matchMap<K, V, R>(
   gadt: MapGADT<K, V>,
@@ -215,14 +215,14 @@ export function matchMap<K, V, R>(
     NonEmpty: (payload: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
   }
 ): R {
-  return pmatch(gadt)
-    .with('Empty', () => patterns.Empty())
-    .with('NonEmpty', p => patterns.NonEmpty(p))
-    .exhaustive() as R;
+  return pmatchMap<K, V, R>(gadt)
+    .with('Empty', patterns.Empty)
+    .with('NonEmpty', patterns.NonEmpty)
+    .exhaustive();
 }
 
 /**
- * Pattern matcher for SetGADT
+ * Pattern matcher for SetGADT (rebuilt on top of pmatch builder)
  */
 export function matchSet<A, R>(
   gadt: SetGADT<A>,
@@ -231,10 +231,10 @@ export function matchSet<A, R>(
     NonEmpty: (payload: { element: A; rest: PersistentSet<A> }) => R;
   }
 ): R {
-  return pmatch(gadt)
-    .with('Empty', () => patterns.Empty())
-    .with('NonEmpty', p => patterns.NonEmpty(p))
-    .exhaustive() as R;
+  return pmatchSet<A, R>(gadt)
+    .with('Empty', patterns.Empty)
+    .with('NonEmpty', patterns.NonEmpty)
+    .exhaustive();
 }
 
 /**
@@ -277,6 +277,106 @@ export function matchSetPartial<A, R>(
 ): R | undefined {
   const handler = patterns[gadt.tag as keyof typeof patterns];
   return handler ? handler(gadt as any) : undefined;
+}
+
+// ============================================================================
+// Part 4.5: Builder-Style Pattern Matching for Ergonomic Use
+// ============================================================================
+
+/**
+ * Builder-style pattern matcher for ListGADT with exhaustiveness checking
+ */
+export function pmatchList<A, R>(value: ListGADT<A>): PatternMatcherBuilder<ListGADT<A>, R> {
+  return pmatch(value);
+}
+
+/**
+ * Tag-only pattern matcher for ListGADT (handlers get no payloads)
+ */
+export function pmatchListTag<A, R>(value: ListGADT<A>): PatternMatcherBuilder<ListGADT<A>, R> {
+  return pmatch(value);
+}
+
+/**
+ * Builder-style pattern matcher for MapGADT with exhaustiveness checking
+ */
+export function pmatchMap<K, V, R>(value: MapGADT<K, V>): PatternMatcherBuilder<MapGADT<K, V>, R> {
+  return pmatch(value);
+}
+
+/**
+ * Tag-only pattern matcher for MapGADT (handlers get no payloads)
+ */
+export function pmatchMapTag<K, V, R>(value: MapGADT<K, V>): PatternMatcherBuilder<MapGADT<K, V>, R> {
+  return pmatch(value);
+}
+
+/**
+ * Builder-style pattern matcher for SetGADT with exhaustiveness checking
+ */
+export function pmatchSet<A, R>(value: SetGADT<A>): PatternMatcherBuilder<SetGADT<A>, R> {
+  return pmatch(value);
+}
+
+/**
+ * Tag-only pattern matcher for SetGADT (handlers get no payloads)
+ */
+export function pmatchSetTag<A, R>(value: SetGADT<A>): PatternMatcherBuilder<SetGADT<A>, R> {
+  return pmatch(value);
+}
+
+// ============================================================================
+// Part 4.6: Type Guards and Narrowing Functions
+// ============================================================================
+
+/**
+ * Type guard for Nil case of ListGADT
+ */
+export function isNil<A>(g: ListGADT<A>): g is { tag: 'Nil'; payload: {} } {
+  return g.tag === 'Nil';
+}
+
+/**
+ * Type guard for Cons case of ListGADT
+ */
+export function isCons<A>(g: ListGADT<A>): g is { tag: 'Cons'; payload: { head: A; tail: PersistentList<A> } } {
+  return g.tag === 'Cons';
+}
+
+/**
+ * Type guard for Empty case of MapGADT
+ */
+export function isEmptyMap<K,V>(g: MapGADT<K,V>): g is { tag: 'Empty'; payload: {} } {
+  return g.tag === 'Empty';
+}
+
+/**
+ * Type guard for NonEmpty case of MapGADT
+ */
+export function isNonEmptyMap<K,V>(g: MapGADT<K,V>): g is { tag: 'NonEmpty'; payload: { key: K; value: V; rest: PersistentMap<K,V> } } {
+  return g.tag === 'NonEmpty';
+}
+
+/**
+ * Type guard for Empty case of SetGADT
+ */
+export function isEmptySet<A>(g: SetGADT<A>): g is { tag: 'Empty'; payload: {} } {
+  return g.tag === 'Empty';
+}
+
+/**
+ * Type guard for NonEmpty case of SetGADT
+ */
+export function isNonEmptySet<A>(g: SetGADT<A>): g is { tag: 'NonEmpty'; payload: { element: A; rest: PersistentSet<A> } } {
+  return g.tag === 'NonEmpty';
+}
+
+/**
+ * Guard/when helper for conditional pattern matching
+ * Usage: pmatchList(g).with('Cons', ({ head }) => when((h:number)=>h>0, () => head)(head)).exhaustive()
+ */
+export function when<T>(pred: (t: T) => boolean, handler: (t: T) => any) {
+  return (t: T) => (pred(t) ? handler(t) : undefined);
 }
 
 // ============================================================================
@@ -454,6 +554,107 @@ export const PersistentSetInstances = {
 export const PersistentSetFunctor: Functor<PersistentSetHKT> = {
   map: PersistentSetInstances.map
 };
+
+// ============================================================================
+// Part 6.5: Foldable Instances for Persistent Collections
+// ============================================================================
+
+/**
+ * Foldable instance for PersistentListHKT
+ */
+export const PersistentListFoldable: Foldable<PersistentListHKT> = {
+  foldr: <A,B>(fa: Apply<PersistentListHKT,[A]>, f: (a:A, b:B)=>B, z: B): B => {
+    let acc = z;
+    // Right-fold: we need to walk from the right. If list supports reverse or tail recursion, use it.
+    // Safe iterative approach: collect then loop backwards.
+    const buf: A[] = [];
+    (fa as PersistentList<A>).forEach(a => buf.push(a));
+    for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
+    return acc;
+  },
+  foldl: <A,B>(fa: Apply<PersistentListHKT,[A]>, f: (b:B, a:A)=>B, z: B): B => {
+    let acc = z;
+    (fa as PersistentList<A>).forEach(a => { acc = f(acc, a); });
+    return acc;
+  }
+};
+
+/**
+ * Foldable instance for PersistentSetHKT
+ */
+export const PersistentSetFoldable: Foldable<PersistentSetHKT> = {
+  foldr: <A,B>(fa: Apply<PersistentSetHKT,[A]>, f: (a:A, b:B)=>B, z:B): B => {
+    // No intrinsic order; pick insertion/iteration order.
+    // Collect then right-fold to satisfy foldr signature.
+    const buf: A[] = [];
+    (fa as PersistentSet<A>).forEach(a => buf.push(a));
+    let acc = z;
+    for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
+    return acc;
+  },
+  foldl: <A,B>(fa: Apply<PersistentSetHKT,[A]>, f: (b:B, a:A)=>B, z:B): B => {
+    let acc = z;
+    (fa as PersistentSet<A>).forEach(a => { acc = f(acc, a); });
+    return acc;
+  }
+};
+
+/**
+ * Foldable instance for PersistentMapHKT (fold over values, ignore keys)
+ */
+export const PersistentMapFoldable: Foldable<PersistentMapHKT> = {
+  foldr: <K,V,B>(fa: Apply<PersistentMapHKT,[K,V]>, f: (v:V, b:B)=>B, z:B): B => {
+    const buf: V[] = [];
+    (fa as PersistentMap<K,V>).forEach((v) => buf.push(v));
+    let acc = z;
+    for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
+    return acc;
+  },
+  foldl: <K,V,B>(fa: Apply<PersistentMapHKT,[K,V]>, f: (b:B, v:V)=>B, z:B): B => {
+    let acc = z;
+    (fa as PersistentMap<K,V>).forEach((v) => { acc = f(acc, v); });
+    return acc;
+  }
+};
+
+// ============================================================================
+// Part 6.6: Traversable Instances for Persistent Collections
+// ============================================================================
+
+/**
+ * Traversable instance for PersistentListHKT (Promise-based fallback for legacy interface)
+ */
+export const PersistentListTraversable: Traversable<PersistentListHKT> = {
+  ...PersistentListFunctor,
+  traverse: <G extends Kind1, A, B>(
+    fa: Apply<PersistentListHKT,[A]>,
+    f: (a: A) => Apply<G,[B]>
+  ): Apply<G,[Apply<PersistentListHKT,[B]>]> => {
+    // Promise-based fallback: treat G as PromiseK at runtime
+    const ps: Promise<B>[] = [];
+    (fa as PersistentList<A>).forEach(a => {
+      ps.push((f(a) as unknown as Promise<B>));
+    });
+    return Promise.all(ps)
+      .then(bs => PersistentList.fromArray(bs)) as unknown as Apply<G,[Apply<PersistentListHKT,[B]>]>;
+  },
+};
+
+/**
+ * Helper functions for sequence and traverse (legacy form)
+ */
+export function sequenceList<A>(
+  xs: Apply<PersistentListHKT,[Promise<A>]>
+): Promise<Apply<PersistentListHKT,[A]>> {
+  return PersistentListTraversable.traverse(xs, (pa) => pa as any) as any;
+}
+
+export function traverseList<A, B>(
+  xs: Apply<PersistentListHKT,[A]>,
+  f: (a: A) => Promise<B>
+): Promise<Apply<PersistentListHKT,[B]>> {
+  return PersistentListTraversable.traverse(xs, f as any) as any;
+}
 
 // ============================================================================
 // Part 7: Integration with Derivable Instances
@@ -704,6 +905,136 @@ export function safeOperation<A, B>(
 ): B {
   const result = operation(value);
   return preserveImmutability(result);
+}
+
+// ============================================================================
+// Part 11.5: Deterministic Equality Helpers
+// ============================================================================
+
+/**
+ * Deterministic equality for PersistentList
+ */
+export function equalsList<A>(
+  x: PersistentList<A>, 
+  y: PersistentList<A>, 
+  eqA: (a: A, b: A) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+): boolean {
+  const ax: A[] = []; 
+  x.forEach(a => ax.push(a));
+  const ay: A[] = []; 
+  y.forEach(a => ay.push(a));
+  if (ax.length !== ay.length) return false;
+  for (let i = 0; i < ax.length; i++) {
+    if (!eqA(ax[i], ay[i])) return false;
+  }
+  return true;
+}
+
+/**
+ * Deterministic equality for PersistentSet (compare sorted arrays)
+ */
+export function equalsSet<A>(
+  x: PersistentSet<A>, 
+  y: PersistentSet<A>, 
+  eqA: (a: A, b: A) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+): boolean {
+  const ax: A[] = []; 
+  x.forEach(a => ax.push(a));
+  const ay: A[] = []; 
+  y.forEach(a => ay.push(a));
+  const sx = ax.map(a => JSON.stringify(a)).sort();
+  const sy = ay.map(a => JSON.stringify(a)).sort();
+  if (sx.length !== sy.length) return false;
+  for (let i = 0; i < sx.length; i++) {
+    if (sx[i] !== sy[i]) return false;
+  }
+  return true;
+}
+
+/**
+ * Deterministic equality for PersistentMap (sort entries by stable string key)
+ */
+export function equalsMap<K, V>(
+  x: PersistentMap<K, V>,
+  y: PersistentMap<K, V>,
+  eqK: (k1: K, k2: K) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  eqV: (v1: V, v2: V) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+): boolean {
+  const ex: Array<[K, V]> = []; 
+  x.forEach((v, k) => ex.push([k, v]));
+  const ey: Array<[K, V]> = []; 
+  y.forEach((v, k) => ey.push([k, v]));
+  if (ex.length !== ey.length) return false;
+  // naive O(n^2) match – fine for demos
+  const used = new Set<number>();
+  for (const [kx, vx] of ex) {
+    let found = false;
+    for (let i = 0; i < ey.length; i++) {
+      if (used.has(i)) continue;
+      const [ky, vy] = ey[i];
+      if (eqK(kx, ky) && eqV(vx, vy)) { 
+        used.add(i); 
+        found = true; 
+        break; 
+      }
+    }
+    if (!found) return false;
+  }
+  return true;
+}
+
+// ============================================================================
+// Part 11.6: Round-Trip Laws and Checks
+// ============================================================================
+
+/**
+ * Check round-trip laws for List ↔ GADT conversion (both directions safe)
+ */
+export function checkListRoundtripBothWays<A>(
+  xs: PersistentList<A>, 
+  eqA?: (a: A, b: A) => boolean
+) {
+  const g = listToGADT(xs);
+  const back = gadtToList(g);
+  const toGADT_toList = equalsList(xs, back, eqA);
+
+  // For gadt -> list -> gadt, compare tag + (head,tail) structure
+  const g2 = listToGADT(gadtToList(g));
+  const same =
+    g.tag === g2.tag &&
+    (g.tag === 'Nil' ||
+      (JSON.stringify(g.payload.head) === JSON.stringify((g2 as any).payload.head) &&
+       equalsList(g.payload.tail, (g2 as any).payload.tail, eqA)));
+  const toList_toGADT = same;
+
+  return { toGADT_toList, toList_toGADT };
+}
+
+/**
+ * Check round-trip law for Map → GADT → Map (safe direction)
+ * Skip GADT → Map → GADT because "first entry" choice is iteration-order dependent
+ */
+export function checkMapRoundtripMapFirst<K, V>(
+  m: PersistentMap<K, V>, 
+  eqK?: (k1: K, k2: K) => boolean, 
+  eqV?: (v1: V, v2: V) => boolean
+): boolean {
+  const g = mapToGADT(m);
+  const back = gadtToMap(g);
+  return equalsMap(m, back, eqK, eqV);
+}
+
+/**
+ * Check round-trip law for Set → GADT → Set (safe direction)
+ * Skip GADT → Set → GADT because "first element" choice is iteration-order dependent
+ */
+export function checkSetRoundtripSetFirst<A>(
+  s: PersistentSet<A>, 
+  eqA?: (a: A, b: A) => boolean
+): boolean {
+  const g = setToGADT(s);
+  const back = gadtToSet(g);
+  return equalsSet(s, back, eqA);
 }
 
 // ============================================================================

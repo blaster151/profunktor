@@ -320,7 +320,7 @@ function demonstrateMultiplicityComposition() {
   console.log("\n=== Multiplicity Composition Examples ===");
   
   // Create streams with different multiplicities
-  const mapStream = new MapStreamImpl<number, string>((x: number) => `processed: ${x}`);
+  const mapStream = new MapStreamImpl<number, number>((x: number) => x * 2);
   const takeStream = new TakeStreamImpl<number, 2>(2);
   const repeatStream = new RepeatStreamImpl<number, 3>(3);
   
@@ -343,9 +343,11 @@ function demonstrateMultiplicityComposition() {
   
   for (const input of testInputs) {
     const initialState = {
-      fState: undefined,
-      gState: { count: 0 },
-      hState: { remaining: 3 }
+      fState: {
+        fState: undefined, // mapStream state (void)
+        gState: { count: 0 as Nat } // takeStream state
+      },
+      gState: { remaining: 3 as Nat } // repeatStream state
     };
     
     try {
@@ -418,7 +420,7 @@ function demonstrateCompileTimeValidation() {
   const potentiallyUnsafe = new StreamBuilder(
     new TakeStreamImpl<number, 5>(5)
   ).compose(
-    new RepeatStreamImpl<string, 3>(3)
+    new RepeatStreamImpl<number, 3>(3)
   ).build();
   
   console.log("Potentially unsafe composition multiplicity:", potentiallyUnsafe.multiplicity);
@@ -447,7 +449,6 @@ export {
   RepeatStream,
   ConditionalMapStream,
   AdaptiveFilterStream,
-  ComposedStream,
   StreamBuilder,
   composeStreams,
   Add,

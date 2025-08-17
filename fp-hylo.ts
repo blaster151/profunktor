@@ -1,23 +1,3 @@
-import { Kind1, Apply } from './fp-hkt';
-import { Functor } from './fp-typeclasses-hkt';
-
-/**
- * hylo :: Functor F => (F A -> A) -> (S -> F S) -> S -> A
- * Encodes a generalized fold after an unfold.
- */
-export function hylo<F extends Kind1, S, A>(
-  F: Functor<F>,
-  alg: (fa: Apply<F, [A]>) => A,
-  coalg: (s: S) => Apply<F, [S]>
-): (seed: S) => A {
-  const go = (s: S): A => {
-    const fs: Apply<F, [S]> = coalg(s);
-    const fa: Apply<F, [A]> = F.map(fs, go) as any;
-    return alg(fa);
-  };
-  return go;
-}
-
 /**
  * Purity-Aware Hylomorphisms System
  * 
@@ -25,8 +5,8 @@ export function hylo<F extends Kind1, S, A>(
  * compile-time purity guarantees and works seamlessly with GADT and HKT systems.
  * 
  * Features:
- * - Hylo type and combinator for single-pass fusion
- * - Purity tracking and inference
+ * - hyloF: The canonical recursion scheme (Functor-driven, recursive)
+ * - hyloCompose: Purity-aware composition (fold ∘ unfold with effect tracking)
  * - GADT and HKT integration
  * - Derivable hylos for types with anamorphism and catamorphism instances
  * - Type-safe purity guarantees
@@ -42,8 +22,7 @@ import {
 import {
   Functor, Applicative, Monad, Bifunctor, Traversable, Foldable,
   deriveFunctor, deriveApplicative, deriveMonad,
-  lift2, composeK, sequence, traverse,
-  map, chain, ap, of
+  lift2, composeK, sequence, traverse
 } from './fp-typeclasses-hkt';
 
 import {
@@ -53,24 +32,36 @@ import {
   Expr, ExprK, evaluate, transformString, ExprFunctor,
   MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor, deriveResultMonad
+  Result, ResultK, ResultFunctor
 } from './fp-gadt-enhanced';
 
 import {
-  EffectTag, EffectOf, Pure, IO, Async, Effect,
-  isPure, isIO, isAsync, getEffectTag,
-  PurityContext, PurityError, PurityResult
+  EffectTag, EffectOf, Pure, IO, Async
 } from './fp-purity';
 
-import {
-  MatchResult, createMatchResult, getMatchValue, getMatchEffect,
-  isMatchResultPure, isMatchResultIO, isMatchResultAsync,
-  InferPurity, InferFunctionPurity, InferUnionPurity, HighestEffect, InferMatchPurity,
-  inferPurityFromValue
-} from './fp-purity-pattern-matching';
+// ============================================================================
+// Part 1: Canonical Recursion Scheme Hylomorphism
+// ============================================================================
+
+/**
+ * hyloF :: Functor F => (F A -> A) -> (S -> F S) -> S -> A
+ * The canonical recursion scheme hylomorphism (unfold + map + fold in one go)
+ */
+export function hyloF<F extends Kind1, S, A>(
+  F: Functor<F>,
+  alg: (fa: Apply<F, [A]>) => A,
+  coalg: (s: S) => Apply<F, [S]>
+): (seed: S) => A {
+  const go = (s: S): A => {
+    const fs: Apply<F, [S]> = coalg(s);
+    const fa: Apply<F, [A]> = F.map(fs, go) as any;
+    return alg(fa);
+  };
+  return go;
+}
 
 // ============================================================================
-// Part 1: Core Hylo Types and Purity System
+// Part 2: Purity-Aware Composition Hylos (fold ∘ unfold)
 // ============================================================================
 
 /**
@@ -126,13 +117,16 @@ export type HyloResult<B, Purity extends HyloPurity> =
 // ============================================================================
 
 /**
- * Core hylo combinator that fuses unfold and fold operations
+ * Core hyloCompose combinator that fuses unfold and fold operations with purity tracking
  * 
- * Law: hylo(u, f)(seed) is semantically equal to f(u(seed))
+ * Note: This is composition (fold ∘ unfold), not the recursion-scheme hylo.
+ * Use hyloF for the true recursion scheme.
+ * 
+ * Law: hyloCompose(u, f)(seed) is semantically equal to f(u(seed))
  * Law: Purity preservation — result purity is min(purity(unfold), purity(fold))
  * Law: Fusion — must not change semantics but should avoid intermediate allocations
  */
-export function hylo<
+export function hyloCompose<
   F extends Kind1,
   A,
   B,
@@ -166,7 +160,7 @@ export function hyloTypeSafe<
   unfold: Unfold<F, A, Purity>,
   fold: Fold<F, A, B, Purity>
 ): (seed: A) => HyloResult<B, Purity> {
-  return hylo<F, A, B, Purity>(unfold, fold);
+  return hyloCompose<F, A, B, Purity>(unfold, fold);
 }
 
 /**
@@ -180,7 +174,7 @@ export function hyloPure<
   unfold: Unfold<F, A, 'Pure'>,
   fold: Fold<F, A, B, 'Pure'>
 ): (seed: A) => B {
-  return hylo<F, A, B, 'Pure'>(unfold, fold) as (seed: A) => B;
+  return hyloCompose<F, A, B, 'Pure'>(unfold, fold) as (seed: A) => B;
 }
 
 /**
@@ -194,7 +188,7 @@ export function hyloImpure<
   unfold: Unfold<F, A, 'Impure'>,
   fold: Fold<F, A, B, 'Impure'>
 ): (seed: A) => Promise<B> | B {
-  return hylo<F, A, B, 'Impure'>(unfold, fold);
+  return hyloCompose<F, A, B, 'Impure'>(unfold, fold);
 }
 
 // ============================================================================
@@ -288,7 +282,7 @@ export function hyloHKT<
   unfold: HKTUnfold<F, A, Purity>,
   fold: HKTFold<F, A, B, Purity>
 ): (seed: A) => HyloResult<B, Purity> {
-  return hylo<F, A, B, Purity>(unfold, fold);
+  return hyloCompose<F, A, B, Purity>(unfold, fold);
 }
 
 /**
@@ -389,7 +383,7 @@ export function createHyloCombinator<Purity extends HyloPurity>() {
     unfold: Unfold<F, A, Purity>,
     fold: Fold<F, A, B, Purity>
   ): (seed: A) => HyloResult<B, Purity> {
-    return hylo<F, A, B, Purity>(unfold, fold);
+    return hyloCompose<F, A, B, Purity>(unfold, fold);
   };
 }
 
@@ -428,7 +422,7 @@ export function composeHylo<
       return result1.then(hylo2) as HyloResult<C, HyloPurityInference<P1, P2>>;
     }
     
-    const result2 = hylo2(result1);
+    const result2 = hylo2(result1 as B);
     return result2 as HyloResult<C, HyloPurityInference<P1, P2>>;
   };
 }
@@ -477,9 +471,9 @@ export function createDerivableHylo<
   catamorphism: DerivableCatamorphism<F, A, B, P2>
 ): DerivableHylomorphism<F, A, B, HyloPurityInference<P1, P2>> {
   const combinedPurity: HyloPurityInference<P1, P2> = 
-    anamorphism.purity === 'Impure' || catamorphism.purity === 'Impure' ? 'Impure' : 'Pure';
+    (anamorphism.purity === 'Impure' || catamorphism.purity === 'Impure' ? 'Impure' : 'Pure') as HyloPurityInference<P1, P2>;
   
-  const hyloFunction = hylo<F, A, B, HyloPurityInference<P1, P2>>(
+  const hyloFunction = hyloCompose<F, A, B, HyloPurityInference<P1, P2>>(
     anamorphism.unfold as Unfold<F, A, HyloPurityInference<P1, P2>>,
     catamorphism.fold as Fold<F, A, B, HyloPurityInference<P1, P2>>
   );
@@ -587,7 +581,7 @@ export function hyloMemoized<
       return cache.get(seed)!;
     }
     
-    const result = hylo<F, A, B, Purity>(unfold, fold)(seed);
+    const result = hyloCompose<F, A, B, Purity>(unfold, fold)(seed);
     cache.set(seed, result);
     
     return result;
@@ -608,7 +602,7 @@ export function hyloLazy<
 ): (seed: A) => HyloResult<B, Purity> {
   return (seed: A) => {
     // For lazy evaluation, we return a thunk that computes on demand
-    const compute = () => hylo<F, A, B, Purity>(unfold, fold)(seed);
+    const compute = () => hyloCompose<F, A, B, Purity>(unfold, fold)(seed);
     
     // Return a lazy promise or value
     // Lazy computation - the type system handles purity at compile time

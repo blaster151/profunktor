@@ -1,4 +1,16 @@
 // fp-deformation-dgla.ts
+/**
+ * @deprecated Legacy/teaching-only. Use fp-deformation-dgla-enhanced.ts for all real work.
+ * 
+ * WARNING: This implementation has several issues:
+ * - "adds" to accumulator without proper additive structure
+ * - Odd code paths with first ? ... : ... || combine(...) and second acc = combine(...)  
+ * - Returns units on scale k=0
+ * - Cannot compute dHom/bracket properly due to missing additive operations
+ * 
+ * This file is kept for historical/documentation purposes only.
+ * Do NOT use in production code.
+ */
 import { Degree, Sum, Term, zero, sum, plus, scale, koszul } from './fp-dg-core';
 
 // Minimal surfaces for the convolution:

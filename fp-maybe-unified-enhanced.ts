@@ -5,6 +5,10 @@
  * createSumType builder with ergonomic .match and .matchTag instance methods.
  */
 
+// ⬇️ Pull the canonical runtime & types
+import type { Maybe } from './fp-maybe-unified';
+import { Just as canonicalJust, Nothing as canonicalNothing, matchMaybe } from './fp-maybe-unified';
+
 import {
   createSumType,
   EnhancedSumTypeBuilder,
@@ -48,50 +52,15 @@ import {
  */
 export const IMMUTABLE_BRAND = Symbol('immutable'); // as unknown as unique symbol;
 
-/**
- * Create enhanced unified Maybe ADT with ergonomic pattern matching
- */
-export const MaybeEnhanced = createSumType({
-  Just: <A>(value: A) => ({ value }),
-  Nothing: () => ({})
-}, {
-  name: 'Maybe',
-  effect: 'Pure',
-  enableHKT: true,
-  enableDerivableInstances: true,
-  enableRuntimeMarkers: false,
-  derive: ['Eq', 'Ord', 'Show']
-});
+// ✅ Use canonical Maybe type from fp-maybe-unified instead of local definition
+// ✅ Keep ergonomic helpers but make them operate on canonical Maybe
 
 /**
- * Extract the enhanced instance type from the unified Maybe
+ * Immutable Maybe type using canonical Maybe with immutable brand
  */
-export type MaybeEnhancedInstance<A> = ExtractEnhancedSumTypeInstance<typeof MaybeEnhanced>;
-
-/**
- * Extract the immutable instance type from the unified Maybe
- */
-export type MaybeImmutableInstance<A> = ExtractImmutableSumTypeInstance<typeof MaybeEnhanced>;
-
-/**
- * Core Maybe type definition (polymorphic in A) - simplified for pattern matching
- */
-export type Maybe<A> = { tag: 'Just'; value: A } | { tag: 'Nothing' };
-
-/**
- * Polymorphic match function for Maybe
- */
-export function matchMaybe<A, R>(
-  ma: Maybe<A>,
-  cases: { Just: (x: { value: A }) => R; Nothing: () => R }
-): R {
-  return ma.tag === 'Just' ? cases.Just({ value: ma.value }) : cases.Nothing();
-}
-
-/**
- * Immutable Maybe type
- */
-export type ImmutableMaybe<A> = MaybeImmutableInstance<A>;
+export type ImmutableMaybe<A> = Maybe<A> & {
+  readonly __immutableBrand: typeof IMMUTABLE_BRAND;
+};
 
 /**
  * HKT kind for Maybe (arity-1 type constructor)
@@ -104,32 +73,29 @@ export interface MaybeK extends Kind1 {
 // Part 2: Constructor Exports
 // ============================================================================
 
-/**
- * Just constructor for Maybe - using simple type
- */
-export const Just = <A>(value: A): Maybe<A> => {
-  return { tag: 'Just', value };
-};
+// ❌ Remove local Just/Nothing constructors - use canonical from fp-maybe-unified
+// ✅ Keep immutable constructors can keep distinct names to avoid overshadowing:
 
 /**
- * Nothing constructor for Maybe - using simple type
- */
-export const Nothing = <A>(): Maybe<A> => {
-  return { tag: 'Nothing' };
-};
-
-/**
- * Create immutable Just
+ * Create immutable Just using canonical constructor with immutable brand
  */
 export const JustImmutable = <A>(value: A): ImmutableMaybe<A> => {
-  return MaybeEnhanced.createImmutable('Just', { value });
+  const canonical = canonicalJust(value);
+  return {
+    ...canonical,
+    __immutableBrand: IMMUTABLE_BRAND
+  } as ImmutableMaybe<A>;
 };
 
 /**
- * Create immutable Nothing
+ * Create immutable Nothing using canonical constructor with immutable brand
  */
 export const NothingImmutable = <A>(): ImmutableMaybe<A> => {
-  return MaybeEnhanced.createImmutable('Nothing', {});
+  const canonical = canonicalNothing<A>();
+  return {
+    ...canonical,
+    __immutableBrand: IMMUTABLE_BRAND
+  } as ImmutableMaybe<A>;
 };
 
 // ============================================================================
@@ -137,7 +103,7 @@ export const NothingImmutable = <A>(): ImmutableMaybe<A> => {
 // ============================================================================
 
 /**
- * Pattern matcher for Maybe (standalone function) - updated for polymorphic matching
+ * Pattern matcher for Maybe (standalone function) - using canonical matchMaybe
  */
 export const createMaybePatternMatcher = <A, R>(
   maybe: Maybe<A>,
@@ -148,17 +114,20 @@ export const createMaybePatternMatcher = <A, R>(
     otherwise?: (tag: string, payload: any) => R;
   }
 ): R => {
-  if (maybe.tag === 'Just') {
-    return handlers.Just ? handlers.Just({ value: maybe.value }) : 
-           handlers._ ? handlers._('Just', { value: maybe.value }) :
-           handlers.otherwise ? handlers.otherwise('Just', { value: maybe.value }) :
-           (() => { throw new Error('No handler for Just'); })();
-  } else {
-    return handlers.Nothing ? handlers.Nothing() :
-           handlers._ ? handlers._('Nothing', {}) :
-           handlers.otherwise ? handlers.otherwise('Nothing', {}) :
-           (() => { throw new Error('No handler for Nothing'); })();
-  }
+  return matchMaybe<A, R>(maybe, {
+    Just: (value) => {
+      if (handlers.Just) return handlers.Just({ value });
+      if (handlers._) return handlers._('Just', { value });
+      if (handlers.otherwise) return handlers.otherwise('Just', { value });
+      throw new Error('No handler for Just');
+    },
+    Nothing: () => {
+      if (handlers.Nothing) return handlers.Nothing();
+      if (handlers._) return handlers._('Nothing', {});
+      if (handlers.otherwise) return handlers.otherwise('Nothing', {});
+      throw new Error('No handler for Nothing');
+    }
+  });
 };
 
 // tag-only stays tag-only (no payload)
@@ -171,17 +140,20 @@ export const matchMaybeTag = <A, R>(
     otherwise?: (tag: string) => R;
   }
 ): R => {
-  if (maybe.tag === 'Just') {
-    return handlers.Just ? handlers.Just() :
-           handlers._ ? handlers._('Just') :
-           handlers.otherwise ? handlers.otherwise('Just') :
-           (() => { throw new Error('No handler for Just'); })();
-  } else {
-    return handlers.Nothing ? handlers.Nothing() :
-           handlers._ ? handlers._('Nothing') :
-           handlers.otherwise ? handlers.otherwise('Nothing') :
-           (() => { throw new Error('No handler for Nothing'); })();
-  }
+  return matchMaybe<A, R>(maybe, {
+    Just: (_value) => {
+      if (handlers.Just) return handlers.Just();
+      if (handlers._) return handlers._('Just');
+      if (handlers.otherwise) return handlers.otherwise('Just');
+      throw new Error('No handler for Just');
+    },
+    Nothing: () => {
+      if (handlers.Nothing) return handlers.Nothing();
+      if (handlers._) return handlers._('Nothing');
+      if (handlers.otherwise) return handlers.otherwise('Nothing');
+      throw new Error('No handler for Nothing');
+    }
+  });
 };
 
 // curry versions mirror the same shapes
@@ -221,41 +193,41 @@ export const isNothing = <A>(maybe: Maybe<A>): maybe is { tag: 'Nothing' } => {
  * Get the value from a Just, or throw if Nothing
  */
 export const fromJust = <A>(maybe: Maybe<A>): A =>
-  matchMaybe(maybe, {
-    Just: ({ value }) => value,
+  matchMaybe<A, A>(maybe, {
+    Just: (value) => value,
     Nothing: () => { throw new Error('fromJust: Nothing'); },
   });
 
 export const fromMaybe = <A>(def: A, maybe: Maybe<A>): A =>
-  matchMaybe(maybe, {
-    Just: ({ value }) => value,
+  matchMaybe<A, A>(maybe, {
+    Just: (value) => value,
     Nothing: () => def,
   });
 
 export const mapMaybe = <A, B>(f: (a: A) => B, maybe: Maybe<A>): Maybe<B> =>
-  matchMaybe(maybe, {
-    Just: ({ value }) => Just(f(value)),
-    Nothing: () => Nothing(),
+  matchMaybe<A, Maybe<B>>(maybe, {
+    Just: (value) => canonicalJust(f(value)),
+    Nothing: () => canonicalNothing<B>(),
   });
 
 export const apMaybe = <A, B>(mf: Maybe<(a: A) => B>, ma: Maybe<A>): Maybe<B> =>
-  matchMaybe(mf, {
-    Just: ({ value: f }) => mapMaybe(f, ma),
-    Nothing: () => Nothing(),
+  matchMaybe<(a: A) => B, Maybe<B>>(mf, {
+    Just: (f) => mapMaybe(f, ma),
+    Nothing: () => canonicalNothing<B>(),
   });
 
 /**
  * Chain operations on Maybe
  */
 export const chainMaybe = <A, B>(f: (a: A) => Maybe<B>, ma: Maybe<A>): Maybe<B> =>
-  matchMaybe(ma, {
-    Just: ({ value }) => f(value),
-    Nothing: () => Nothing(),
+  matchMaybe<A, Maybe<B>>(ma, {
+    Just: (value) => f(value),
+    Nothing: () => canonicalNothing<B>(),
   });
 
 export const foldMaybe = <A, B>(onJust: (a: A) => B, onNothing: () => B, ma: Maybe<A>): B =>
-  matchMaybe(ma, {
-    Just: ({ value }) => onJust(value),
+  matchMaybe<A, B>(ma, {
+    Just: (value) => onJust(value),
     Nothing: () => onNothing(),
   });
 // ============================================================================
@@ -271,12 +243,12 @@ export const MaybeFunctor = deriveFunctor<MaybeK>(
 );
 
 export const MaybeApplicative = deriveApplicative<MaybeK>(
-  <A>(a: A): Maybe<A> => Just(a),
+  <A>(a: A): Maybe<A> => canonicalJust(a),
   <A, B>(ff: Maybe<(a: A) => B>, fa: Maybe<A>): Maybe<B> => apMaybe(ff, fa)
 );
 
 export const MaybeMonad = deriveMonad<MaybeK>(
-  <A>(a: A): Maybe<A> => Just(a),
+  <A>(a: A): Maybe<A> => canonicalJust(a),
   <A, B>(fa: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> => chainMaybe(f, fa)
 );
 
@@ -285,14 +257,14 @@ export const MaybeMonad = deriveMonad<MaybeK>(
  */
 export const MaybeFoldable: Foldable<MaybeK> = {
   foldr: <A, B>(fa: Maybe<A>, f: (a: A, b: B) => B, z: B): B => {
-    return matchMaybe(fa, {
-      Just: ({ value }) => f(value, z),
+    return matchMaybe<A, B>(fa, {
+      Just: (value) => f(value, z),
       Nothing: () => z
     });
   },
   foldl: <A, B>(fa: Maybe<A>, f: (b: B, a: A) => B, z: B): B => {
-    return matchMaybe(fa, {
-      Just: ({ value }) => f(z, value),
+    return matchMaybe<A, B>(fa, {
+      Just: (value) => f(z, value),
       Nothing: () => z
     });
   }
@@ -318,15 +290,15 @@ export const MaybeTraversable: Traversable<MaybeK> = {
     fa: Maybe<A>,
     f: (a: A) => Apply<G, [B]>
   ): Apply<G, [Maybe<B>]> => {
-    return matchMaybe(fa, {
-      Just: ({ value }) =>
+    return matchMaybe<A, Apply<G, [Maybe<B>]>>(fa, {
+      Just: (value) =>
         // treat Apply<G,[B]> as Promise<B>, then wrap result back into Maybe
         (f(value) as unknown as Promise<B>)
-          .then(b => Just(b)) as unknown as Apply<G, [Maybe<B>]>,
+          .then(b => canonicalJust(b)) as unknown as Apply<G, [Maybe<B>]>,
 
       Nothing: () =>
         // G.of(Nothing()) — but we don't have G; use Promise.resolve
-        Promise.resolve(Nothing()) as unknown as Apply<G, [Maybe<B>]>
+        Promise.resolve(canonicalNothing<B>()) as unknown as Apply<G, [Maybe<B>]>
     });
   },
 };
@@ -399,12 +371,12 @@ export const MaybeShow = deriveShowInstance<Maybe<unknown>>();
  */
 export function exampleUsage() {
   // Create Maybe instances with proper typing
-  const maybeJust: Maybe<number> = Just(42);
-  const maybeNothing: Maybe<number> = Nothing();
+  const maybeJust: Maybe<number> = canonicalJust(42);
+  const maybeNothing: Maybe<number> = canonicalNothing<number>();
   
   // Full pattern matching using matchMaybe
-  const result1 = matchMaybe(maybeJust, {
-    Just: ({ value }) => `Got ${value}`,
+  const result1 = matchMaybe<number, string>(maybeJust, {
+    Just: (value) => `Got ${value}`,
     Nothing: () => "None"
   });
   console.log(result1); // "Got 42"
@@ -424,8 +396,8 @@ export function exampleUsage() {
   console.log(result3); // "Has value"
   
   // Type-safe payload access with proper number typing
-  const result4 = matchMaybe(maybeJust, {
-    Just: ({ value }) => value * 2, // value is properly typed as number
+  const result4 = matchMaybe<number, number>(maybeJust, {
+    Just: (value) => value * 2, // value is properly typed as number
     Nothing: () => 0
   });
   console.log(result4); // 84
@@ -435,8 +407,8 @@ export function exampleUsage() {
   const immutableNothing = NothingImmutable();
   
   // Pattern matching works the same using the matchMaybe function
-  const result5 = matchMaybe(immutableJust as Maybe<number>, {
-    Just: ({ value }) => `Immutable: ${value}`,
+  const result5 = matchMaybe<number, string>(immutableJust as Maybe<number>, {
+    Just: (value) => `Immutable: ${value}`,
     Nothing: () => "Immutable: None"
   });
   console.log(result5); // "Immutable: 42"

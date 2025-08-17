@@ -5,58 +5,51 @@
  * from its parts and how the compiler can statically catch illegal escalation.
  */
 
-import { StreamModule, Nat, Add, Mul, StateFn } from './fp-dot-stream-modules';
+import { StreamModule, Nat, Add, Mul, StateFn } from './fp-dot-stream-modules-complete';
 
 // Enhanced multiplicity tracking with conditional types
 type ConditionalMultiplicity<Condition extends boolean, Then extends Nat, Else extends Nat> = 
   Condition extends true ? Then : Else;
 
 // Advanced stream modules with complex multiplicity patterns
-interface ConditionalMapStream<In, Out, F extends (input: In) => Out, P extends (input: In) => boolean> extends StreamModule {
-  type In = In;
-  type Out = Out;
-  type State = void;
-  // Multiplicity depends on predicate: if predicate is true, consume once; otherwise, consume twice
-  type Mult<I extends this.In>; // Conditional multiplicity
-  run(input: this.In): StateFn<this.State, this.Out>;
+interface ConditionalMapStream<In, Out, F extends (input: In) => Out, P extends (input: In) => boolean, M extends Nat> extends StreamModule<In, Out, void, M> {
+  readonly predicate: P;
+  readonly mapper: F;
+  run(input: In): StateFn<void, Out>;
 }
 
-interface AdaptiveFilterStream<In, P extends (input: In) => boolean> extends StreamModule {
-  type In = In;
-  type Out = In;
-  type State = { adaptiveThreshold: number };
-  // Multiplicity depends on adaptive threshold: higher threshold = more consumption
-  type Mult<I extends this.In>; // Adaptive multiplicity
-  run(input: this.In): StateFn<this.State, this.Out>;
+interface AdaptiveFilterStream<In, P extends (input: In) => boolean, M extends Nat> extends StreamModule<In, In, { adaptiveThreshold: number }, M> {
+  readonly predicate: P;
+  run(input: In): StateFn<{ adaptiveThreshold: number }, In>;
 }
 
-interface MultiplicativeStream<In, Out, F extends (input: In) => Out, Factor extends Nat> extends StreamModule {
-  type In = In;
-  type Out = Out;
-  type State = void;
-  // Multiplicity is multiplied by a factor
-  type Mult<I extends this.In>; // Multiplicative multiplicity
-  run(input: this.In): StateFn<this.State, this.Out>;
+interface MultiplicativeStream<In, Out, F extends (input: In) => Out, Factor extends Nat, M extends Nat> extends StreamModule<In, Out, void, M> {
+  readonly mapper: F;
+  readonly factor: Factor;
+  run(input: In): StateFn<void, Out>;
 }
 
 // Enhanced composition with multiplicity tracking
-interface TrackedComposition<F extends StreamModule, G extends StreamModule> extends StreamModule {
-  type In = F['In'];
-  type Out = G['Out'];
-  type State = { 
-    fState: F['State']; 
-    gState: G['State'];
+interface TrackedComposition<F extends StreamModule<any, any, any, any>, G extends StreamModule<any, any, any, any>, M extends Nat> extends StreamModule<F extends StreamModule<infer I, any, any, any> ? I : never, G extends StreamModule<any, infer O, any, any> ? O : never, { 
+  fState: F extends StreamModule<any, any, infer FS, any> ? FS : never; 
+  gState: G extends StreamModule<any, any, infer GS, any> ? GS : never;
+  multiplicityTracker: {
+    expected: Nat;
+    actual: Nat;
+    violations: string[];
+  };
+}, M> {
+  readonly f: F;
+  readonly g: G;
+  run(input: F extends StreamModule<infer I, any, any, any> ? I : never): StateFn<{ 
+    fState: F extends StreamModule<any, any, infer FS, any> ? FS : never; 
+    gState: G extends StreamModule<any, any, infer GS, any> ? GS : never;
     multiplicityTracker: {
       expected: Nat;
       actual: Nat;
       violations: string[];
     };
-  };
-  
-  // Compute composed multiplicity with tracking
-  type Mult<I extends this.In>; // Tracked multiplicity
-  
-  run(input: this.In): StateFn<this.State, this.Out>;
+  }, G extends StreamModule<any, infer O, any, any> ? O : never>;
 }
 
 // Type-level multiplicity validation with detailed error reporting
@@ -67,8 +60,9 @@ type MultiplicityViolation<Expected extends Nat, Actual extends Nat, Context ext
     `Multiplicity mismatch in ${Context}: expected ${Expected}, got ${Actual}`;
 
 // Compile-time multiplicity safety check with error messages
-type ValidateCompositionSafety<F extends StreamModule, G extends StreamModule, I extends F['In']> = 
-  MultiplicityViolation<F['Mult']<I>, TrackedComposition<F, G>['Mult']<I>, 'composition'>;
+// Note: This is experimental syntax for advanced type-level computations
+// type ValidateCompositionSafety<F extends StreamModule<any, any, any, any>, G extends StreamModule<any, any, any, any>, I> = 
+//   MultiplicityViolation<any, any, 'composition'>;
 
 // Example implementations
 class ConditionalMapStreamImpl<In, Out> implements ConditionalMapStream<In, Out, (input: In) => Out, (input: In) => boolean> {

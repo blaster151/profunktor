@@ -1,20 +1,24 @@
 // fp-deformation-integration.ts
 // Integration layer for deformation complex with existing cooperad infrastructure
 
-import { Tree, admissibleCuts, keyOf } from './fp-cooperad-trees.js';
-import { GradedTree, gradedTree, edgeDegree } from './fp-cooperad-dg.js';
-import { 
+import { Tree, admissibleCuts, keyOf } from './fp-cooperad-trees';
+import { GradedTree, gradedTree, edgeDegree } from './fp-cooperad-dg';
+import type { 
   DgCooperadLike, 
   DgAlgebraLike, 
-  Hom, 
+  Hom,
+  Module
+} from './fp-deformation-dgla-enhanced';
+import { 
   deformationComplex,
   isMaurerCartan,
   isChainMap,
   constantHom,
   zeroHom,
-  identityHom
-} from './fp-deformation-dgla-enhanced.js';
-import { Sum, sum, zero, scale, plus } from './fp-dg-core.js';
+  identityHom,
+  endomorphismAlgebra
+} from './fp-deformation-dgla-enhanced';
+import { Sum, sum, zero, scale, plus } from './fp-dg-core';
 
 // ============================================================================
 // Part 1: Adapters for Existing Cooperad Infrastructure
@@ -125,55 +129,48 @@ export function polynomialAlgebra(): DgAlgebraLike<string> {
   };
 }
 
+// ============================================================================
+// Part 3: Example Modules and Algebras
+// ============================================================================
+
 /**
- * Endomorphism algebra (linear maps)
+ * Example: Number vector space Module
  */
-export function endomorphismAlgebra<V>(): DgAlgebraLike<(v: V) => V> {
-  return {
-    // Multiplicative structure (composition)
-    mul: (f: (v: V) => V, g: (v: V) => V): (v: V) => V => {
-      return (v: V) => f(g(v));
-    },
-    
-    unit: () => (v: V) => v, // identity map
-    
-    // Additive structure
-    add: (f: (v: V) => V, g: (v: V) => V): (v: V) => V => {
-      return (v: V) => {
-        // This is a simplified version - in practice you'd need proper vector space structure
-        return f(v); // Placeholder
-      };
-    },
-    
-    sub: (f: (v: V) => V, g: (v: V) => V): (v: V) => V => {
-      return (v: V) => f(v); // Placeholder
-    },
-    
-    scale: (k: number, f: (v: V) => V): (v: V) => V => {
-      return (v: V) => f(v); // Placeholder
-    },
-    
-    zero: () => (_: V) => {
-      throw new Error('Zero map not implemented');
-    },
-    
-    // Grading and differential
-    degree: (_: (v: V) => V): number => 0,
-    
-    dP: (f: (v: V) => V): Sum<(v: V) => V> => {
-      return zero();
-    },
-    
-    // Equality (simplified)
-    equals: (f: (v: V) => V, g: (v: V) => V): boolean => {
-      // In practice, you'd test on a basis
-      return f === g;
-    }
-  };
+export const numberModule: Module<number> = {
+  add: (x, y) => x + y,
+  sub: (x, y) => x - y,
+  scale: (k, x) => k * x,
+  zero: () => 0,
+  equals: (a, b) => Math.abs(a - b) < 1e-10
+};
+
+/**
+ * Example: String polynomial Module (for demonstration)
+ */
+export const stringPolynomialModule: Module<string> = {
+  add: (x, y) => x === "0" ? y : y === "0" ? x : `(${x} + ${y})`,
+  sub: (x, y) => y === "0" ? x : `(${x} - ${y})`,
+  scale: (k, x) => k === 0 ? "0" : k === 1 ? x : `${k}*${x}`,
+  zero: () => "0",
+  equals: (a, b) => a === b // Note: This is syntactic, not semantic equality
+};
+
+/**
+ * Example: Create endomorphism algebra for numbers
+ */
+export function createNumberEndomorphismAlgebra(): DgAlgebraLike<(v: number) => number> {
+  return endomorphismAlgebra(numberModule);
+}
+
+/**
+ * Example: Create endomorphism algebra for string polynomials
+ */
+export function createStringPolynomialEndomorphismAlgebra(): DgAlgebraLike<(v: string) => string> {
+  return endomorphismAlgebra(stringPolynomialModule);
 }
 
 // ============================================================================
-// Part 3: Example Homomorphisms
+// Part 4: Example Homomorphisms
 // ============================================================================
 
 /**

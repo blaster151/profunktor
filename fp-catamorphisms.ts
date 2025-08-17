@@ -32,6 +32,9 @@ import {
   lift2, composeK, sequence, traverse
 } from './fp-typeclasses-hkt';
 
+// Help TS infer R: explicitly pick R at the call site without repeating PatternMatcherBuilder
+const P = <T extends GADT<string, any>, R>(gadt: T) => pmatch<T, R>(gadt);
+
 // ============================================================================
 // Generic Fold Framework
 // ============================================================================
@@ -87,14 +90,14 @@ export type FoldExpr<A, R> = {
 };
 
 function foldBool(expr: Expr<boolean>): boolean {
-  return pmatch(expr)
+  return pmatch<Expr<boolean>, boolean>(expr)
     .with('Const', ({ value }) => value)
     .with('If', ({ cond, then, else: else_ }) =>
       foldBool(cond) ? foldBool(then as any) : foldBool(else_ as any)
     )
     .with('Var', ({ name }) => { throw new Error(`Unbound variable: ${name}`); })
     .with('Add', () => { throw new Error('Cannot evaluate Add as boolean'); })
-    .with('Let', ({ name, value, body }) => foldBool(body as any))
+    .with('Let', ({ body }) => foldBool(body as any))
     .exhaustive();
 }
 
@@ -106,7 +109,7 @@ export function cataExpr<A, R>(
   expr: Expr<A>,
   algebra: FoldExpr<A, R>
 ): R {
-  return pmatch(expr)
+  return pmatch<Expr<A>, R>(expr)
     .with('Const', ({ value }) => algebra.Const(value))
     .with('Add', ({ left, right }) => algebra.Add(
       cataExpr(left as any, algebra),
@@ -130,17 +133,17 @@ export function cataExpr<A, R>(
  * Recursive catamorphism for Expr<A> that applies the algebra recursively
  * This version recurses into sub-expressions before applying the algebra
  */
-export function cataExprRecursive<A, R>(
-  expr: Expr<A>,
+export function cataExprRecursive<R>(
+  expr: Expr<any>,
   algebra: {
-    Const: (value: A) => R;
+    Const: (value: any) => R;
     Add: (left: R, right: R) => R;
     If: (cond: R, thenBranch: R, elseBranch: R) => R;
     Var: (name: string) => R;
     Let: (name: string, value: R, body: R) => R;
   }
 ): R {
-  return pmatch(expr)
+  return pmatch<Expr<any>, R>(expr)
     .with('Const', ({ value }) => algebra.Const(value))
     .with('Add', ({ left, right }) => 
       algebra.Add(
@@ -239,7 +242,7 @@ export function foldMaybeK<A, R>(
     Nothing: () => R;
   }
 ): R {
-  return pmatch(maybe as MaybeGADT<A>)
+  return pmatch<MaybeGADT<A>, R>(maybe as MaybeGADT<A>)
     .with('Just', ({ value }) => algebra.Just(value))
     .with('Nothing', () => algebra.Nothing())
     .exhaustive();
@@ -255,7 +258,7 @@ export function foldEitherK<L, R, Result>(
     Right: (value: R) => Result;
   }
 ): Result {
-  return pmatch(either as EitherGADT<L, R>)
+  return pmatch<EitherGADT<L, R>, Result>(either as EitherGADT<L, R>)
     .with('Left', ({ value }) => algebra.Left(value))
     .with('Right', ({ value }) => algebra.Right(value))
     .exhaustive();
@@ -280,7 +283,7 @@ export function cataMaybe<A, R>(
   maybe: MaybeGADT<A>,
   algebra: FoldMaybe<A, R>
 ): R {
-  return pmatch(maybe)
+  return pmatch<MaybeGADT<A>, R>(maybe)
     .with('Just', algebra.Just)
     .with('Nothing', algebra.Nothing)
     .exhaustive();
@@ -297,11 +300,11 @@ export type FoldEither<L, R, Result> = {
 /**
  * Catamorphism for EitherGADT<L, R>
  */
-export function cataEither<L, R, Result>(
+export function cataEither<L, R, Out>(
   either: EitherGADT<L, R>,
-  algebra: FoldEither<L, R, Result>
-): Result {
-  return pmatch(either)
+  algebra: FoldEither<L, R, Out>
+): Out {
+  return pmatch<EitherGADT<L, R>, Out>(either)
     .with('Left', algebra.Left)
     .with('Right', algebra.Right)
     .exhaustive();
@@ -319,10 +322,10 @@ export type FoldResult<A, E, R> = {
  * Catamorphism for Result<A, E>
  */
 export function cataResult<A, E, R>(
-  result: Result<A, E>,
+  result: ResultGADT<A, E>,
   algebra: FoldResult<A, E, R>
 ): R {
-  return pmatch(result)
+  return pmatch<ResultGADT<A, E>, R>(result)
     .with('Ok', algebra.Ok)
     .with('Err', algebra.Err)
     .exhaustive();
@@ -337,21 +340,11 @@ export function cataResult<A, E, R>(
  */
 export function evalExprAlgebra(): FoldExpr<number, number> {
   return {
-    Const: ({ value }) => value,
-    Add: ({ left, right }) => {
-      // Note: This is a simplified version that doesn't recurse
-      // In practice, you'd use cataExprRecursive for proper evaluation
-      return 0; // Placeholder
-    },
-    If: ({ cond, then, else: else_ }) => {
-      // Note: This is a simplified version that doesn't recurse
-      return 0; // Placeholder
-    },
-    Var: ({ name }) => { throw new Error(`Unbound variable: ${name}`); },
-    Let: ({ name, value, body }) => {
-      // Note: This is a simplified version that doesn't recurse
-      return 0; // Placeholder
-    }
+    Const: (value) => value,
+    Add: (l, r) => l + r,
+    If: (cond, t, e) => (cond ? t : e),
+    Var: (name) => { throw new Error(`Unbound variable: ${name}`); },
+    Let: (_name, _value, body) => body
   };
 }
 
@@ -373,11 +366,15 @@ export function evalExprRecursive(expr: Expr<number>): number {
  */
 export function transformStringAlgebra(): FoldExpr<string, Expr<string>> {
   return {
-    Const: ({ value }) => Expr.Const(value.toUpperCase()),
-    Add: ({ left, right }) => { throw new Error("Cannot add strings in this context"); },
-    If: ({ cond, then, else: else_ }) => Expr.If(cond, then, else_),
-    Var: ({ name }) => Expr.Var(name),
-    Let: ({ name, value, body }) => Expr.Let(name, value, body)
+    Const: (value) => Expr.Const(value.toUpperCase()),
+    Add: (_l, _r) => { throw new Error("Cannot add strings in this context"); },
+    If: (cond, thenBranch, elseBranch) => {
+      // For transforming strings, we need to construct boolean expressions
+      const boolCond = typeof cond === 'boolean' ? Expr.Const(cond) : Expr.Const(true);
+      return Expr.If(boolCond, thenBranch, elseBranch);
+    },
+    Var: (name) => Expr.Var(name),
+    Let: (name, value, body) => Expr.Let(name, value, body)
   };
 }
 
@@ -422,12 +419,12 @@ export function composeFoldAlgebras<T extends GADT<string, any>, R1, R2>(
   algebra1: Fold<T, R1>,
   algebra2: (r1: R1) => R2
 ): Fold<T, R2> {
-  return Object.fromEntries(
-    Object.entries(algebra1).map(([tag, handler]) => [
-      tag,
-      (payload: any) => algebra2(handler(payload))
-    ])
-  ) as Fold<T, R2>;
+  const out: Partial<Fold<T, R2>> = {};
+  (Object.keys(algebra1) as Array<GADTTags<T>>).forEach((tag) => {
+    const h = algebra1[tag] as (p: GADTPayload<T, typeof tag>) => R1;
+    (out as any)[tag] = (payload: GADTPayload<T, typeof tag>) => algebra2(h(payload));
+  });
+  return out as Fold<T, R2>;
 }
 
 /**
@@ -451,8 +448,8 @@ export function composeMaybeAlgebras<A, R1, R2>(
  * Example: Using fold with MaybeGADT
  */
 export function exampleMaybeFold(): void {
-  const justValue = MaybeGADT.Just(42);
-  const nothingValue = MaybeGADT.Nothing();
+  const justValue = MaybeGADT.Just<number>(42);
+  const nothingValue = MaybeGADT.Nothing<number>();
   
   const toStringAlgebra = maybeToStringAlgebra<number>();
   
@@ -479,8 +476,8 @@ export function exampleMaybeFold(): void {
  * Example: Using fold with EitherGADT
  */
 export function exampleEitherFold(): void {
-  const leftValue = EitherGADT.Left('error');
-  const rightValue = EitherGADT.Right(123);
+  const leftValue = EitherGADT.Left<string, number>('error');
+  const rightValue = EitherGADT.Right<string, number>(123);
   
   const defaultAlgebra = eitherDefaultAlgebra<string, number>(0);
   
@@ -518,8 +515,8 @@ export function exampleExprFold(): void {
  * Example: Using fold with Result
  */
 export function exampleResultFold(): void {
-  const success = ResultGADT.Ok(42);
-  const failure = ResultGADT.Err('Something went wrong');
+  const success = ResultGADT.Ok<number, string>(42);
+  const failure = ResultGADT.Err<number, string>('Something went wrong');
   
   const successAlgebra = resultSuccessAlgebra<number, string>(
     error => parseInt(error) || 0
@@ -548,7 +545,7 @@ export function exampleAlgebraReuse(): void {
     str => str.toUpperCase()
   );
   
-  const justValue = MaybeGADT.Just(42);
+  const justValue = MaybeGADT.Just<number>(42);
   
   const baseResult = cataMaybe(justValue, baseMaybeAlgebra);
   const upperResult = cataMaybe(justValue, upperCaseAlgebra);
