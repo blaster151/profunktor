@@ -9,6 +9,12 @@
  */
 
 // ============================================================================
+// Imports
+// ============================================================================
+
+import type { EitherGADT, Result } from './fp-gadt-enhanced';
+
+// ============================================================================
 // Data Type Definitions
 // ============================================================================
 
@@ -464,6 +470,13 @@ export interface TaskEitherK extends Kind2 {
   readonly type: any; // Will be properly typed when imported
   readonly __effect: 'Async'; // Mark as async for purity tracking
 }
+
+// ============================================================================
+// Kind1 wrappers for right-covariant families  
+// ============================================================================
+
+// Re-export specialized Kind1 wrappers from dedicated module
+export type { EitherRightK, ResultOkK } from './fp-hkt-either-result-kinds';
 
 // ----------------------------------------------------------------------------
 // Centralized Kind identifier constants (for registries)

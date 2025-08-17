@@ -5,11 +5,11 @@
  * including .match and .matchTag instance methods with full type safety and immutable compatibility.
  */
 
-import {
-  Maybe, Just, Nothing, matchMaybe,
-  Either, Left, Right, matchEither,
-  Result, Ok, Err, matchResult
-} from './fp-adt-registry';
+// import {
+//   Maybe, Just, Nothing, matchMaybe,
+//   Either, Left, Right, matchEither,
+//   Result, Ok, Err, matchResult
+// } from './fp-adt-registry';
 
 // ============================================================================
 // Part 1: DRY Helper Functions
@@ -78,7 +78,7 @@ export type TagHandler<Tag extends string, Payload, Result> =
  * Handlers object for pattern matching
  */
 export type MatchHandlers<Spec, Result> = {
-  [K in keyof Spec]?: TagHandler<K, Spec[K], Result>;
+  [K in keyof Spec & string]?: TagHandler<K, Spec[K], Result>;
 } & {
   _?: (tag: string, payload: any) => Result;
   otherwise?: (tag: string, payload: any) => Result;
@@ -140,7 +140,7 @@ export interface EnhancedADTInstance<Tag extends string, Payload = any> {
  */
 export interface ImmutableADTInstance<Tag extends string, Payload = any> 
   extends EnhancedADTInstance<Tag, Payload> {
-  readonly __immutableBrand: unique symbol;
+  readonly __immutableBrand: symbol;
 }
 
 // ============================================================================
@@ -227,7 +227,7 @@ export const EnhancedNothing = <A>(): EnhancedMaybe<A> => {
  * Enhanced Maybe with immutable branding
  */
 export class ImmutableMaybe<A> extends EnhancedMaybe<A> implements ImmutableADTInstance<'Just' | 'Nothing', { value?: A }> {
-  readonly __immutableBrand: unique symbol = {} as unique symbol;
+  readonly __immutableBrand: symbol = Symbol('immutable-maybe');
 }
 
 /**
@@ -326,30 +326,30 @@ export class EnhancedEither<L, R> implements EnhancedADTInstance<'Left' | 'Right
 /**
  * Enhanced Either constructors
  */
-export const EnhancedLeft = <L>(value: L): EnhancedEither<L, never> => {
-  return new EnhancedEither('Left', { value });
+export const EnhancedLeft = <L, R = never>(value: L): EnhancedEither<L, R> => {
+  return new EnhancedEither('Left', { value }) as unknown as EnhancedEither<L, R>;
 };
 
-export const EnhancedRight = <R>(value: R): EnhancedEither<never, R> => {
-  return new EnhancedEither('Right', { value });
+export const EnhancedRight = <R, L = never>(value: R): EnhancedEither<L, R> => {
+  return new EnhancedEither('Right', { value }) as unknown as EnhancedEither<L, R>;
 };
 
 /**
  * Enhanced Either with immutable branding
  */
 export class ImmutableEither<L, R> extends EnhancedEither<L, R> implements ImmutableADTInstance<'Left' | 'Right', { value: L | R }> {
-  readonly __immutableBrand: unique symbol = {} as unique symbol;
+  readonly __immutableBrand: symbol = Symbol('immutable-either');
 }
 
 /**
  * Immutable Either constructors
  */
-export const ImmutableLeft = <L>(value: L): ImmutableEither<L, never> => {
-  return new ImmutableEither('Left', { value });
+export const ImmutableLeft = <L, R = never>(value: L): ImmutableEither<L, R> => {
+  return new ImmutableEither('Left', { value }) as unknown as ImmutableEither<L, R>;
 };
 
-export const ImmutableRight = <R>(value: R): ImmutableEither<never, R> => {
-  return new ImmutableEither('Right', { value });
+export const ImmutableRight = <R, L = never>(value: R): ImmutableEither<L, R> => {
+  return new ImmutableEither('Right', { value }) as unknown as ImmutableEither<L, R>;
 };
 
 // ============================================================================
@@ -449,7 +449,7 @@ export const EnhancedErr = <E>(error: E): EnhancedResult<never, E> => {
  * Enhanced Result with immutable branding
  */
 export class ImmutableResult<T, E> extends EnhancedResult<T, E> implements ImmutableADTInstance<'Ok' | 'Err', { value?: T; error?: E }> {
-  readonly __immutableBrand: unique symbol = {} as unique symbol;
+  readonly __immutableBrand: symbol = Symbol('immutable-result');
 }
 
 /**

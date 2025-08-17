@@ -24,9 +24,10 @@ function infiniteUsage<T>(): Usage<T> {
 
 import { 
   UsageBound, 
-  multiplyUsageBounds,
   getUsageBoundForType
 } from './fluent-usage-wrapper';
+
+import { multiplyUsageBounds } from './src/stream/multiplicity/types';
 
 import { 
   getUsageBound, 

@@ -513,7 +513,16 @@ export function matchTagWithGuards<Spec extends Record<string, any>, Result>(
   // Handle different handler types
   if (Array.isArray(handler)) {
     // Guarded handlers array
-    return matchTagGuardedHandlers(handler);
+    const result = matchTagGuardedHandlers<Result>(handler);
+    if (result !== NO_MATCH) {
+      return result as Result; // Explicit type assertion after NO_MATCH check
+    }
+    // If no guard matched, try fallback
+    const fallback = handlers._ || handlers.otherwise;
+    if (fallback) {
+      return fallback(String(tag));
+    }
+    throw new Error(`No guard matched for tag: ${String(tag)}`);
   } else if (typeof handler === 'function') {
     // Regular handler
     return handler();
@@ -521,9 +530,9 @@ export function matchTagWithGuards<Spec extends Record<string, any>, Result>(
     // Guarded handlers with fallback
     const { guards: guardHandlers, fallback } = handler;
     if (guardHandlers) {
-      const result = matchTagGuardedHandlers(guardHandlers);
+      const result = matchTagGuardedHandlers<Result>(guardHandlers);
       if (result !== NO_MATCH) { // Check for NO_MATCH sentinel
-        return result as Result;
+        return result; // TypeScript should narrow this to Result
       }
     }
     if (fallback) {

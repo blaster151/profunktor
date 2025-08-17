@@ -44,15 +44,19 @@ export interface RBazaar<A, B, S, T> {
  * @param arr Array of Apply<F, [A]>
  * @returns Apply<F, [A[]]>
  */
-export function sequenceArray<F extends Kind1, A>(F: Applicative<F>, arr: Apply<F, [A]>[]): Apply<F, [A[]]> {
-  // Standard right fold with explicit accumulator type
+export function sequenceArray<F extends Kind1, A>(
+  F: Applicative<F>,
+  arr: Array<Apply<F, [A]>>
+): Apply<F, [A[]]> {
+  const init = F.of<A[]>([]);
+
   return arr.reduce(
-    (fas, fa): Apply<F, [A[]]> =>
+    (fas: Apply<F, [A[]]>, fa: Apply<F, [A]>) =>
       F.ap(
-        F.map(fas, (as: A[]) => (a: A) => [...as, a]),
+        F.map<A[], (a: A) => A[]>(fas, (as: A[]) => (a: A) => [...as, a]),
         fa
       ),
-    F.of([] as A[])
+    init
   );
 }
 

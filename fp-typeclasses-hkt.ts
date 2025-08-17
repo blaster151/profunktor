@@ -11,8 +11,11 @@ import {
   ArrayK, MaybeK, EitherK, TupleK, FunctionK, PromiseK, SetK, MapK, ListK,
   ReaderK, WriterK, StateK,
   Maybe, Either, List, Reader, Writer, State,
-  RequireCovariantLast
+  RequireCovariantLast,
+  EitherRightK, ResultOkK
 } from './fp-hkt';
+
+import type { EitherGADT, Result, EitherGADT as EGT } from './fp-gadt-enhanced';
 
 // Local no-op purity marker to satisfy references in examples
 declare function attachPurityMarker<T>(obj: T, marker: string): void;
@@ -787,6 +790,26 @@ lift2P(Promise.resolve(1), Promise.resolve(2)).then(console.log); // 3
  * 
  * HKT Laws:
  * 1. Apply Identity: Apply<F, [A]> should be well-formed for valid F and A
- * 2. Apply Composition: Apply<Compose<F, G>, [A]> = Apply<F, [Apply<G, [A]>]>
- * 3. Kind Preservation: KindArity<F> should be consistent across all uses
- */ 
+ */
+
+// ============================================================================
+// GADT-friendly constructors
+// ============================================================================
+
+const LeftG  = <L, R = never>(l: L): EitherGADT<L, R> => ({ tag: 'Left',  payload: { value: l } } as const);
+const RightG = <L, R>(r: R): EitherGADT<L, R>         => ({ tag: 'Right', payload: { value: r } } as const);
+
+const OkG  = <A, E>(a: A): Result<A, E>   => ({ tag: 'Ok',  payload: { value: a } } as const);
+const ErrG = <A = never, E = unknown>(e: E): Result<A, E> => ({ tag: 'Err', payload: { error: e } } as const);
+
+// ============================================================================
+// Factory instances for right-covariant families  
+// ============================================================================
+
+// Re-export specialized factory functions from dedicated module
+export { 
+  getEitherFunctor, 
+  getEitherApplicative, 
+  getResultFunctor, 
+  getResultApplicative 
+} from './fp-typeclasses-std'; 

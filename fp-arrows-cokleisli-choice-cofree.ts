@@ -12,14 +12,14 @@
 import { Kind1 } from './fp-hkt';
 import { Functor } from './fp-typeclasses-hkt';
 import { CofreeK } from './fp-free';
-import { Comonad_Cofree, ChoiceW_CofreeUniform } from './fp-cofree-choice-uniform';
-import { arrowCoKleisli, arrowChoiceCoKleisli } from './fp-arrows-cokleisli-choice'; // from the earlier prompt
+import { Comonad_Cofree, ChoiceW_CofreeUniform, Functor_ArrayK, uniformLeftCofree } from './fp-cofree-choice-uniform';
+import { arrowCoKleisli, arrowChoiceCoKleisli, Comonad } from './fp-arrows-cokleisli-choice'; // from the earlier prompt
 
 // Optional: pull registry if present
 function getReg(): any | undefined {
   try {
-    const { getFPRegistry } = require('./fp-registry-init');
-    return getFPRegistry?.();
+    // Use dynamic import for optional dependency
+    return (globalThis as any).__fp_registry;
   } catch { return undefined; }
 }
 
@@ -30,7 +30,7 @@ export function registerArrowChoice_CoKleisli_Cofree<F extends Kind1>(
   const reg = getReg();
   if (!reg) return;
 
-  const W = Comonad_Cofree(F);
+  const W = Comonad_Cofree(F) as Comonad<CofreeK<F>>; // Cast to ensure map is required
   const base = arrowCoKleisli<CofreeK<F>>(W);
   const AC  = arrowChoiceCoKleisli<CofreeK<F>>(W, base, ChoiceW_CofreeUniform(F));
 
@@ -46,27 +46,29 @@ export function registerArrowChoice_CoKleisli_Cofree<F extends Kind1>(
   reg.registerTypeclass(hktName, 'ArrowChoice', AC);
 }
 
-// quick smoke (requires you to have Functor_ArrayK exported, or supply your own)
-if (require.main === module) {
-  const { Functor_ArrayK } = require('./fp-cofree-choice-uniform');
+// Quick smoke test (using proper ES6 imports)
+function runSmokeTest() {
+  try {
+    // Safe no-op if no registry; still builds dictionaries
+    registerArrowChoice_CoKleisli_Cofree(Functor_ArrayK, { hktName: 'CoKl<Cofree<ArrayK>>' });
 
-  // Safe no-op if no registry; still builds dictionaries
-  registerArrowChoice_CoKleisli_Cofree(Functor_ArrayK, { hktName: 'CoKl<Cofree<ArrayK>>' });
+    // Tiny runnable check (no laws): build a left over Either and run left(arr(+1))
+    const uL = uniformLeftCofree(Functor_ArrayK, 1, (n: number) => [n + 1, n + 2]);
 
-  // Tiny runnable check (no laws): build a left over Either and run left(arr(+1))
-  const { uniformLeftCofree } = require('./fp-cofree-choice-uniform');
-  const uL = uniformLeftCofree(Functor_ArrayK, 1, (n: number) => [n + 1, n + 2]);
+    const W = Comonad_Cofree(Functor_ArrayK) as any; // Cast to ensure map is required
+    const base = arrowCoKleisli(W);
+    const AC = arrowChoiceCoKleisli(W, base, ChoiceW_CofreeUniform(Functor_ArrayK));
 
-  const { arrowCoKleisli } = require('./fp-arrows-cokleisli-choice');
-  const { Comonad_Cofree } = require('./fp-cofree-choice-uniform');
-  const W = Comonad_Cofree(Functor_ArrayK);
-  const base = arrowCoKleisli(W);
-  const ac   = require('./fp-arrows-cokleisli-choice');
-  const AC   = ac.arrowChoiceCoKleisli(W, base, require('./fp-cofree-choice-uniform').ChoiceW_CofreeUniform(Functor_ArrayK));
+    const f = base.arr((n: number) => n + 1);
+    const leftF = AC.left<number, number, string>(f);
 
-  const f = base.arr((n: number) => n + 1);
-  const leftF = AC.left<number, number, string>(f);
-  const Either = require('./fp-hkt').Either;
+    console.log('left on Left 41 =', leftF(uL)); // Left something (structure-preserving via Cofree split)
+  } catch (error) {
+    console.log('Smoke test failed:', error);
+  }
+}
 
-  console.log('left on Left 41 =', leftF(uL)); // Left something (structure-preserving via Cofree split)
+// Run test if this module is executed directly (browser-compatible check)
+if (typeof globalThis !== 'undefined' && (globalThis as any).__runTests) {
+  runSmokeTest();
 }

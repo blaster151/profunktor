@@ -1,6 +1,6 @@
 // Minimal optics auto-derivation facade (adapter-backed, no global registry)
 
-import { Lens, Prism, Traversal, lens, prism, traversal } from './fp-optics';
+import { Lens, Prism, Traversal, lens, prism, traversal } from './fp-optics-adapter';
 
 // Lightweight metadata types
 export interface OpticsMetadata {

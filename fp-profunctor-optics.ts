@@ -24,9 +24,9 @@ import {
   composeTraversalLens,
   composeTraversalPrism,
   composeTraversalOptional
-} from './fp-optics';
+} from './fp-optics-adapter';
 
-export type { Lens, Prism, Optional, Traversal } from './fp-optics';
+export type { Lens, Prism, Optional, Traversal } from './fp-optics-adapter';
 
 export const OpticsAPI = {
   lens,

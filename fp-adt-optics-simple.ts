@@ -8,19 +8,15 @@
  */
 
 import {
-  // Core optic types
+  // Core optic types and utilities
   Lens,
   Prism,
-  
-  // Lens utilities
   view,
   set,
   over,
-  
-  // Prism utilities
   preview,
   review
-} from './fp-optics';
+} from './fp-optics-adapter';
 
 import {
   // ADT imports

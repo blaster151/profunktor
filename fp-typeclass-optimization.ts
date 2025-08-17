@@ -1,4 +1,17 @@
-import { fusibilityStats } from './src/fusionReachability';
+/**
+ * Typeclass-Driven Optimization System
+ * 
+ * This module implements typeclass-driven optimization passes for both lazy and eager ADTs,
+ * 
+ * Provides fusibility analysis and optimization paths for various typeclass instances.
+ */
+
+// Simple stub for fusibility stats (used only for tracing)
+// Simple stub for fusibility stats (used only for tracing)
+function fusibilityStats(): { operators: number; reachablePairs: number } {
+  return { operators: 0, reachablePairs: 0 };
+}
+
 /**
  * Typeclass-Driven Optimization System
  * 

@@ -51,9 +51,11 @@ export type DoGen2<F extends Kind2, Fixed, A> = Generator<Apply<Fix2Right<F, Fix
 export type DoGen3<F extends Kind3, A, B, C> = Generator<Apply<Fix3To1<F, A, B>, [any]>, C, any>;
 
 /**
- * Helper type for fixing Kind3 to Kind1
+ * Helper interface for fixing Kind3 to Kind1 by fixing the first two parameters
  */
-type Fix3To1<F extends Kind3, A, B> = Fix2Right<Fix2Left<F, A>, B>;
+interface Fix3To1<F extends Kind3, A, B> extends Kind1 {
+  readonly type: Apply<F, [A, B, this['arg0']]>;
+}
 
 /**
  * Monadic value with effect tag
@@ -77,7 +79,7 @@ export type MonadicValue3<F extends Kind3, A, B, C, E extends EffectTag = 'Pure'
  * Effect composition result
  */
 export type ComposedEffect<T extends readonly EffectTag[]> = 
-  T extends readonly [infer First, ...infer Rest]
+  T extends readonly [infer First extends EffectTag, ...infer Rest]
     ? Rest extends readonly EffectTag[]
       ? ComposeEffects<First, ComposedEffect<Rest>>
       : First
@@ -199,7 +201,7 @@ export function markDoMResult<F extends Kind1, A, E extends EffectTag>(
  */
 export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag {
   if (hasPurityMarker(value)) {
-    return extractPurityMarker(value);
+    return extractPurityMarker(value).effect;
   }
   
   // Default effect inference based on type
@@ -219,9 +221,12 @@ export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag
 export function composeMonadicEffects<Effects extends readonly EffectTag[]>(
   effects: Effects
 ): ComposedEffect<Effects> {
-  return effects.reduce((acc, effect) => 
-    ComposeEffects<typeof acc, typeof effect>(acc, effect), 'Pure' as EffectTag
-  ) as ComposedEffect<Effects>;
+  return effects.reduce((acc, effect) => {
+    // Runtime effect composition logic
+    if (acc === 'Pure') return effect;
+    if (effect === 'Pure') return acc;
+    return `${acc}|${effect}` as EffectTag;
+  }, 'Pure' as EffectTag) as ComposedEffect<Effects>;
 }
 
 // ============================================================================

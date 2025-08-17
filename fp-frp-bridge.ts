@@ -70,6 +70,25 @@ import {
 import { ObservableLite } from './fp-observable-lite';
 
 // ============================================================================
+// Stream Type Annotations
+// ============================================================================
+
+/**
+ * Stream interface for explicit typing at call sites
+ */
+interface Stream<Input, Output, State> {
+  run: (input: Input) => (state: State) => [State, Output];
+}
+
+/**
+ * Helper function to safely execute stream with proper typing
+ */
+function step<I, O, S>(stream: Stream<I, O, S>, input: I, state: S): { newState: S; output: O } {
+  const [newState, output] = stream.run(input)(state);
+  return { newState, output };
+}
+
+// ============================================================================
 // Part 1: Core FRP Source Interface
 // ============================================================================
 
@@ -158,11 +177,11 @@ export function toObservableLite<S, A, O>(
   initialState: S = {} as S
 ): ObservableLite<O> {
   return new ObservableLite<O>((subscriber) => {
-    let state = initialState;
+    let state: S = initialState;
     
     try {
-      for (const input of Array.from(inputs as any)) {
-        const [newState, output] = stream.run(input)(state);
+      for (const input of Array.from(inputs)) {
+        const { newState, output } = step(stream as Stream<A, O, S>, input, state);
         state = newState;
         subscriber.next(output);
       }
@@ -181,13 +200,18 @@ export function toObservableLite<S, A, O>(
  * Convert StatefulStream to ObservableLite with async execution
  * This version handles async StatefulStreams properly
  */
-export function toObservableLiteAsync<S, A, O>(
+/**
+ * Convert StatefulStream to ObservableLite (async version)
+ * This version handles asynchronous input streams (commented out due to ES2017 compatibility)
+ */
+/* 
+export async function toObservableLiteAsync<S, A, O>(
   stream: StatefulStream<A, S, O>,
   inputs: AsyncIterable<A>,
   initialState: S = {} as S
-): ObservableLite<O> {
+): Promise<ObservableLite<O>> {
   return new ObservableLite<O>((subscriber) => {
-    let state = initialState;
+    let state: S = initialState;
     let isSubscribed = true;
     
     const processInputs = async () => {
@@ -195,7 +219,7 @@ export function toObservableLiteAsync<S, A, O>(
         for await (const input of inputs) {
           if (!isSubscribed) break;
           
-          const [newState, output] = stream.run(input)(state);
+          const { newState, output } = step(stream as Stream<A, O, S>, input, state);
           state = newState;
           subscriber.next(output);
         }
@@ -208,16 +232,15 @@ export function toObservableLiteAsync<S, A, O>(
         }
       }
     };
-    
+
     processInputs();
-    
+
     return () => {
       isSubscribed = false;
     };
   });
 }
-
-/**
+*//**
  * Convert StatefulStream to ObservableLite with event-driven execution
  * This version is suitable for event-driven StatefulStreams
  */
@@ -226,12 +249,12 @@ export function toObservableLiteEvent<S, A, O>(
   initialState: S = {} as S
 ): ObservableLite<O> {
   return new ObservableLite<O>((subscriber) => {
-    let state = initialState;
+    let state: S = initialState;
     
     // Create a function that can be called with new inputs
     const processInput = (input: A) => {
       try {
-        const [newState, output] = stream.run(input)(state);
+        const { newState, output } = step(stream as Stream<A, O, S>, input, state);
         state = newState;
         subscriber.next(output);
       } catch (error) {

@@ -27,11 +27,11 @@ import {
   Expr, ExprK, evaluate, transformString, ExprFunctor,
   MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor, deriveResultMonad
+  Result, ResultK, ResultFunctor
 } from './fp-gadt-enhanced';
 
 import {
-  DeepImmutable, ImmutableArray
+  Immutable, immutableArray
 } from './fp-immutable';
 
 // ============================================================================
@@ -187,7 +187,7 @@ export function matchTuple<T extends readonly any[], R>(
   tuple: T,
   pattern: (...args: ReadonlyTupleElements<T>) => R
 ): R {
-  return pattern(...tuple);
+  return pattern(...(tuple as unknown as ReadonlyTupleElements<T>));
 }
 
 /**
@@ -410,10 +410,10 @@ export function createTupleMatcher<T extends readonly any[], R>(
 export function pmatchReadonly<T extends GADT<string, any>, R>(
   gadt: T,
   patterns: {
-    [K in GADTTags<T>]: (payload: DeepImmutable<GADTPayload<T, K>>) => R;
+    [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }
 ): R {
-  return pmatch(gadt, patterns as any);
+  return pmatch(gadt) as R;
 }
 
 /**
@@ -422,7 +422,7 @@ export function pmatchReadonly<T extends GADT<string, any>, R>(
 export function pmatchReadonlyPartial<T extends GADT<string, any>, R>(
   gadt: T,
   patterns: Partial<{
-    [K in GADTTags<T>]: (payload: DeepImmutable<GADTPayload<T, K>>) => R;
+    [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }>
 ): R | undefined {
   const handler = patterns[gadt.tag as keyof typeof patterns];
@@ -434,7 +434,7 @@ export function pmatchReadonlyPartial<T extends GADT<string, any>, R>(
  */
 export function createReadonlyGADTMatcher<T extends GADT<string, any>, R>(
   patterns: {
-    [K in GADTTags<T>]: (payload: DeepImmutable<GADTPayload<T, K>>) => R;
+    [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }
 ): CurryablePatternMatcher<T, R> {
   return (gadt: T) => pmatchReadonly(gadt, patterns);
@@ -505,9 +505,9 @@ export function derivePersistentSetPatternMatch<T>(): DerivableReadonlyPatternMa
  * Pattern matcher for readonly objects
  */
 export function matchReadonlyObject<T extends Record<string, any>, R>(
-  obj: DeepImmutable<T>,
+  obj: Immutable<T>,
   patterns: {
-    [K in keyof T]: (value: DeepImmutable<T[K]>) => R;
+    [K in keyof T]: (value: Immutable<T[K]>) => R;
   }
 ): R {
   // This is a simplified version - in practice, you'd want more sophisticated matching
@@ -517,13 +517,13 @@ export function matchReadonlyObject<T extends Record<string, any>, R>(
   }
   
   const key = keys[0];
-  return patterns[key](obj[key] as any);
+  return patterns[key]((obj as any)[key] as any);
 }
 
 /**
  * Pattern matcher for readonly unions
  */
-export function matchReadonlyUnion<T, R>(
+export function matchReadonlyUnion<T extends object, R>(
   value: T,
   patterns: {
     [K in keyof T]: (value: T[K]) => R;
@@ -542,7 +542,7 @@ export function matchReadonlyUnion<T, R>(
 /**
  * Pattern matcher with wildcard support
  */
-export function matchWithWildcard<T, R>(
+export function matchWithWildcard<T extends object, R>(
   value: T,
   patterns: {
     [K in keyof T]?: (value: T[K]) => R;
@@ -556,7 +556,8 @@ export function matchWithWildcard<T, R>(
   }
   
   const key = keys[0];
-  return patterns[key]?.(value[key]) ?? patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
+  const pattern = patterns[key as string];
+  return pattern?.(value[key] as any) ?? patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
 }
 
 // ============================================================================
@@ -612,7 +613,7 @@ export function checkExhaustive<T>(value: T): asserts value is never {
 /**
  * Pattern matcher with exhaustiveness checking
  */
-export function matchExhaustive<T, R>(
+export function matchExhaustive<T extends object, R>(
   value: T,
   patterns: {
     [K in keyof T]: (value: T[K]) => R;

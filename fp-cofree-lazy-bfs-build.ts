@@ -45,7 +45,7 @@ export function unfoldLazyCofreeBFS<F extends Kind1, A>(
         myKids.map((h, j) => [h, offset + j] as const);
 
       // lift into F and map to child nodes
-      const kidsF = From.fromArray(pairs) as Apply<F, [readonly [A, number]]>;
+      const kidsF = From.fromArray([...pairs]) as Apply<F, [readonly [A, number]]>;
       return F.map(kidsF, ([h, idx]) =>
         nodeWithLevel(h, depth + 1, nextLevelHeads, idx)
       ) as Apply<F, [LazyCofree<F, A>]>;

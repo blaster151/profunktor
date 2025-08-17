@@ -11,24 +11,39 @@ import {
   EnhancedSumTypeBuilder,
   EnhancedProductTypeBuilder,
   EnhancedADTInstance,
-  EnhancedProductTypeInstance,
+  EnhancedProductTypeInstance
+} from './fp-adt-builders-enhanced';
+
+import {
   ConstructorSpec,
   ProductFields,
   SumTypeConfig,
   ProductTypeConfig
-} from './fp-adt-builders-enhanced';
+} from './fp-adt-builders';
 
 import {
   GuardedMatchHandlers,
   GuardedTagOnlyHandlers,
   GuardedADTInstance,
+  GuardedMatchHandlersWithKeys,
+  GuardedTagOnlyHandlersWithKeys,
+  GuardedHandler,
   matchWithGuards,
   matchTagWithGuards,
-  withGuards,
   guard,
   guards,
   guardWithFallback,
-  Guards
+  and,
+  or,
+  not,
+  matchWithGuardsDataLast,
+  matchTagWithGuardsDataLast,
+  createGuardedMatcher,
+  createGuardedTagMatcher,
+  ExtractGuardedResult,
+  ExtractGuardedTagResult,
+  IsGuardedExhaustive,
+  HasGuardedFallback
 } from './fp-pattern-guards';
 
 // ============================================================================
@@ -123,11 +138,11 @@ export function createSumTypeWithGuards<Spec extends ConstructorSpec>(
     
     // Guard-enabled match methods
     matchWithGuards<Result>(handlers: GuardedMatchHandlers<Spec, Result>): Result {
-      return matchWithGuards(this, handlers);
+      return matchWithGuards(this as any, handlers as GuardedMatchHandlersWithKeys<Spec, Result>);
     }
     
     matchTagWithGuards<Result>(handlers: GuardedTagOnlyHandlers<Spec, Result>): Result {
-      return matchTagWithGuards(this, handlers);
+      return matchTagWithGuards(this as any, handlers as GuardedTagOnlyHandlersWithKeys<Spec, Result>);
     }
     
     is<K extends keyof Spec>(tag: K): this is ADTInstanceWithGuards<Spec> & {
@@ -246,7 +261,7 @@ export function createProductTypeWithGuards<Fields extends ProductFields>(
         otherwise?: (fields: Fields) => Result;
       }
     ): Result {
-      return baseBuilder.match(this, handlers);
+      return baseBuilder.match(this, handlers as any);
     }
     
     // Guard-enabled match method
@@ -288,7 +303,7 @@ export function createProductTypeWithGuards<Fields extends ProductFields>(
   
   // Enhanced builder with guard support
   const enhancedBuilder: ProductTypeBuilderWithGuards<Fields> = {
-    ...baseBuilder,
+    ...baseBuilder as any,
     
     createWithGuards(fields: Fields): ProductTypeInstanceWithGuards<Fields> {
       return new ProductWithGuards(fields);
@@ -388,45 +403,27 @@ export const ResultGuarded = {
  * Create a reusable Maybe matcher with guards
  */
 export function createMaybeGuardedMatcher<A, Result>(
-  handlers: GuardedMatchHandlers<{
-    Just: { value: A };
-    Nothing: {};
-  }, Result>
+  handlers: GuardedMatchHandlers<any, Result>
 ) {
-  return (maybe: ADTInstanceWithGuards<{
-    Just: { value: A };
-    Nothing: {};
-  }>) => maybe.matchWithGuards(handlers);
+  return (maybe: ADTInstanceWithGuards<any>) => maybe.matchWithGuards(handlers);
 }
 
 /**
  * Create a reusable Either matcher with guards
  */
 export function createEitherGuardedMatcher<L, R, Result>(
-  handlers: GuardedMatchHandlers<{
-    Left: { value: L };
-    Right: { value: R };
-  }, Result>
+  handlers: GuardedMatchHandlers<any, Result>
 ) {
-  return (either: ADTInstanceWithGuards<{
-    Left: { value: L };
-    Right: { value: R };
-  }>) => either.matchWithGuards(handlers);
+  return (either: ADTInstanceWithGuards<any>) => either.matchWithGuards(handlers);
 }
 
 /**
  * Create a reusable Result matcher with guards
  */
 export function createResultGuardedMatcher<T, E, Result>(
-  handlers: GuardedMatchHandlers<{
-    Ok: { value: T };
-    Err: { error: E };
-  }, Result>
+  handlers: GuardedMatchHandlers<any, Result>
 ) {
-  return (result: ADTInstanceWithGuards<{
-    Ok: { value: T };
-    Err: { error: E };
-  }>) => result.matchWithGuards(handlers);
+  return (result: ADTInstanceWithGuards<any>) => result.matchWithGuards(handlers);
 }
 
 // ============================================================================
@@ -458,12 +455,10 @@ export {
   guard,
   guards,
   guardWithFallback,
-  Guards,
   
   // Guard matching functions
   matchWithGuards,
   matchTagWithGuards,
-  withGuards,
   
   // Guard composition
   and,

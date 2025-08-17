@@ -22,7 +22,12 @@ import {
 
 import {
   ResultUnified, Result, ResultK, Ok, Err, matchResult
-} from './fp-result';
+} from './fp-result-unified';
+
+import {
+  // HKT imports
+  Kind1, Kind2
+} from './fp-hkt';
 
 import {
   // Typeclass imports
@@ -30,6 +35,10 @@ import {
   deriveFunctor, deriveApplicative, deriveMonad,
   lift2, composeK, sequence, traverse
 } from './fp-typeclasses-hkt';
+
+import {
+  getEitherApplicative, getResultApplicative, getEitherFunctor, getResultFunctor
+} from './fp-typeclasses-std';
 
 import {
   // Purity imports
@@ -51,13 +60,13 @@ export interface ADTRegistryEntry<HKT, Instance, Constructors, Matchers> {
   readonly matchers: Matchers;
   readonly effect: EffectTag;
   readonly typeclassInstances: {
-    readonly Functor?: Functor<HKT>;
-    readonly Applicative?: Applicative<HKT>;
-    readonly Monad?: Monad<HKT>;
-    readonly Bifunctor?: Bifunctor<HKT>;
-    readonly Profunctor?: Profunctor<HKT>;
-    readonly Traversable?: Traversable<HKT>;
-    readonly Foldable?: Foldable<HKT>;
+    Functor?: Functor<HKT extends Kind1 ? HKT : never>;
+    Applicative?: Applicative<HKT extends Kind1 ? HKT : never>;
+    Monad?: Monad<HKT extends Kind1 ? HKT : never>;
+    Bifunctor?: Bifunctor<HKT extends Kind2 ? HKT : never>;
+    Profunctor?: Profunctor<HKT extends Kind2 ? HKT : never>;
+    Traversable?: Traversable<HKT extends Kind1 ? HKT : never>;
+    Foldable?: Foldable<HKT extends Kind1 ? HKT : never>;
   };
 }
 
@@ -89,8 +98,9 @@ export const ADTRegistry = {
     matchers: { match: matchEither },
     effect: 'Pure' as EffectTag,
     typeclassInstances: {
-      Functor: EitherUnified.HKT ? {} as Functor<EitherK> : undefined,
-      Applicative: EitherUnified.HKT ? {} as Applicative<EitherK> : undefined,
+      // Provide factories because Either is Kind2: we must fix L first  
+      getFunctor: getEitherFunctor, // call as getFunctor<L>()
+      getApplicative: getEitherApplicative, // call as getApplicative<L>()
       Monad: EitherUnified.HKT ? {} as Monad<EitherK> : undefined,
       Bifunctor: EitherUnified.HKT ? {} as Bifunctor<EitherK> : undefined,
       Traversable: EitherUnified.HKT ? {} as Traversable<EitherK> : undefined,
@@ -106,8 +116,9 @@ export const ADTRegistry = {
     matchers: { match: matchResult },
     effect: 'Pure' as EffectTag,
     typeclassInstances: {
-      Functor: ResultUnified.HKT ? {} as Functor<ResultK> : undefined,
-      Applicative: ResultUnified.HKT ? {} as Applicative<ResultK> : undefined,
+      // Provide factories because Result is Kind2: we must fix E first
+      getFunctor: getResultFunctor, // call as getFunctor<E>()
+      getApplicative: getResultApplicative, // call as getApplicative<E>()
       Monad: ResultUnified.HKT ? {} as Monad<ResultK> : undefined,
       Bifunctor: ResultUnified.HKT ? {} as Bifunctor<ResultK> : undefined,
       Traversable: ResultUnified.HKT ? {} as Traversable<ResultK> : undefined,
@@ -229,8 +240,8 @@ export function generateTypeclassInstances(): void {
   if (MaybeUnified.HKT) {
     // Functor instance
     ADTRegistry.Maybe.typeclassInstances.Functor = {
-      map: (fa, f) => matchMaybe(fa, {
-        Just: value => Just(f(value)),
+      map: <A, B>(fa: any, f: (a: A) => B) => matchMaybe(fa, {
+        Just: (value: A) => Just(f(value)),
         Nothing: () => Nothing()
       })
     } as Functor<MaybeK>;
@@ -239,9 +250,9 @@ export function generateTypeclassInstances(): void {
     ADTRegistry.Maybe.typeclassInstances.Applicative = {
       ...ADTRegistry.Maybe.typeclassInstances.Functor,
       of: Just,
-      ap: (fab, fa) => matchMaybe(fab, {
-        Just: f => matchMaybe(fa, {
-          Just: a => Just(f(a)),
+      ap: <A, B>(fab: any, fa: any) => matchMaybe(fab, {
+        Just: (f: (a: A) => B) => matchMaybe(fa, {
+          Just: (a: A) => Just(f(a)),
           Nothing: () => Nothing()
         }),
         Nothing: () => Nothing()
@@ -251,8 +262,8 @@ export function generateTypeclassInstances(): void {
     // Monad instance
     ADTRegistry.Maybe.typeclassInstances.Monad = {
       ...ADTRegistry.Maybe.typeclassInstances.Applicative,
-      chain: (fa, f) => matchMaybe(fa, {
-        Just: value => f(value),
+      chain: <A, B>(fa: any, f: (a: A) => any) => matchMaybe(fa, {
+        Just: (value: A) => f(value),
         Nothing: () => Nothing()
       })
     } as Monad<MaybeK>;
@@ -264,43 +275,38 @@ export function generateTypeclassInstances(): void {
   if (EitherUnified.HKT) {
     // Functor instance
     ADTRegistry.Either.typeclassInstances.Functor = {
-      map: (fa, f) => matchEither(fa, {
-        Left: value => Left(value),
-        Right: value => Right(f(value))
+      map: <A, B>(fa: any, f: (a: A) => B) => matchEither(fa as any, {
+        Left: (value: any) => Left(value),
+        Right: (value: A) => Right(f(value))
       })
-    } as Functor<EitherK>;
+    } as unknown as Functor<EitherK>;
 
     // Bifunctor instance
     ADTRegistry.Either.typeclassInstances.Bifunctor = {
-      bimap: (fa, f, g) => matchEither(fa, {
-        Left: value => Left(f(value)),
-        Right: value => Right(g(value))
+      bimap: <A, B, C, D>(fa: any, f: (a: A) => C, g: (b: B) => D) => matchEither(fa as any, {
+        Left: (value: A) => Left(f(value)),
+        Right: (value: B) => Right(g(value))
       }),
-      mapLeft: (fa, f) => matchEither(fa, {
-        Left: value => Left(f(value)),
-        Right: value => Right(value)
+      mapLeft: <A, B, C>(fa: any, f: (a: A) => C) => matchEither(fa as any, {
+        Left: (value: A) => Left(f(value)),
+        Right: (value: B) => Right(value)
+      }),
+      mapRight: <A, B, D>(fa: any, g: (b: B) => D) => matchEither(fa as any, {
+        Left: (value: A) => Left(value),
+        Right: (value: B) => Right(g(value))
       })
-    } as Bifunctor<EitherK>;
+    } as unknown as Bifunctor<EitherK>;
 
-    // Applicative instance
-    ADTRegistry.Either.typeclassInstances.Applicative = {
-      ...ADTRegistry.Either.typeclassInstances.Functor,
-      of: Right,
-      ap: (fab, fa) => matchEither(fab, {
-        Left: value => Left(value),
-        Right: f => matchEither(fa, {
-          Left: value => Left(value),
-          Right: a => Right(f(a))
-        })
-      })
-    } as Applicative<EitherK>;
+    // Factory functions
+    (ADTRegistry.Either.typeclassInstances as any).getFunctor = getEitherFunctor;
+    (ADTRegistry.Either.typeclassInstances as any).getApplicative = getEitherApplicative;
 
     // Monad instance
     ADTRegistry.Either.typeclassInstances.Monad = {
       ...ADTRegistry.Either.typeclassInstances.Applicative,
-      chain: (fa, f) => matchEither(fa, {
-        Left: value => Left(value),
-        Right: value => f(value)
+      chain: <A, B>(fa: any, f: (a: A) => any) => matchEither(fa as any, {
+        Left: (value: any) => Left(value),
+        Right: (value: A) => f(value)
       })
     } as Monad<EitherK>;
 
@@ -311,43 +317,38 @@ export function generateTypeclassInstances(): void {
   if (ResultUnified.HKT) {
     // Functor instance
     ADTRegistry.Result.typeclassInstances.Functor = {
-      map: (fa, f) => matchResult(fa, {
-        Ok: value => Ok(f(value)),
-        Err: error => Err(error)
+      map: <A, B>(fa: any, f: (a: A) => B) => matchResult(fa, {
+        Ok: (value: A) => Ok(f(value)),
+        Err: (error: any) => Err(error)
       })
     } as Functor<ResultK>;
 
     // Bifunctor instance
     ADTRegistry.Result.typeclassInstances.Bifunctor = {
-      bimap: (fa, f, g) => matchResult(fa, {
-        Ok: value => Ok(f(value)),
-        Err: error => Err(g(error))
+      bimap: <A, B, C, D>(fa: any, f: (a: A) => C, g: (b: B) => D) => matchResult(fa, {
+        Ok: (value: A) => Ok(f(value)),
+        Err: (error: B) => Err(g(error))
       }),
-      mapLeft: (fa, f) => matchResult(fa, {
-        Ok: value => Ok(value),
-        Err: error => Err(f(error))
+      mapLeft: <A, B, C>(fa: any, f: (a: A) => C) => matchResult(fa, {
+        Ok: (value: B) => Ok(value),
+        Err: (error: A) => Err(f(error))
+      }),
+      mapRight: <A, B, D>(fa: any, g: (b: B) => D) => matchResult(fa, {
+        Ok: (value: B) => Ok(g(value)),
+        Err: (error: A) => Err(error)
       })
     } as Bifunctor<ResultK>;
 
-    // Applicative instance
-    ADTRegistry.Result.typeclassInstances.Applicative = {
-      ...ADTRegistry.Result.typeclassInstances.Functor,
-      of: Ok,
-      ap: (fab, fa) => matchResult(fab, {
-        Ok: f => matchResult(fa, {
-          Ok: a => Ok(f(a)),
-          Err: error => Err(error)
-        }),
-        Err: error => Err(error)
-      })
-    } as Applicative<ResultK>;
+    // Factory functions
+    (ADTRegistry.Result.typeclassInstances as any).getFunctor = getResultFunctor;
+    (ADTRegistry.Result.typeclassInstances as any).getApplicative = getResultApplicative;
 
     // Monad instance
     ADTRegistry.Result.typeclassInstances.Monad = {
       ...ADTRegistry.Result.typeclassInstances.Applicative,
-      chain: (fa, f) => matchResult(fa, {
-        Ok: value => f(value),
-        Err: error => Err(error)
+      chain: <A, B>(fa: any, f: (a: A) => any) => matchResult(fa, {
+        Ok: (value: A) => f(value),
+        Err: (error: any) => Err(error)
       })
     } as Monad<ResultK>;
 
@@ -398,17 +399,26 @@ export type ExtractADTHKT<K extends keyof typeof ADTRegistry> = typeof ADTRegist
 /**
  * Extract instance type from ADT name
  */
-export type ExtractADTInstance<K extends keyof typeof ADTRegistry> = typeof ADTRegistry[K] extends ADTRegistryEntry<any, infer Instance, any, any> ? Instance : never;
+export type ExtractADTInstance<K extends keyof typeof ADTRegistry> =
+  typeof ADTRegistry[K] extends ADTRegistryEntry<infer _HKT, infer Instance, infer _Cons, infer _Matchers>
+    ? Instance
+    : never;
 
 /**
  * Extract constructors type from ADT name
  */
-export type ExtractADTConstructors<K extends keyof typeof ADTRegistry> = typeof ADTRegistry[K] extends ADTRegistryEntry<any, any, infer Constructors, any> ? Constructors : never;
+export type ExtractADTConstructors<K extends keyof typeof ADTRegistry> =
+  typeof ADTRegistry[K] extends ADTRegistryEntry<infer _HKT, infer _Instance, infer Constructors, infer _Matchers>
+    ? Constructors
+    : never;
 
 /**
  * Extract matchers type from ADT name
  */
-export type ExtractADTMatchers<K extends keyof typeof ADTRegistry> = typeof ADTRegistry[K] extends ADTRegistryEntry<any, any, any, infer Matchers> ? Matchers : never;
+export type ExtractADTMatchers<K extends keyof typeof ADTRegistry> =
+  typeof ADTRegistry[K] extends ADTRegistryEntry<infer _HKT, infer _Instance, infer _Constructors, infer Matchers>
+    ? Matchers
+    : never;
 
 // ============================================================================
 // Part 6: Initialization

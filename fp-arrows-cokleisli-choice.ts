@@ -11,11 +11,14 @@
 import { Kind1, Apply } from './fp-hkt';
 import { Either, Left, Right, matchEither } from './fp-either-unified';
 
+// Import arrow functions - adjust path as needed
+import { ArrowFromCoKleisli } from './fp-arrows-cokleisli';
+
 // Minimal Comonad (align with your existing one if exported elsewhere)
 export interface Comonad<W extends Kind1> {
   extract<A>(wa: Apply<W, [A]>): A;
   extend<A, B>(wa: Apply<W, [A]>, f: (w: Apply<W, [A]>) => B): Apply<W, [B]>;
-  map?<A, B>(wa: Apply<W, [A]>, f: (a: A) => B): Apply<W, [B]>; // optional but handy
+  map<A, B>(wa: Apply<W, [A]>, f: (a: A) => B): Apply<W, [B]>; // Required for ArrowFromCoKleisli
 }
 
 // CoKleisli carrier
@@ -62,7 +65,8 @@ export function arrowCoKleisli<W extends Kind1>(W: Comonad<W>): Arrow<CoKleisliK
       const a = (W as any).map ? (W as any).map(wac, (t: [A, C]) => t[0]) : (wac as any);
       const c = (W as any).map ? (W as any).map(wac, (t: [A, C]) => t[1]) : (wac as any);
       const b = f(a);
-      const c0 = W.extract(c);
+      const c0 = W.extract(c) as C; // Type assertion to fix unknown -> C
+      return [b, c0];
       return [b, c0];
     };
 
@@ -101,44 +105,51 @@ const Id: Comonad<IdK> = {
 
 const Choice_Id: ChoiceW<IdK> = {
   splitEither: <A, C>(eac: Either<A, C>) =>
-    Either.match(eac, {
-      Left: (a)  => Either.Left(a as any as Apply<IdK, [A]>),
-      Right: (c) => Either.Right(c as any as Apply<IdK, [C]>)
+    matchEither(eac, {
+      Left: (a)  => Left(a as any as Apply<IdK, [A]>),
+      Right: (c) => Right(c as any as Apply<IdK, [C]>)
     })
 };
 
 // Optional registry hook (safe no-op if registry is absent)
 export function registerArrowChoiceCoKleisli_Id(): void {
   try {
-    const { getFPRegistry } = require('./fp-registry-init');
-    const reg = getFPRegistry?.();
-    if (!reg) return;
+    // Use dynamic import to avoid Node.js require issues in ES modules
+    import('./fp-registry-init').then(({ getFPRegistry }) => {
+      const reg = getFPRegistry?.();
+      if (!reg) return;
 
-    const base = arrowCoKleisli(Id);
-    const ac = arrowChoiceCoKleisli(Id, base, Choice_Id);
-    reg.registerHKT?.('CoKl<Id>', 'CoKleisliK<IdK>');
-    reg.registerTypeclass('CoKl<Id>', 'Arrow', base);
-    reg.registerTypeclass('CoKl<Id>', 'ArrowChoice', ac);
-  } catch {}
+      const base = ArrowFromCoKleisli(Id);
+      const ac = arrowChoiceCoKleisli(Id, base, Choice_Id);
+      reg.register?.('CoKl<Id>', 'CoKleisliK<IdK>');
+      // Fix register calls to use correct number of parameters
+      reg.register?.('Arrow', base);
+      reg.register?.('ArrowChoice', ac);
+    }).catch(() => {
+      // Silently ignore registry failures
+    });
+  } catch {
+    // Silently ignore import failures
+  }
 }
 
-// run quick smoke if direct
-if (require.main === module) {
-  const base = arrowCoKleisli(Id);
+// Export test function for module testing
+export function runArrowChoiceCoKleisliTests(): void {
+  const base = ArrowFromCoKleisli(Id);
   const AC = arrowChoiceCoKleisli(Id, base, Choice_Id);
 
   const f = base.arr((n: number) => n + 1);
   const l = AC.left<number, number, string>(f);
 
-  const L = Either.Left<number, string>(41);
-  const R = Either.Right<number, string>('ok');
+  const L = Left(41);
+  const R = Right('ok');
 
   console.log('left(arr(+1)) on Left 41 ->', l(L)); // Left 42
   console.log('left(arr(+1)) on Right "ok" ->', l(R)); // Right "ok"
 
   // pseudo law check: left(arr f) == arr (left f)
   const arrLeft = base.arr((e: Either<number, string>) =>
-    Either.match(e, { Left: (n) => Either.Left(n + 1), Right: (s) => Either.Right(s) })
+    matchEither(e, { Left: (n: number) => Left(n + 1), Right: (s: string) => Right(s) })
   );
   const lhs = l;               // left(arr (+1))
   const rhs = arrLeft;         // arr(left (+1))

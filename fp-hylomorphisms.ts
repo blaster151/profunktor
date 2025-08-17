@@ -16,8 +16,14 @@ import {
   Expr, ExprK, evaluate, transformString, ExprFunctor,
   MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor, deriveResultMonad
+  ResultK, ResultFunctor
 } from './fp-gadt-enhanced';
+
+import type { Result as ResultGADT } from './fp-gadt-enhanced';
+import { Result } from './fp-gadt-enhanced';
+
+// Destructure Result constructors for convenience
+const { Ok, Err } = Result;
 
 import {
   Fold, fold, foldGeneric,
@@ -30,16 +36,13 @@ import {
 } from './fp-catamorphisms';
 
 import {
-  Unfold, unfold, unfoldRecursive,
-  anaExpr, anaExprRecursive, UnfoldExpr,
-  deriveUnfold, createUnfoldBuilder,
-  unfoldK, unfoldExprK, unfoldMaybeK, unfoldEitherK,
-  anaMaybe, UnfoldMaybe,
-  anaEither, UnfoldEither,
-  anaResult, UnfoldResult,
-  anaList, UnfoldList, ListGADT, ListGADTK,
-  Build, Done, More, anaRecursive
+  Build, Done, More,
+  anaRecursive,
+  anaMaybe, anaEither, anaResult
 } from './fp-anamorphisms';
+
+// List GADT definitions needed for hylomorphisms
+import { ListGADT } from './fp-gadt';
 
 import {
   Kind1, Kind2, Kind3,
@@ -76,11 +79,11 @@ export type Hylo<Result, T extends GADT<string, any>, Seed> = {
  * @param seed - Initial seed value
  * @returns Result of applying algebra to coalgebra-generated GADT
  */
-export function hylo<Result, GADT extends GADT<string, any>, Seed>(
-  alg: (g: GADT) => Result,         // fold (cata) algebra
-  coalg: (seed: Seed) => GADT,      // unfold (ana) coalgebra
+export function hylo<R, TNode extends GADT<string, any>, Seed>(
+  alg: (g: TNode) => R,         // fold (cata) algebra
+  coalg: (seed: Seed) => TNode,      // unfold (ana) coalgebra
   seed: Seed
-): Result {
+): R {
   return alg(coalg(seed)); // Basic implementation - recursive version follows
 }
 
@@ -89,11 +92,11 @@ export function hylo<Result, GADT extends GADT<string, any>, Seed>(
  * Each recursive call feeds the next seed into coalg then alg
  * Termination condition comes from coalg producing a leaf/terminator node
  */
-export function hyloRecursive<Result, GADT extends GADT<string, any>, Seed>(
-  alg: (g: GADT) => Result,
-  coalg: (seed: Seed) => { gadt: GADT; subSeeds?: Seed[] },
+export function hyloRecursive<R, TNode extends GADT<string, any>, Seed>(
+  alg: (g: TNode) => R,
+  coalg: (seed: Seed) => { gadt: TNode; subSeeds?: Seed[] },
   seed: Seed
-): Result {
+): R {
   const { gadt, subSeeds } = coalg(seed);
   
   // For now, apply algebra directly to the GADT
@@ -233,28 +236,28 @@ export function hyloExprRecursive<A, Seed, R>(
 /**
  * DerivableHylo type for auto-deriving hylomorphisms via the Derivable Instances system
  */
-export type DerivableHylo<Result, GADT extends GADT<string, any>, Seed> = {
-  alg: (g: GADT) => Result;
-  coalg: (seed: Seed) => GADT;
+export type DerivableHylo<R, TNode extends GADT<string, any>, Seed> = {
+  alg: (g: TNode) => R;
+  coalg: (seed: Seed) => TNode;
 };
 
 /**
  * Auto-derive hylomorphism for any GADT type
  */
-export function deriveHylo<Result, GADT extends GADT<string, any>, Seed>(
-  hyloDef: DerivableHylo<Result, GADT, Seed>
-): (seed: Seed) => Result {
+export function deriveHylo<R, TNode extends GADT<string, any>, Seed>(
+  hyloDef: DerivableHylo<R, TNode, Seed>
+): (seed: Seed) => R {
   return (seed: Seed) => hylo(hyloDef.alg, hyloDef.coalg, seed);
 }
 
 /**
  * Create a hylomorphism builder for a specific GADT type
  */
-export function createHyloBuilder<Result, GADT extends GADT<string, any>, Seed>(
-  alg: (g: GADT) => Result,
-  coalg: (seed: Seed) => GADT
+export function createHyloBuilder<R, TNode extends GADT<string, any>, Seed>(
+  alg: (g: TNode) => R,
+  coalg: (seed: Seed) => TNode
 ) {
-  return function(seed: Seed): Result {
+  return function(seed: Seed): R {
     return hylo(alg, coalg, seed);
   };
 }
@@ -312,31 +315,70 @@ export function hyloEitherK<L, R, Seed, Result>(
 /**
  * Hylomorphism for MaybeGADT<A>
  */
-export function hyloMaybe<A, Seed, Result>(
-  alg: (maybe: MaybeGADT<A>) => Result,
+export function hyloMaybe<A, Seed, R>(
+  alg: (m: MaybeGADT<A>) => R,
   coalg: (seed: Seed) => MaybeGADT<A>
-): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+): (seed: Seed) => R;
+
+export function hyloMaybe<A, Seed, R>(
+  alg: (m: MaybeGADT<A>) => R,
+  coalg: (seed: Seed) => MaybeGADT<A>,
+  seed: Seed
+): R;
+
+export function hyloMaybe<A, Seed, R>(
+  alg: (m: MaybeGADT<A>) => R,
+  coalg: (seed: Seed) => MaybeGADT<A>,
+  seed?: Seed
+): any {
+  if (arguments.length === 2) return (s: Seed) => alg(coalg(s));
+  return alg(coalg(seed as Seed));
 }
 
 /**
  * Hylomorphism for EitherGADT<L, R>
  */
-export function hyloEither<L, R, Seed, Result>(
-  alg: (either: EitherGADT<L, R>) => Result,
-  coalg: (seed: Seed) => EitherGADT<L, R>
-): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+export function hyloEither<L, R0, Seed, R>(
+  alg: (e: EitherGADT<L, R0>) => R,
+  coalg: (seed: Seed) => EitherGADT<L, R0>
+): (seed: Seed) => R;
+
+export function hyloEither<L, R0, Seed, R>(
+  alg: (e: EitherGADT<L, R0>) => R,
+  coalg: (seed: Seed) => EitherGADT<L, R0>,
+  seed: Seed
+): R;
+
+export function hyloEither<L, R0, Seed, R>(
+  alg: (e: EitherGADT<L, R0>) => R,
+  coalg: (seed: Seed) => EitherGADT<L, R0>,
+  seed?: Seed
+): any {
+  if (arguments.length === 2) return (s: Seed) => alg(coalg(s));
+  return alg(coalg(seed as Seed));
 }
 
 /**
  * Hylomorphism for Result<A, E>
  */
-export function hyloResult<A, E, Seed, Result>(
-  alg: (result: Result<A, E>) => Result,
-  coalg: (seed: Seed) => Result<A, E>
-): (seed: Seed) => Result {
-  return (seed: Seed) => hylo(alg, coalg, seed);
+export function hyloResult<A, E, Seed, R>(
+  alg: (r: ResultGADT<A, E>) => R,
+  coalg: (seed: Seed) => ResultGADT<A, E>
+): (seed: Seed) => R;
+
+export function hyloResult<A, E, Seed, R>(
+  alg: (r: ResultGADT<A, E>) => R,
+  coalg: (seed: Seed) => ResultGADT<A, E>,
+  seed: Seed
+): R;
+
+export function hyloResult<A, E, Seed, R>(
+  alg: (r: ResultGADT<A, E>) => R,
+  coalg: (seed: Seed) => ResultGADT<A, E>,
+  seed?: Seed
+): any {
+  if (arguments.length === 2) return (s: Seed) => alg(coalg(s));
+  return alg(coalg(seed as Seed));
 }
 
 /**
@@ -360,10 +402,11 @@ export function hyloList<A, Seed, Result>(
 export function rangeSumHylo(n: number): number {
   // Fold algebra: sum the list
   const sumAlgebra = (list: ListGADT<number>): number => {
-    return pmatch(list)
-      .with('Nil', () => 0)
-      .with('Cons', ({ head, tail }) => head + sumAlgebra(tail))
-      .exhaustive();
+    if (list.tag === 'Nil') {
+      return 0;
+    } else { // list.tag === 'Cons'
+      return list.payload.head + sumAlgebra(list.payload.tail);
+    }
   };
   
   // Unfold coalgebra: count down from n
@@ -467,7 +510,7 @@ export function processEitherHylo(seed: number): string {
  */
 export function processResultHylo(seed: number): string {
   // Fold algebra: process Result
-  const processAlgebra = (result: Result<number, string>): string => {
+  const processAlgebra = (result: ResultGADT<number, string>): string => {
     return cataResult(result, {
       Ok: ({ value }) => `Valid: ${value}`,
       Err: ({ error }) => `Invalid: ${error}`
@@ -475,13 +518,13 @@ export function processResultHylo(seed: number): string {
   };
   
   // Unfold coalgebra: generate Result from seed
-  const generateCoalgebra = (s: number): Result<number, string> => {
+  const generateCoalgebra = (s: number): ResultGADT<number, string> => {
     if (s < 0) {
-      return Err('Negative number');
+      return Result.Err('Negative number');
     } else if (s > 100) {
-      return Err('Too large');
+      return Result.Err('Too large');
     } else {
-      return Ok(s);
+      return Result.Ok(s);
     }
   };
   
@@ -499,10 +542,11 @@ export function processResultHylo(seed: number): string {
 export function createRangeSumHylo(): (start: number, end: number) => number {
   // Fold algebra: sum the list
   const sumAlgebra = (list: ListGADT<number>): number => {
-    return pmatch(list)
-      .with('Nil', () => 0)
-      .with('Cons', ({ head, tail }) => head + sumAlgebra(tail))
-      .exhaustive();
+    if (list.tag === 'Nil') {
+      return 0;
+    } else { // list.tag === 'Cons'
+      return list.payload.head + sumAlgebra(list.payload.tail);
+    }
   };
   
   // Unfold coalgebra: generate range
@@ -565,7 +609,7 @@ export function createConfigEvalHylo(): (config: { operation: 'add' | 'multiply'
  */
 export function createValidationHylo(): (value: number) => string {
   // Fold algebra: process validation result
-  const processAlgebra = (result: Result<number, string>): string => {
+  const processAlgebra = (result: ResultGADT<number, string>): string => {
     return cataResult(result, {
       Ok: ({ value }) => `Valid value: ${value}`,
       Err: ({ error }) => `Validation failed: ${error}`
@@ -573,15 +617,15 @@ export function createValidationHylo(): (value: number) => string {
   };
   
   // Unfold coalgebra: generate validation result
-  const validationCoalgebra = (value: number): Result<number, string> => {
+  const validationCoalgebra = (value: number): ResultGADT<number, string> => {
     if (value < 0) {
-      return Err('Negative value');
+      return Result.Err('Negative value');
     } else if (value > 100) {
-      return Err('Value too large');
+      return Result.Err('Value too large');
     } else if (value === 0) {
-      return Err('Zero is not allowed');
+      return Result.Err('Zero is not allowed');
     } else {
-      return Ok(value);
+      return Result.Ok(value);
     }
   };
   

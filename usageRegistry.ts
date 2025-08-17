@@ -1,98 +1,126 @@
-// /**
-//  * Usage Registry for Global Typeclass System
-//  * 
-//  * This module provides a centralized registry for usage bounds across all
-//  * registered types in the typeclass system, enabling global usage tracking
-//  * and compile-time safety.
-//  */
+/**
+ * Usage Registry for Global Typeclass System
+ * 
+ * This module provides a centralized registry for usage bounds across all
+ * registered types in the typeclass system, enabling global usage tracking
+ * and compile-time safety.
+ */
 
-// import { 
-//   Usage, 
-//   Multiplicity, 
-//   constantUsage, 
-//   onceUsage, 
-//   neverUsage, 
-//   infiniteUsage 
-// } from './src/stream/multiplicity/types';
+import { 
+  Usage, 
+  Multiplicity, 
+  UsageBound
+} from './src/stream/multiplicity/types';
 
-// // ============================================================================
-// // Core Registry Types
-// // ============================================================================
+import type { Eq, Ord, Show } from './fp-derivation-helpers';
 
-// /**
-//  * Registry entry that extends the existing typeclass registry with usage information
-//  */
-// export interface RegistryEntry<K> {
-//   typeKey: K;
-//   instances: TypeclassInstances<K>;
-//   usage?: Usage<any>; // Optional: multiplicity tracking
-// }
+// ============================================================================
+// Core Registry Types
+// ============================================================================
 
-// /**
-//  * Typeclass instances interface (placeholder - will be imported from existing system)
-//  */
-// export interface TypeclassInstances<K> {
-//   functor?: any;
-//   applicative?: any;
-//   monad?: any;
-//   bifunctor?: any;
-//   eq?: any;
-//   ord?: any;
-//   show?: any;
-//   [key: string]: any;
-// }
+/**
+ * Registry entry that extends the existing typeclass registry with usage information
+ */
+export interface RegistryEntry<K> {
+  typeKey: K;
+  instances: TypeclassInstances<K>;
+  usage?: Usage<unknown>; // Optional: multiplicity tracking
+}
 
-// /**
-//  * Usage registry interface
-//  */
-// export interface UsageRegistry {
-//   /**
-//    * Register usage for a type
-//    */
-//   registerUsage<K>(typeKey: K, usage: Usage<any>): void;
+/**
+ * Typeclass instances interface (placeholder - will be imported from existing system)
+ */
+export interface TypeclassInstances<K> {
+  functor?: unknown;
+  applicative?: unknown;
+  monad?: unknown;
+  bifunctor?: unknown;
+  eq?: Eq<unknown>;
+  ord?: Ord<unknown>;
+  show?: Show<unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * Usage registry interface
+ */
+export interface UsageRegistry {
+  /**
+   * Register usage for a type
+   */
+  register<K, T>(typeKey: K, usage: Usage<T>): void;
   
-//   /**
-//    * Get usage for a type
-//    */
-//   getUsage<K>(typeKey: K): Usage<any> | undefined;
+  /**
+   * Get usage for a type
+   */
+  getUsage<K, T>(typeKey: K): Usage<T> | undefined;
   
-//   /**
-//    * Check if a type has usage registered
-//    */
-//   hasUsage<K>(typeKey: K): boolean;
+  /**
+   * Check if a type has usage registered
+   */
+  hasUsage<K>(typeKey: K): boolean;
   
-//   /**
-//    * Get all registered usages
-//    */
-//   getAllUsages(): Map<any, Usage<any>>;
+  /**
+   * Get all registered usages
+   */
+  getAllUsages(): Map<unknown, Usage<unknown>>;
   
-//   /**
-//    * Clear all usages
-//    */
-//   clear(): void;
-// }
+  /**
+   * Clear all usages
+   */
+  clear(): void;
+}
 
-// // ============================================================================
-// // Global Usage Registry Implementation
-// // ============================================================================
+// ============================================================================
+// Global Usage Registry Implementation
+// ============================================================================
 
-// /**
-//  * Global usage registry implementation
-//  */
-// class GlobalUsageRegistry implements UsageRegistry {
-//   private usages = new Map<any, Usage<any>>();
+/**
+ * Global usage registry implementation
+ */
+class GlobalUsageRegistry implements UsageRegistry {
+  private usages = new Map<unknown, Usage<unknown>>();
 
-//   registerUsage<K>(typeKey: K, usage: Usage<any>): void {
-//     this.usages.set(typeKey, usage);
-//   }
+  register<K, T>(typeKey: K, usage: Usage<T>): void {
+    this.usages.set(typeKey, usage as Usage<unknown>);
+  }
 
-//   getUsage<K>(typeKey: K): Usage<any> | undefined {
-//     return this.usages.get(typeKey);
-//   }
+  getUsage<K, T>(typeKey: K): Usage<T> | undefined {
+    return this.usages.get(typeKey) as Usage<T> | undefined;
+  }
 
-//   hasUsage<K>(typeKey: K): boolean {
-//     return this.usages.has(typeKey);
-//   }
+  hasUsage<K>(typeKey: K): boolean {
+    return this.usages.has(typeKey);
+  }
+
+  getAllUsages(): Map<unknown, Usage<unknown>> {
+    return new Map(this.usages);
+  }
+
+  clear(): void {
+    this.usages.clear();
+  }
+}
+
+/**
+ * Global registry instance
+ */
+export const usageRegistry = new GlobalUsageRegistry();
+
+/**
+ * Get usage bound for a type from the registry
+ */
+export function getUsageBound<T>(typeKey: string): UsageBound<T> | undefined {
+  const usage = usageRegistry.getUsage(typeKey);
+  return usage ? { usage } : undefined;
+}
+
+/**
+ * Register usage for a type in the global registry
+ */
+export function registerUsage<T>(typeKey: string, usage: Usage<T>): void {
+  usageRegistry.register(typeKey, usage);
+}
 
 //   getAllUsages(): Map<any, Usage<any>> {
 //     return new Map(this.usages);

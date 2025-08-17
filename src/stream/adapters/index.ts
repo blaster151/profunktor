@@ -135,7 +135,7 @@ export function maybeProcessor<A, B>(
     run: (maybe) => () => [
       undefined,
       matchMaybe(maybe, {
-        Just: ({ value }) => Just(processor(value)),
+        Just: (value) => Just(processor(value as A)),
         Nothing: () => Nothing()
       })
     ],
@@ -152,8 +152,8 @@ export function testMaybeRoundTrip<A>(maybe: Maybe<A>): boolean {
   const result = toMaybe(stream, undefined, undefined);
   
   return matchMaybe(maybe, {
-    Just: ({ value }) => matchMaybe(result, {
-      Just: ({ value: resultValue }) => value === resultValue,
+    Just: (value) => matchMaybe(result, {
+      Just: (resultValue) => value === resultValue,
       Nothing: () => false
     }),
     Nothing: () => matchMaybe(result, {
@@ -250,11 +250,11 @@ export function maybeAccumulator<A, B>(
   return {
     run: (maybe) => (state) => [
       matchMaybe(maybe, {
-        Just: ({ value }) => processor(state, value),
+        Just: (value) => processor(state, value as A),
         Nothing: () => state
       }),
       matchMaybe(maybe, {
-        Just: ({ value }) => processor(state, value),
+        Just: (value) => processor(state, value as A),
         Nothing: () => state
       })
     ],
@@ -293,7 +293,7 @@ export function maybeFilter<A>(
     run: (maybe) => () => [
       undefined,
       matchMaybe(maybe, {
-        Just: ({ value }) => predicate(value) ? Just(value) : Nothing(),
+        Just: (value) => predicate(value as A) ? Just(value) : Nothing(),
         Nothing: () => Nothing()
       })
     ],

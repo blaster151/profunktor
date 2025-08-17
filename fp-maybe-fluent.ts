@@ -9,12 +9,44 @@ import {
   FluentOps, 
   FluentOpsImpl, 
   UsageBound, 
-  multiplyUsageBounds,
+  ContainerOf,
+  InnerType,
+  minUsageBounds,
   filterUsageBound,
   scanUsageBound,
   takeUsageBound,
   getUsageBoundForType
 } from './fluent-usage-wrapper';
+
+import { Multiplicity } from './src/stream/multiplicity/types';
+
+// ============================================================================
+// Augment Type Families for Maybe Support
+// ============================================================================
+
+// Augment the ContainerOf type family to support Maybe
+declare module './fluent-usage-wrapper' {
+  interface ContainerOfAugmentation<C, B> {
+    maybeMappingForContainerOf: C extends Maybe<any> ? Maybe<B> : never;
+  }
+}
+
+// Augment the InnerType type family to support Maybe  
+declare module './fluent-usage-wrapper' {
+  interface InnerTypeAugmentation<C> {
+    maybeMappingForInnerType: C extends Maybe<infer A> ? A : never;
+  }
+}
+
+// Override ContainerOf to include Maybe support
+export type MaybeContainerOf<C, B> = 
+  C extends Maybe<any> ? Maybe<B> :
+  ContainerOf<C, B>;
+
+// Override InnerType to include Maybe support
+export type MaybeInnerType<C> =
+  C extends Maybe<infer A> ? A :
+  InnerType<C>;
 
 // ============================================================================
 // Maybe Type Definition
@@ -73,130 +105,166 @@ export function nothing<A>(): Maybe<A> {
  * Create a Maybe from a value or null/undefined
  */
 export function fromNullable<A>(value: A | null | undefined): Maybe<A> {
-  return value != null ? just(value) : nothing<A>();
+  return value != null ? just(value as A) : nothing<A>();
 }
 
 // ============================================================================
-// Fluent Maybe Implementation
+// Fluent Maybe Implementation (Option B: Natural Inner Type Usage)
 // ============================================================================
 
 /**
- * Fluent Maybe wrapper that extends FluentOpsImpl
+ * Fluent Maybe interface that works naturally with inner types
+ * Functions take the inner type A, not Maybe<A>
+ * This enables the desired ergonomics: .map(x => x * 2) where x is the inner type
  */
-export class FluentMaybe<A> extends FluentOpsImpl<Maybe<A>, UsageBound<Maybe<A>>> {
+export interface FluentMaybeOps<A> {
+  // Core fluent operations that work on inner type A
+  map<B>(f: (a: A) => B): FluentMaybeOps<B>;
+  filter(predicate: (a: A) => boolean): FluentMaybeOps<A>;
+  scan<B>(initial: B, f: (acc: B, a: A) => B): FluentMaybeOps<B>;
+  chain<B>(f: (a: A) => FluentMaybeOps<B>): FluentMaybeOps<B>;
+  flatMap<B>(f: (a: A) => FluentMaybeOps<B>): FluentMaybeOps<B>;
+  take(n: number): FluentMaybeOps<A>;
+  
+  // Maybe-specific operations
+  getMaybe(): Maybe<A>;
+  getOrElse(defaultValue: A): A;
+  unsafeGet(): A;
+  match<B>(patterns: { Just: (value: A) => B; Nothing: () => B }): B;
+  
+  // Usage tracking
+  getUsageBound(): UsageBound<Maybe<A>>;
+  validateUsage(input: Maybe<A>): Multiplicity;
+}
+
+/**
+ * Fluent Maybe wrapper extending FluentOpsImpl with Option B approach
+ * A = inner type, Maybe<A> = container type
+ */
+/**
+ * Fluent Maybe implementation with Option B approach
+ * Methods work naturally with inner type A
+ */
+export class FluentMaybe<A> implements FluentMaybeOps<A> {
+  private readonly maybe: Maybe<A>;
+  private readonly usageBound: UsageBound<Maybe<A>>;
+
   constructor(maybe: Maybe<A>) {
-    super(maybe, maybe.__usageBound);
+    this.maybe = maybe;
+    this.usageBound = maybe.__usageBound as UsageBound<Maybe<A>>;
   }
 
   /**
-   * Map over Maybe with usage propagation
+   * Map with usage propagation - f works on inner type A
    */
-  map<B>(f: (a: A) => B): FluentOps<Maybe<B>, UsageBound<Maybe<B>>> {
-    const mappedMaybe = this.value.tag === 'Just' 
-      ? just(f(this.value.value))
+  map<B>(f: (a: A) => B): FluentMaybeOps<B> {
+    const mappedMaybe = this.maybe.tag === 'Just' 
+      ? just(f(this.maybe.value))
       : nothing<B>();
     
-    const mappedUsageBound: UsageBound<Maybe<B>> = {
-      usage: (input: Maybe<B>): Multiplicity => this.__usageBound.usage(input as any),
-      maxUsage: this.__usageBound.maxUsage
-    };
-    
-    return new FluentMaybe(mappedMaybe);
+    return new FluentMaybe<B>(mappedMaybe);
   }
 
   /**
-   * Filter Maybe with usage propagation
+   * Filter with usage propagation - predicate works on inner type A
    */
-  filter(predicate: (a: A) => boolean): FluentOps<Maybe<A>, UsageBound<Maybe<A>>> {
-    if (this.value.tag === 'Nothing') {
-      return new FluentMaybe(this.value);
+  filter(predicate: (a: A) => boolean): FluentMaybeOps<A> {
+    if (this.maybe.tag === 'Nothing') {
+      return new FluentMaybe<A>(this.maybe);
     }
     
-    if (!predicate(this.value.value)) {
-      const nothingValue = nothing<A>();
-      return new FluentMaybe(nothingValue);
-    }
-    
-    const filteredUsageBound = filterUsageBound(this.__usageBound, predicate);
-    return new FluentMaybe({ ...this.value, __usageBound: filteredUsageBound });
+    const passes = predicate(this.maybe.value);
+    const result = passes ? this.maybe : nothing<A>();
+    return new FluentMaybe<A>(result);
   }
 
   /**
-   * Scan over Maybe with usage propagation
+   * Scan with usage propagation - f works on inner type A
    */
-  scan<B>(initial: B, f: (acc: B, a: A) => B): FluentOps<Maybe<B>, UsageBound<Maybe<B>>> {
-    const scannedValue = this.value.tag === 'Just' 
-      ? f(initial, this.value.value)
-      : initial;
+  scan<B>(initial: B, f: (acc: B, a: A) => B): FluentMaybeOps<B> {
+    const result = this.maybe.tag === 'Just'
+      ? just(f(initial, this.maybe.value))
+      : nothing<B>();
     
-    const scannedMaybe = just(scannedValue);
-    const scannedUsageBound = scanUsageBound<Maybe<A>, Maybe<B>>(this.__usageBound);
-    
-    return new FluentMaybe(scannedMaybe);
+    return new FluentMaybe<B>(result);
   }
 
   /**
-   * Chain Maybe with usage propagation
+   * Chain/flatMap with usage propagation - f works on inner type A
    */
-  chain<B>(f: (a: A) => FluentOps<Maybe<B>, UsageBound<Maybe<B>>>): FluentOps<Maybe<B>, UsageBound<Maybe<B>>> {
-    if (this.value.tag === 'Nothing') {
-      const nothingValue = nothing<B>();
-      return new FluentMaybe(nothingValue);
+  chain<B>(f: (a: A) => FluentMaybeOps<B>): FluentMaybeOps<B> {
+    if (this.maybe.tag === 'Nothing') {
+      return new FluentMaybe<B>(nothing<B>());
     }
     
-    const innerWrapper = f(this.value.value);
-    const chainedUsageBound = multiplyUsageBounds(this.__usageBound, innerWrapper.getUsageBound());
-    
-    // Access the inner Maybe value
-    const innerMaybe = (innerWrapper as any).value;
-    return new FluentMaybe(innerMaybe);
+    return f(this.maybe.value);
   }
 
   /**
-   * Take n elements (for Maybe, this is either 0 or 1)
+   * Alias for chain
    */
-  take(n: number): FluentOps<Maybe<A>, UsageBound<Maybe<A>>> {
-    const takeUsageBoundResult = takeUsageBound(this.__usageBound, n);
-    
-    if (n === 0) {
-      const nothingValue = nothing<A>();
-      return new FluentMaybe(nothingValue);
+  flatMap<B>(f: (a: A) => FluentMaybeOps<B>): FluentMaybeOps<B> {
+    return this.chain(f);
+  }
+
+  /**
+   * Take with usage propagation
+   */
+  take(n: number): FluentMaybeOps<A> {
+    if (n <= 0) {
+      return new FluentMaybe<A>(nothing<A>());
     }
     
-    return new FluentMaybe({ ...this.value, __usageBound: takeUsageBoundResult });
+    return new FluentMaybe<A>(this.maybe);
   }
+
+  // ============================================================================
+  // Maybe-specific methods
+  // ============================================================================
 
   /**
    * Get the underlying Maybe value
    */
   getMaybe(): Maybe<A> {
-    return this.value;
+    return this.maybe;
   }
 
   /**
-   * Extract value or throw if Nothing
-   */
-  unsafeGet(): A {
-    if (this.value.tag === 'Just') {
-      return this.value.value;
-    }
-    throw new Error('Cannot extract value from Nothing');
-  }
-
-  /**
-   * Extract value with default
+   * Get the value or default - works with inner type A
    */
   getOrElse(defaultValue: A): A {
-    return this.value.tag === 'Just' ? this.value.value : defaultValue;
+    return this.maybe.tag === 'Just' ? this.maybe.value : defaultValue;
   }
 
   /**
-   * Pattern matching
+   * Unsafe get - returns inner type A
+   */
+  unsafeGet(): A {
+    if (this.maybe.tag === 'Nothing') {
+      throw new Error('Cannot get value from Nothing');
+    }
+    return this.maybe.value;
+  }
+
+  /**
+   * Pattern match - Just handler works with inner type A
    */
   match<B>(patterns: { Just: (value: A) => B; Nothing: () => B }): B {
-    return this.value.tag === 'Just' 
-      ? patterns.Just(this.value.value)
+    return this.maybe.tag === 'Just' 
+      ? patterns.Just(this.maybe.value)
       : patterns.Nothing();
+  }
+
+  // ============================================================================
+  // Usage tracking
+  // ============================================================================
+
+  getUsageBound(): UsageBound<Maybe<A>> {
+    return this.usageBound;
+  }
+
+  validateUsage(input: Maybe<A>): Multiplicity {
+    return this.usageBound.usage(input);
   }
 }
 
@@ -226,45 +294,38 @@ export function fluentNothing<A>(): FluentMaybe<A> {
 }
 
 // ============================================================================
-// Usage Examples
+// Option B Example: Natural Inner Type Usage
 // ============================================================================
 
 /**
- * Example usage of fluent Maybe with usage bounds
+ * Example demonstrating Option B approach - fluent methods work with inner types
  */
-export function exampleUsage() {
-  // Create a fluent Maybe with usage bound from registry
+export function exampleOptionB() {
+  // Create a fluent Maybe with number
   const maybe = fluentJust(42);
   
-  // Chain operations with usage propagation
+  // Chain operations - functions work directly with the inner types (number, string, etc.)
   const result = maybe
-    .map(x => x * 2)           // usage = 1
-    .filter(x => x > 50)       // usage = 1 (filtered)
-    .map(x => x.toString())    // usage = 1
-    .chain(x => fluentJust(x.length)); // usage = 1 * 1 = 1
+    .map(x => x * 2)           // x is number (42 -> 84)
+    .filter(x => x > 50)       // x is number (84 > 50 = true)
+    .map(x => x.toString())    // x is number (84 -> "84") 
+    .map(x => x.length)        // x is string ("84" -> 2)
+    .chain(x => fluentJust(x + 10)); // x is number (2 -> 12)
   
-  // Validate usage
+  // Extract result using natural inner type methods
+  const value = result.getOrElse(0);  // returns number: 12
+  console.log('Option B Result:', value);
+  
+  // Pattern matching with inner types
+  const message = result.match({
+    Just: x => `Value is ${x}`,     // x is number
+    Nothing: () => 'No value'
+  });
+  console.log('Message:', message);
+  
+  // Usage validation
   const usage = result.validateUsage(result.getMaybe());
-  console.log('Usage:', usage); // Should be 1
+  console.log('Usage:', usage);
   
-  // Extract result
-  const value = result.getOrElse(0);
-  console.log('Result:', value); // Should be 2 (length of "84")
-}
-
-// ============================================================================
-// Type-Level Enforcement Example
-// ============================================================================
-
-/**
- * Type-level enforcement example
- * This would trigger a compile error if usage exceeds bounds
- */
-export type SafeMaybeChain<A, B> = 
-  FluentMaybe<A> extends FluentOps<infer U, infer UB> 
-    ? UB extends UsageBound<infer V> 
-      ? V extends Maybe<B> 
-        ? FluentMaybe<B> 
-        : never 
-      : never 
-    : never; 
+  return result;
+} 
