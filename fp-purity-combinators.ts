@@ -24,22 +24,30 @@ import {
 
 import {
   Functor, Applicative, Monad, Bifunctor, Profunctor, Traversable, Foldable,
-  deriveFunctor, deriveApplicative, deriveMonad,
-  lift2, composeK, sequence, traverse
+  deriveFunctor, deriveApplicative, deriveMonad
+  // Do NOT import lift2/composeK/sequence/traverse here to avoid name conflicts
 } from './fp-typeclasses-hkt';
 
 import {
-  EffectTag, EffectOf, Pure, IO, Async, Effect,
-  isPure, isIO, isAsync, getEffectTag,
-  PurityContext, PurityError, PurityResult
+  EffectTag, EffectOf, Pure, IO, Async
 } from './fp-purity';
 
-import {
-  MatchResult, createMatchResult, getMatchValue, getMatchEffect,
-  isMatchResultPure, isMatchResultIO, isMatchResultAsync,
-  InferPurity, InferFunctionPurity, InferUnionPurity, HighestEffect, InferMatchPurity,
-  inferPurityFromValue
-} from './fp-purity-pattern-matching';
+// import {
+//   MatchResult, createMatchResult, getMatchValue, getMatchEffect,
+//   isMatchResultPure, isMatchResultIO, isMatchResultAsync,
+//   InferPurity, InferFunctionPurity, InferUnionPurity, HighestEffect, InferMatchPurity,
+//   inferPurityFromValue
+// } from './fp-purity-pattern-matching';
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+export function getEffectTag(x: unknown): EffectTag {
+  return (x && typeof x === 'object' && '__effect' in (x as any))
+    ? ((x as any).__effect as EffectTag)
+    : 'Pure';
+}
 
 // ============================================================================
 // Part 1: Purity Utilities for Pipelines
@@ -48,14 +56,12 @@ import {
 /**
  * Combine multiple effect tags into a single effect tag
  */
+// Pure is identity; equal non-Pure stays; otherwise fall back to EffectTag so it's assignable
 export type CombineEffects<A extends EffectTag, B extends EffectTag> =
-  A extends 'Pure'
-    ? B
-    : B extends 'Pure'
-      ? A
-      : A extends B
-        ? A
-        : `${A}|${B}`; // Union if different impure tags
+  A extends 'Pure' ? B :
+  B extends 'Pure' ? A :
+  A extends B ? A :
+  EffectTag;
 
 /**
  * Combine multiple effect tags from an array
@@ -449,7 +455,7 @@ export function sequence<
   G_: Applicative<G>,
   fga: Apply<F, [Apply<G, [A]>]>
 ): PurityAwareResult<Apply<G, [Apply<F, [A]>]>, CombineEffects<PF, PG>> {
-  const result = F_.sequence(G_, fga);
+  const result = (F_ as any).sequence(G_, fga);
   const combinedEffect = combineEffects(
     getEffectTag(fga) as PF,
     getEffectTag(fga as any) as PG
@@ -473,7 +479,7 @@ export function traverse<
   f: (a: A) => Apply<G, [B]>,
   fa: Apply<F, [A]>
 ): PurityAwareResult<Apply<G, [Apply<F, [B]>]>, CombineEffects<PF, PG>> {
-  const result = F_.traverse(G_, f, fa);
+  const result = (F_ as any).traverse(G_, f, fa);
   const combinedEffect = combineEffects(
     getEffectTag(fa) as PF,
     getEffectTag(f(fa as any)) as PG
@@ -499,7 +505,7 @@ export function foldMap<
   f: (a: A) => M,
   fa: Apply<F, [A]>
 ): PurityAwareResult<M, P> {
-  const result = F_.foldMap(M, f, fa);
+  const result = (F_ as any).foldMap(M, f, fa);
   return createPurityAwareResult(result, getEffectTag(fa) as P);
 }
 
@@ -517,7 +523,7 @@ export function foldr<
   b: B,
   fa: Apply<F, [A]>
 ): PurityAwareResult<B, P> {
-  const result = F_.foldr(f, b, fa);
+  const result = (F_ as any).foldr(f, b, fa);
   return createPurityAwareResult(result, getEffectTag(fa) as P);
 }
 
@@ -535,7 +541,7 @@ export function foldl<
   b: B,
   fa: Apply<F, [A]>
 ): PurityAwareResult<B, P> {
-  const result = F_.foldl(f, b, fa);
+  const result = (F_ as any).foldl(f, b, fa);
   return createPurityAwareResult(result, getEffectTag(fa) as P);
 }
 
@@ -587,13 +593,10 @@ export function compose<
  * Purity-aware flow combinator
  */
 export function flow<
-  Args extends any[],
   P extends EffectTag[]
->(
-  ...fns: Array<(arg: any) => PurityAwareResult<any, any>>
-): (...args: Args) => PurityAwareResult<any, CombineEffectsArray<P>> {
-  return (...args: Args) => {
-    let result = fns[0](...args);
+>(...fns: Array<(arg: any) => PurityAwareResult<any, any>>) {
+  return (arg: any) => {
+    let result = fns[0](arg);
     for (let i = 1; i < fns.length; i++) {
       result = fns[i](extractValue(result));
     }
@@ -670,13 +673,13 @@ export const PurityDebug = {
  * Combine effects at runtime
  */
 export function combineEffects<A extends EffectTag, B extends EffectTag>(
-  a: A,
-  b: B
+  a: A, b: B
 ): CombineEffects<A, B> {
   if (a === 'Pure') return b as CombineEffects<A, B>;
   if (b === 'Pure') return a as CombineEffects<A, B>;
-  if (a === b) return a as CombineEffects<A, B>;
-  return `${a}|${b}` as CombineEffects<A, B>;
+  if ((a as string) === (b as string)) return a as CombineEffects<A, B>;
+  // fallback – we can't express the precise OR at type level (now returns EffectTag)
+  return (a as unknown as EffectTag) as CombineEffects<A, B>;
 }
 
 /**

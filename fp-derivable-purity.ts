@@ -16,27 +16,27 @@
 
 import {
   Kind1, Kind2, Kind3,
-  Apply, Type, TypeArgs, KindArity, KindResult,
-  ArrayK, MaybeK, EitherK, TupleK, FunctionK,
-  Maybe, Either
+  Apply, //Type, TypeArgs, KindArity, KindResult,
+  //ArrayK, MaybeK, EitherK, TupleK, FunctionK,
+  //Maybe, Either
 } from './fp-hkt';
 
 import {
-  Functor, Applicative, Monad, Bifunctor, Profunctor, Traversable, Foldable,
-  deriveFunctor, deriveApplicative, deriveMonad,
-  lift2, composeK, sequence, traverse
+  /*Functor,*/ Applicative,// Monad, Bifunctor, Profunctor, Traversable, Foldable,
+  //deriveFunctor, deriveApplicative, deriveMonad,
+  //lift2, composeK, sequence, traverse
 } from './fp-typeclasses-hkt';
 
 import {
-  EffectTag, EffectOf, Pure, IO, Async, Effect,
-  isPure, isIO, isAsync, getEffectTag,
-  PurityContext, PurityError, PurityResult
+  EffectTag, EffectOf, Pure, IO, Async, //Effect,
+  //isPure, isIO, isAsync, getEffectTag,
+  //PurityContext, PurityError, PurityResult
 } from './fp-purity';
 
 import {
-  CombineEffects, CombineEffectsArray, ExtractEffect, PurityAwareResult,
-  createPurityAwareResult, extractValue, extractEffect,
-  combineEffects, hasPurityInfo, stripPurityInfo, addPurityInfo
+  CombineEffects, ExtractEffect, //CombineEffectsArray, , PurityAwareResult,
+  //createPurityAwareResult, extractValue, extractEffect,
+  combineEffects, //hasPurityInfo, stripPurityInfo, addPurityInfo
 } from './fp-purity-combinators';
 
 // ============================================================================
@@ -219,7 +219,7 @@ export function derivePurityAwareMonad<F extends Kind1>(
       
       if (enableRuntimeMarkers) {
         const effect1 = (fa as any).__effect || baseEffect;
-        const effect2 = (f(fa as any) as any).__effect || baseEffect;
+        const effect2 = (result as any).__effect || baseEffect; // <— safer
         const combinedEffect = combineEffects(effect1, effect2);
         return Object.assign(result, { __effect: combinedEffect });
       }
@@ -594,8 +594,8 @@ export function deriveAllPurityAwareInstances<F extends Kind1 | Kind2>(
   functor?: PurityAwareFunctor<F>;
   applicative?: PurityAwareApplicative<F>;
   monad?: PurityAwareMonad<F>;
-  bifunctor?: PurityAwareBifunctor<F>;
-  profunctor?: PurityAwareProfunctor<F>;
+  bifunctor?: F extends Kind2 ? PurityAwareBifunctor<F> : undefined;
+  profunctor?: F extends Kind2 ? PurityAwareProfunctor<F> : undefined;
   traversable?: PurityAwareTraversable<F>;
   foldable?: PurityAwareFoldable<F>;
 } {
@@ -657,7 +657,7 @@ export function hasPurityAwareMethods<T>(instance: T): boolean {
 /**
  * Extract purity information from a purity-aware instance
  */
-export function extractPurityFromInstance<T>(instance: T): EffectTag {
+export function extractPurityFromInstance<T extends object>(instance: T): EffectTag {
   if (!hasPurityAwareMethods(instance)) {
     return 'Pure';
   }
@@ -677,7 +677,7 @@ export function extractPurityFromInstance<T>(instance: T): EffectTag {
 /**
  * Create a purity-aware wrapper around an existing instance
  */
-export function wrapWithPurityAwareness<T>(
+export function wrapWithPurityAwareness<T extends object>(
   instance: T,
   effect: EffectTag = 'Pure',
   options: PurityAwareGeneratorOptions = {}

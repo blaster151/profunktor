@@ -14,11 +14,12 @@
 import { 
   deriveInstances, 
   deriveEqInstance, 
-  deriveOrdInstance, 
+  deriveOrdInstance,
   deriveShowInstance 
 } from './fp-derivation-helpers';
 import { createDualAPI } from './fp-dual-api';
 import { applyFluentOps } from './fp-fluent-api';
+import type { Kind1, Kind2 } from './fp-hkt';
 
 // ============================================================================
 // Part 1: HKT Definitions
@@ -27,26 +28,22 @@ import { applyFluentOps } from './fp-fluent-api';
 /**
  * HKT kind for IO monad
  */
-export interface IOK<A> {
-  readonly _tag: 'IO';
-  readonly _A: A;
+export interface IOK extends Kind1 {
+  readonly type: IO<this['arg0']>;
 }
 
 /**
  * HKT kind for Task monad
  */
-export interface TaskK<A> {
-  readonly _tag: 'Task';
-  readonly _A: A;
+export interface TaskK extends Kind1 {
+  readonly type: Task<this['arg0']>;
 }
 
 /**
- * HKT kind for State monad
+ * HKT kind for State monad - curry the first parameter S for Kind1
  */
-export interface StateK<S, A> {
-  readonly _tag: 'State';
-  readonly _S: S;
-  readonly _A: A;
+export interface StateK<S> extends Kind1 {
+  readonly type: State<S, this['arg0']>;
 }
 
 // ============================================================================
@@ -62,7 +59,7 @@ export interface StateK<S, A> {
  * Purity: 'Pure' - IO is considered pure as it's lazy and doesn't execute until run()
  */
 export class IO<A> {
-  private constructor(private readonly _run: () => A) {}
+  protected constructor(private readonly _run: () => A) {}
 
   /**
    * Execute the IO computation
@@ -75,21 +72,21 @@ export class IO<A> {
    * Map over the result of an IO computation
    */
   map<B>(f: (a: A) => B): IO<B> {
-    return new IO(() => f(this.run()));
+    return IO.from(() => f(this.run()));
   }
 
   /**
    * Apply a function inside IO to the result of another IO
    */
   ap<B>(fab: IO<(a: A) => B>): IO<B> {
-    return new IO(() => fab.run()(this.run()));
+    return IO.from(() => fab.run()(this.run()));
   }
 
   /**
    * Chain IO computations
    */
   chain<B>(f: (a: A) => IO<B>): IO<B> {
-    return new IO(() => f(this.run()).run());
+    return IO.from(() => f(this.run()).run());
   }
 
   /**
@@ -103,21 +100,28 @@ export class IO<A> {
    * Convert IO to Task
    */
   toTask(): Task<A> {
-    return new Task(() => Promise.resolve(this.run()));
+    return Task.fromThunk(() => Promise.resolve(this.run()));
   }
 
   /**
    * Static constructor from a value
    */
   static of<A>(a: A): IO<A> {
-    return new IO(() => a);
+    return IO.from(() => a);
   }
 
   /**
    * Static constructor from a thunk
    */
   static from<A>(thunk: () => A): IO<A> {
-    return new IO(thunk);
+    return new (IO as any)(thunk);
+  }
+
+  /**
+   * Alias for from - static constructor from a thunk
+   */
+  static fromThunk<A>(thunk: () => A): IO<A> {
+    return IO.from(thunk);
   }
 
   /**
@@ -131,21 +135,21 @@ export class IO<A> {
    * Sequence a list of IO computations
    */
   static sequence<A>(ios: IO<A>[]): IO<A[]> {
-    return new IO(() => ios.map(io => io.run()));
+    return IO.from(() => ios.map(io => io.run()));
   }
 
   /**
    * Execute IO computations in parallel (for side effects)
    */
   static parallel<A>(ios: IO<A>[]): IO<A[]> {
-    return new IO(() => ios.map(io => io.run()));
+    return IO.from(() => ios.map(io => io.run()));
   }
 
   /**
    * Read from environment (Reader-like functionality)
    */
   static ask<E>(): IO<E> {
-    return new IO(() => {
+    return IO.from(() => {
       // In a real implementation, this would read from a context
       // For now, we'll throw an error indicating this needs proper context
       throw new Error('IO.ask() requires proper environment context');
@@ -162,14 +166,39 @@ export class IO<A> {
   /**
    * Local environment modification
    */
-  local<E, A>(f: (e: E) => E): IO<A> {
-    return new IO(() => {
+  local<E>(f: (e: E) => E): IO<A> {
+    return new (IO as any)(() => {
       // This would modify the environment for the computation
       // For now, we'll just run the original computation
       return this.run();
     });
   }
 }
+
+/**
+ * Derive all instances for IO
+ */
+export const IODerivedInstances = deriveInstances<IOK>({
+  functor: true,
+  applicative: true,
+  monad: true,
+  eq: true,
+  ord: true,
+  show: true,
+  customMap: <A, B>(fa: IO<A>, f: (a: A) => B): IO<B> => fa.map(f),
+  customChain: <A, B>(fa: IO<A>, f: (a: A) => IO<B>): IO<B> => fa.chain(f),
+  customEq: (a: IO<any>, b: IO<any>) => {
+    // IO equality is based on reference equality since we can't compare functions
+    return a === b;
+  },
+  customOrd: (a: IO<any>, b: IO<any>) => {
+    // IO ordering is arbitrary since we can't compare functions
+    return a === b ? 0 : a < b ? -1 : 1;
+  },
+  customShow: (a: IO<any>) => {
+    return `IO(${a.toString()})`;
+  }
+});
 
 // ============================================================================
 // Part 3: Task Monad (Async Effect)
@@ -184,7 +213,7 @@ export class IO<A> {
  * Purity: 'Async' - Task is considered async as it involves asynchronous operations
  */
 export class Task<A> {
-  private constructor(private readonly _run: () => Promise<A>) {}
+  protected constructor(private readonly _run: () => Promise<A>) {}
 
   /**
    * Execute the Task computation
@@ -197,14 +226,14 @@ export class Task<A> {
    * Map over the result of a Task computation
    */
   map<B>(f: (a: A) => B): Task<B> {
-    return new Task(async () => f(await this.run()));
+    return Task.fromThunk(async () => f(await this.run()));
   }
 
   /**
    * Apply a function inside Task to the result of another Task
    */
   ap<B>(fab: Task<(a: A) => B>): Task<B> {
-    return new Task(async () => {
+    return Task.fromThunk(async () => {
       const [f, a] = await Promise.all([fab.run(), this.run()]);
       return f(a);
     });
@@ -214,7 +243,7 @@ export class Task<A> {
    * Chain Task computations
    */
   chain<B>(f: (a: A) => Task<B>): Task<B> {
-    return new Task(async () => {
+    return Task.fromThunk(async () => {
       const a = await this.run();
       return f(a).run();
     });
@@ -238,7 +267,7 @@ export class Task<A> {
    * Handle errors in Task
    */
   catch<B>(f: (error: any) => Task<B>): Task<A | B> {
-    return new Task(async () => {
+    return Task.fromThunk(async () => {
       try {
         return await this.run();
       } catch (error) {
@@ -251,21 +280,28 @@ export class Task<A> {
    * Static constructor from a value
    */
   static of<A>(a: A): Task<A> {
-    return new Task(() => Promise.resolve(a));
+    return Task.fromThunk(() => Promise.resolve(a));
   }
 
   /**
    * Static constructor from a Promise
    */
   static from<A>(promise: Promise<A>): Task<A> {
-    return new Task(() => promise);
+    return Task.fromThunk(() => promise);
+  }
+
+  /**
+   * Alias for from - static constructor from a Promise
+   */
+  static fromPromise<A>(promise: Promise<A>): Task<A> {
+    return Task.from(promise);
   }
 
   /**
    * Static constructor from a thunk that returns a Promise
    */
   static fromThunk<A>(thunk: () => Promise<A>): Task<A> {
-    return new Task(thunk);
+    return new (Task as any)(thunk);
   }
 
   /**
@@ -279,7 +315,7 @@ export class Task<A> {
    * Sequence a list of Task computations
    */
   static sequence<A>(tasks: Task<A>[]): Task<A[]> {
-    return new Task(async () => {
+    return Task.fromThunk(async () => {
       const results: A[] = [];
       for (const task of tasks) {
         results.push(await task.run());
@@ -292,7 +328,7 @@ export class Task<A> {
    * Execute Task computations in parallel
    */
   static parallel<A>(tasks: Task<A>[]): Task<A[]> {
-    return new Task(async () => {
+    return Task.fromThunk(async () => {
       return Promise.all(tasks.map(task => task.run()));
     });
   }
@@ -317,7 +353,7 @@ export class Task<A> {
  * Purity: 'Impure' - State involves state mutation and is considered impure
  */
 export class State<S, A> {
-  private constructor(private readonly _run: (s: S) => [A, S]) {}
+  protected constructor(private readonly _run: (s: S) => [A, S]) {}
 
   /**
    * Run the State computation with initial state
@@ -344,7 +380,7 @@ export class State<S, A> {
    * Map over the result of a State computation
    */
   map<B>(f: (a: A) => B): State<S, B> {
-    return new State((s: S) => {
+    return State.from((s: S) => {
       const [a, s2] = this.run(s);
       return [f(a), s2];
     });
@@ -354,7 +390,7 @@ export class State<S, A> {
    * Apply a function inside State to the result of another State
    */
   ap<B>(fab: State<S, (a: A) => B>): State<S, B> {
-    return new State((s: S) => {
+    return State.from((s: S) => {
       const [f, s2] = fab.run(s);
       const [a, s3] = this.run(s2);
       return [f(a), s3];
@@ -365,7 +401,7 @@ export class State<S, A> {
    * Chain State computations
    */
   chain<B>(f: (a: A) => State<S, B>): State<S, B> {
-    return new State((s: S) => {
+    return State.from((s: S) => {
       const [a, s2] = this.run(s);
       return f(a).run(s2);
     });
@@ -382,7 +418,7 @@ export class State<S, A> {
    * Map over the state
    */
   mapState<T>(f: (s: S) => T): State<T, A> {
-    return new State((s: T) => {
+    return State.from((s: T) => {
       // This is a simplified implementation
       // In a real implementation, you'd need to handle the state transformation properly
       throw new Error('State.mapState() requires proper state transformation');
@@ -393,35 +429,42 @@ export class State<S, A> {
    * Static constructor from a value
    */
   static of<S, A>(a: A): State<S, A> {
-    return new State((s: S) => [a, s]);
+    return State.from((s: S) => [a, s]);
   }
 
   /**
    * Static constructor from a state function
    */
   static from<S, A>(f: (s: S) => [A, S]): State<S, A> {
-    return new State(f);
+    return new (State as any)(f);
+  }
+
+  /**
+   * Alias for from - static constructor from a state function
+   */
+  static fromFn<S, A>(f: (s: S) => [A, S]): State<S, A> {
+    return State.from(f);
   }
 
   /**
    * Get the current state
    */
   static get<S>(): State<S, S> {
-    return new State((s: S) => [s, s]);
+    return State.from((s: S) => [s, s]);
   }
 
   /**
    * Set the state
    */
   static set<S>(s: S): State<S, void> {
-    return new State(() => [undefined, s]);
+    return State.from(() => [undefined, s]);
   }
 
   /**
    * Modify the state
    */
   static modify<S>(f: (s: S) => S): State<S, void> {
-    return new State((s: S) => [undefined, f(s)]);
+    return State.from((s: S) => [undefined, f(s)]);
   }
 
   /**
@@ -435,14 +478,14 @@ export class State<S, A> {
    * Convert State to IO with initial state
    */
   toIO(initialState: S): IO<A> {
-    return new IO(() => this.eval(initialState));
+    return IO.from(() => this.eval(initialState));
   }
 
   /**
    * Convert State to Task with initial state
    */
   toTask(initialState: S): Task<A> {
-    return new Task(() => Promise.resolve(this.eval(initialState)));
+    return Task.fromThunk(() => Promise.resolve(this.eval(initialState)));
   }
 }
 
@@ -523,35 +566,21 @@ export const StateMonad = {
 // Part 6: Derived Instances
 // ============================================================================
 
-/**
- * Derive all instances for IO
- */
-export const IODerivedInstances = deriveInstances({
-  name: 'IO',
-  kind: 'Kind1',
-  effect: 'Pure',
-  instances: ['Functor', 'Applicative', 'Monad'],
-  customEq: (a: IO<any>, b: IO<any>) => {
-    // IO equality is based on reference equality since we can't compare functions
-    return a === b;
-  },
-  customOrd: (a: IO<any>, b: IO<any>) => {
-    // IO ordering is arbitrary since we can't compare functions
-    return a === b ? 0 : a < b ? -1 : 1;
-  },
-  customShow: (io: IO<any>) => {
-    return `IO(<function>)`;
-  }
-});
+// Note: IODerivedInstances, TaskDerivedInstances, and StateDerivedInstances 
+// are defined earlier in the file after their respective class definitions
 
 /**
  * Derive all instances for Task
  */
-export const TaskDerivedInstances = deriveInstances({
-  name: 'Task',
-  kind: 'Kind1',
-  effect: 'Async',
-  instances: ['Functor', 'Applicative', 'Monad'],
+export const TaskDerivedInstances = deriveInstances<TaskK>({
+  functor: true,
+  applicative: true,
+  monad: true,
+  eq: true,
+  ord: true,
+  show: true,
+  customMap: <A, B>(fa: Task<A>, f: (a: A) => B): Task<B> => fa.map(f),
+  customChain: <A, B>(fa: Task<A>, f: (a: A) => Task<B>): Task<B> => fa.chain(f),
   customEq: (a: Task<any>, b: Task<any>) => {
     // Task equality is based on reference equality since we can't compare async functions
     return a === b;
@@ -566,25 +595,34 @@ export const TaskDerivedInstances = deriveInstances({
 });
 
 /**
- * Derive all instances for State
+ * Derive instances for State - factory function since State is Kind2
  */
-export const StateDerivedInstances = deriveInstances({
-  name: 'State',
-  kind: 'Kind2',
-  effect: 'Impure',
-  instances: ['Functor', 'Applicative', 'Monad'],
-  customEq: (a: State<any, any>, b: State<any, any>) => {
+export const deriveStateInstances = <S>() => deriveInstances<StateK<S>>({
+  functor: true,
+  applicative: true,
+  monad: true,
+  eq: true,
+  ord: true,
+  show: true,
+  customMap: <A, B>(fa: State<S, A>, f: (a: A) => B): State<S, B> => fa.map(f),
+  customChain: <A, B>(fa: State<S, A>, f: (a: A) => State<S, B>): State<S, B> => fa.chain(f),
+  customEq: (a: State<S, any>, b: State<S, any>) => {
     // State equality is based on reference equality since we can't compare state functions
     return a === b;
   },
-  customOrd: (a: State<any, any>, b: State<any, any>) => {
+  customOrd: (a: State<S, any>, b: State<S, any>) => {
     // State ordering is arbitrary since we can't compare state functions
     return a === b ? 0 : a < b ? -1 : 1;
   },
-  customShow: (state: State<any, any>) => {
+  customShow: (state: State<S, any>) => {
     return `State(<state function>)`;
   }
 });
+
+/**
+ * Default State instances for any state type
+ */
+export const StateDerivedInstances = deriveStateInstances<any>();
 
 // ============================================================================
 // Part 7: Fluent API Integration
@@ -634,33 +672,45 @@ export function addStateFluentMethods(): void {
  * Data-last functions for IO
  */
 export const io = createDualAPI({
-  of: <A>(a: A) => IO.of(a),
-  map: IOFunctor.map,
-  ap: IOApplicative.ap,
-  chain: IOMonad.chain,
-  flatMap: IOMonad.chain
+  instance: {
+    of: <A>(a: A) => IO.of(a),
+    map: IOFunctor.map,
+    ap: IOApplicative.ap,
+    chain: IOMonad.chain,
+    flatMap: IOMonad.chain
+  },
+  name: 'IO',
+  operations: ['of', 'map', 'ap', 'chain', 'flatMap']
 });
 
 /**
  * Data-last functions for Task
  */
 export const task = createDualAPI({
-  of: <A>(a: A) => Task.of(a),
-  map: TaskFunctor.map,
-  ap: TaskApplicative.ap,
-  chain: TaskMonad.chain,
-  flatMap: TaskMonad.chain
+  instance: {
+    of: <A>(a: A) => Task.of(a),
+    map: TaskFunctor.map,
+    ap: TaskApplicative.ap,
+    chain: TaskMonad.chain,
+    flatMap: TaskMonad.chain
+  },
+  name: 'Task',
+  operations: ['of', 'map', 'ap', 'chain', 'flatMap']
 });
 
 /**
  * Data-last functions for State
  */
 export const state = createDualAPI({
-  of: <S, A>(a: A) => State.of<S, A>(a),
-  map: StateFunctor.map,
-  ap: StateApplicative.ap,
-  chain: StateMonad.chain,
-  flatMap: StateMonad.chain
+  instance: {
+    of: <S, A>(a: A) => State.of<S, A>(a),
+    map: StateFunctor.map,
+    ap: StateApplicative.ap,
+    chain: StateMonad.chain,
+    flatMap: StateMonad.chain
+  },
+  name: 'State',
+  operations: ['of', 'map', 'ap', 'chain', 'flatMap']
 });
 
 // ============================================================================
@@ -688,7 +738,7 @@ export function stateToIO<S, A>(state: State<S, A>, initialState: S): IO<A> {
  * Convert IO to State
  */
 export function ioToState<A>(io: IO<A>): State<any, A> {
-  return new State(() => [io.run(), undefined]);
+  return State.from(() => [io.run(), undefined]);
 }
 
 /**
@@ -750,49 +800,5 @@ export function registerEffectMonadInstances(): void {
 }
 
 // ============================================================================
-// Part 11: Export Everything
-// ============================================================================
-
-export {
-  // Core monads
-  IO,
-  Task,
-  State,
-  
-  // HKT kinds
-  IOK,
-  TaskK,
-  StateK,
-  
-  // Typeclass instances
-  IOFunctor,
-  IOApplicative,
-  IOMonad,
-  TaskFunctor,
-  TaskApplicative,
-  TaskMonad,
-  StateFunctor,
-  StateApplicative,
-  StateMonad,
-  
-  // Derived instances
-  IODerivedInstances,
-  TaskDerivedInstances,
-  StateDerivedInstances,
-  
-  // Data-last APIs
-  io,
-  task,
-  state,
-  
-  // Interop functions
-  ioToTask,
-  unsafeTaskToIO,
-  stateToIO,
-  ioToState,
-  promiseToTask,
-  taskToPromise,
-  
-  // Registry integration
-  registerEffectMonadInstances
-}; 
+// Registry integration is handled above through registerEffectMonadInstances
+// ============================================================================ 

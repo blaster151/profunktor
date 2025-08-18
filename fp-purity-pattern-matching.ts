@@ -22,15 +22,11 @@ import {
 } from './fp-hkt';
 
 import {
-  Functor, Applicative, Monad, Bifunctor, Profunctor, Traversable, Foldable,
-  deriveFunctor, deriveApplicative, deriveMonad,
-  lift2, composeK, sequence, traverse
+  Functor, Applicative, Monad, Bifunctor, Profunctor, Traversable, Foldable
 } from './fp-typeclasses-hkt';
 
 import {
-  EffectTag, EffectOf, Pure, IO, Async, Effect,
-  isPure, isIO, isAsync, getEffectTag,
-  PurityContext, PurityError, PurityResult
+  EffectTag, EffectOf
 } from './fp-purity';
 
 import {
@@ -94,7 +90,7 @@ export type PurityAwareMatchResult<T, P extends EffectTag> = T & { __effect?: P 
  */
 export type EnhancedMatchFunction<
   T extends GADT<string, any>,
-  Handlers,
+  Handlers extends Record<string, (...args: any[]) => any>,
   P extends EffectTag = MergeAllHandlerEffects<Handlers>
 > = (
   value: T,
@@ -106,7 +102,7 @@ export type EnhancedMatchFunction<
  */
 export type EnhancedMatchWithPurity<
   T extends GADT<string, any>,
-  Handlers,
+  Handlers extends Record<string, (...args: any[]) => any>,
   P extends EffectTag
 > = (
   value: T,
@@ -202,7 +198,7 @@ export function inferHandlerPurity<H extends (...args: any[]) => any>(
   }
   
   // Check if the result is a Promise (Async)
-  if (result instanceof Promise) {
+  if (result && typeof (result as any).then === 'function') {
     return 'Async';
   }
   
@@ -251,7 +247,7 @@ export function enhancedMatchExpr<
     Const: (expr: { tag: 'Const'; value: A }) => any;
     Add: (expr: { tag: 'Add'; left: Expr<A>; right: Expr<A> }) => any;
     If: (expr: { tag: 'If'; cond: Expr<A>; then: Expr<A>; else: Expr<A> }) => any;
-  },
+  } & Record<string, (...args: any[]) => any>,
   P extends EffectTag = MergeAllHandlerEffects<Handlers>
 >(
   expr: Expr<A>,
@@ -272,7 +268,7 @@ export function enhancedMatchMaybe<
   Handlers extends {
     Nothing: (expr: { tag: 'Nothing' }) => any;
     Just: (expr: { tag: 'Just'; value: A }) => any;
-  },
+  } & Record<string, (...args: any[]) => any>,
   P extends EffectTag = MergeAllHandlerEffects<Handlers>
 >(
   maybe: MaybeGADT<A>,
@@ -294,7 +290,7 @@ export function enhancedMatchEither<
   Handlers extends {
     Left: (expr: { tag: 'Left'; value: L }) => any;
     Right: (expr: { tag: 'Right'; value: R }) => any;
-  },
+  } & Record<string, (...args: any[]) => any>,
   P extends EffectTag = MergeAllHandlerEffects<Handlers>
 >(
   either: EitherGADT<L, R>,
@@ -372,7 +368,7 @@ export function enhancedMatchHKT<
   Handlers extends Record<string, (...args: any[]) => any>,
   P extends EffectTag = MergeAllHandlerEffects<Handlers>
 >(
-  F_: Functor<F>,
+  F_: Applicative<F>, // <-- was Functor<F>
   value: T,
   handlers: Handlers,
   options: {
@@ -382,11 +378,9 @@ export function enhancedMatchHKT<
 ): PurityAwareMatchResult<Apply<F, [ReturnType<Handlers[keyof Handlers]>]>, P> {
   const matchResult = enhancedMatch(value, handlers, options);
   const result = F_.of(extractValue(matchResult));
-  
   if (options.enableRuntimeMarkers) {
     return Object.assign(result, { __effect: extractEffect(matchResult) });
   }
-  
   return result as PurityAwareMatchResult<Apply<F, [ReturnType<Handlers[keyof Handlers]>]>, P>;
 }
 
@@ -443,7 +437,7 @@ export function extractMatchEffect<T, P extends EffectTag>(
  * Check if enhanced match result is pure
  */
 export function isMatchResultPure<T, P extends EffectTag>(
-  result: PurityAwareMatchResult<T, P>
+  result: PurityAwareMatchResult<T, any>
 ): result is PurityAwareMatchResult<T, 'Pure'> {
   return extractEffect(result) === 'Pure';
 }
@@ -452,16 +446,17 @@ export function isMatchResultPure<T, P extends EffectTag>(
  * Check if enhanced match result is impure
  */
 export function isMatchResultImpure<T, P extends EffectTag>(
-  result: PurityAwareMatchResult<T, P>
+  result: PurityAwareMatchResult<T, any>
 ): result is PurityAwareMatchResult<T, 'IO' | 'Async'> {
-  return extractEffect(result) !== 'Pure';
+  const e = extractEffect(result);
+  return e !== 'Pure';
 }
 
 /**
  * Check if enhanced match result is IO
  */
 export function isMatchResultIO<T, P extends EffectTag>(
-  result: PurityAwareMatchResult<T, P>
+  result: PurityAwareMatchResult<T, any>
 ): result is PurityAwareMatchResult<T, 'IO'> {
   return extractEffect(result) === 'IO';
 }
@@ -470,7 +465,7 @@ export function isMatchResultIO<T, P extends EffectTag>(
  * Check if enhanced match result is async
  */
 export function isMatchResultAsync<T, P extends EffectTag>(
-  result: PurityAwareMatchResult<T, P>
+  result: PurityAwareMatchResult<T, any>
 ): result is PurityAwareMatchResult<T, 'Async'> {
   return extractEffect(result) === 'Async';
 }
