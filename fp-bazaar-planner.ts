@@ -33,7 +33,11 @@ export type TraverseStep<A, B, S, T> = {
 };
 
 export type SeqPlan = { tag: 'Seq'; steps: Array<FilterAStep<any, any, any> | TraverseStep<any, any, any, any>> };
-
+export type GenericPlan =
+  | ParTraverseIfPlan<any, any, any, any>
+  | SeqPlan
+  | FilterAStep<any, any, any>
+  | TraverseStep<any, any, any, any>;
 export type ParTraverseIfPlan<A, B, S, T> = {
   tag: 'ParTraverseIf';
   baz: Bazaar<A, B, S, T>;
@@ -43,14 +47,17 @@ export type ParTraverseIfPlan<A, B, S, T> = {
   options?: { concurrency?: number; preserveOrder?: boolean };
 };
 
-export type GenericPlan =
-  | ParTraverseIfPlan<any, any, any, any>
-  | SeqPlan
-  | (FilterAStep<any, any, any> | TraverseStep<any, any, any, any>);
+
 
 // -------------------------
 // Public API
 // -------------------------
+export interface OptimizeOptions {
+  fuse?: boolean;
+  autoPar?: boolean;
+  autoChunk?: number;
+}
+
 export function makeParTraverseIf<A, B, S, T>(
   baz: Bazaar<A, B, S, T>,
   s: S,
@@ -61,7 +68,7 @@ export function makeParTraverseIf<A, B, S, T>(
   return { tag: 'ParTraverseIf', baz, s, predAsync, kAsync, options };
 }
 
-export function optimizePlan<P extends GenericPlan>(plan: P, _opts?: { fuse?: boolean }): P {
+export function optimizePlan<P extends GenericPlan>(plan: P, _opts?: OptimizeOptions): P {
   // Keep as identity for now. You can add fusing rules later, e.g.:
   // - Seq[ FilterA(p), Traverse(k) ] => a single ParTraverseIf with predAsync=p & kAsync=k (sync->async lift)
   // Ensure the behavior matches your laws before enabling.
@@ -198,6 +205,21 @@ async function runPlanCollectOutputs(plan: GenericPlan): Promise<any[]> {
     return runSeq({ tag: 'Seq', steps: [plan as any] });
   }
   return [];
+}
+
+// --- Compatibility wrappers for optics-scheduler ---
+export type Plan<A = unknown> = GenericPlan;
+
+export function planOf<A = unknown>(steps: GenericPlan | GenericPlan[]): Plan<A> {
+  if (Array.isArray(steps)) {
+    return { tag: 'Seq', steps: steps as any };
+  }
+  return steps;
+}
+
+export async function runPlan<A = unknown>(plan: Plan<A>): Promise<A[]> {
+  const outs = await runPlanCollectOutputs(plan);
+  return outs as A[];
 }
 
 // End of fp-bazaar-planner.ts

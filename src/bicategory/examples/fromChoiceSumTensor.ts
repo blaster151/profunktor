@@ -1,6 +1,6 @@
 // fromChoiceSumTensor.ts
 import { Kind2, Apply } from '../../../fp-hkt';
-import { Either } from '../instances/profunctor-choice';
+import type { Either } from '../../../fp-hkt';
 
 // Minimal profunctor + Choice ops expected from P
 export type ProfunctorChoiceOps<P extends Kind2> = {

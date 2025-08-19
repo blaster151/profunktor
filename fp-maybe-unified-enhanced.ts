@@ -82,7 +82,7 @@ export interface MaybeK extends Kind1 {
 export const JustImmutable = <A>(value: A): ImmutableMaybe<A> => {
   const canonical = canonicalJust(value);
   return {
-    ...canonical,
+    ...(canonical as object),
     __immutableBrand: IMMUTABLE_BRAND
   } as ImmutableMaybe<A>;
 };
@@ -93,7 +93,7 @@ export const JustImmutable = <A>(value: A): ImmutableMaybe<A> => {
 export const NothingImmutable = <A>(): ImmutableMaybe<A> => {
   const canonical = canonicalNothing<A>();
   return {
-    ...canonical,
+    ...(canonical as object),
     __immutableBrand: IMMUTABLE_BRAND
   } as ImmutableMaybe<A>;
 };
@@ -179,14 +179,14 @@ export const createMaybeTagMatcher = <R>(handlers: {
  * Check if a Maybe is Just
  */
 export const isJust = <A>(maybe: Maybe<A>): maybe is { tag: 'Just'; value: A } => {
-  return maybe.tag === 'Just';
+  return (maybe as any).tag === 'Just';
 };
 
 /**
  * Check if a Maybe is Nothing
  */
 export const isNothing = <A>(maybe: Maybe<A>): maybe is { tag: 'Nothing' } => {
-  return maybe.tag === 'Nothing';
+  return (maybe as any).tag === 'Nothing';
 };
 
 /**
@@ -348,7 +348,10 @@ export type IsMaybePure<T> = EffectOfMaybe<T> extends 'Pure' ? true : false;
 /**
  * Apply Maybe HKT to type arguments
  */
-export type ApplyMaybe<Args extends TypeArgs<MaybeK>> = Apply<MaybeK, Args>;
+/**
+ * Type alias for applying MaybeK to type arguments
+ */
+export type ApplyMaybe<Args extends readonly unknown[]> = Apply<MaybeK, Args>;
 
 /**
  * Maybe with specific type arguments

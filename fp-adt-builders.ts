@@ -151,10 +151,22 @@ export interface ProductTypeConfig extends ADTPurityConfig {
 /**
  * Sum type builder interface
  */
-export interface SumTypeBuilder<Spec extends ConstructorSpec> {
+export interface SumTypeBuilder<
+  Spec extends ConstructorSpec,
+  HKT = unknown,
+  Instance = unknown,
+  Arity extends number = number
+> {
   // Type information
   readonly Type: new <A>() => SumTypeInstance<Spec>;
   readonly Instance: SumTypeInstance<Spec>;
+  
+  /** Phantom carrier for HKT type extraction, never read at runtime */
+  readonly __hkt?: HKT;
+  /** Phantom carrier for instance type extraction, never read at runtime */
+  readonly __instance?: Instance;
+  /** Phantom carrier for arity extraction, never read at runtime */
+  readonly __arity?: Arity;
   
   // Constructors
   readonly constructors: {
@@ -219,10 +231,22 @@ export interface SumTypeBuilder<Spec extends ConstructorSpec> {
 /**
  * Product type builder interface
  */
-export interface ProductTypeBuilder<Fields extends ProductFields> {
+export interface ProductTypeBuilder<
+  Fields extends ProductFields,
+  HKT = unknown,
+  Instance = unknown,
+  Arity extends number = number
+> {
   // Type information
   readonly Type: new () => ProductTypeInstance<Fields>;
   readonly Instance: ProductTypeInstance<Fields>;
+  
+  /** Phantom carrier for HKT type extraction, never read at runtime */
+  readonly __hkt?: HKT;
+  /** Phantom carrier for instance type extraction, never read at runtime */
+  readonly __instance?: Instance;
+  /** Phantom carrier for arity extraction, never read at runtime */
+  readonly __arity?: Arity;
   
   // Constructor
   readonly of: (fields: Fields) => ProductTypeInstance<Fields>;
@@ -296,10 +320,14 @@ export interface ProductTypeBuilder<Fields extends ProductFields> {
  * Maybe.Show?.show(just1); // "Just({ value: 42 })"
  * ```
  */
-export function createSumType<Spec extends ConstructorSpec>(
+export function createSumType<
+  Spec extends ConstructorSpec,
+  HKT = unknown,
+  Instance = unknown
+>(
   spec: Spec,
   config: SumTypeConfig = {}
-): SumTypeBuilder<Spec> {
+): SumTypeBuilder<Spec, HKT, Instance> {
   const {
     effect = 'Pure',
     enableRuntimeMarkers = false,
@@ -402,7 +430,7 @@ export function createSumType<Spec extends ConstructorSpec>(
   // Effect override
   const createWithEffect = <E extends EffectTag>(
     newEffect: E
-  ): SumTypeBuilder<Spec> & { effect: E } => {
+  ): SumTypeBuilder<Spec, HKT, Instance> & { effect: E } => {
     return createSumType(spec, { ...config, effect: newEffect }) as any;
   };
   
@@ -559,9 +587,13 @@ export function createSumType<Spec extends ConstructorSpec>(
  * const p3 = Point.update(p1, 'y', y => y * 2);
  * ```
  */
-export function createProductType<Fields extends ProductFields>(
+export function createProductType<
+  Fields extends ProductFields,
+  HKT = unknown,
+  Instance = ProductTypeInstance<Fields>
+>(
   config: ProductTypeConfig = {}
-): ProductTypeBuilder<Fields> {
+): ProductTypeBuilder<Fields, HKT, Instance> {
   const {
     effect = 'Pure',
     enableRuntimeMarkers = false,
@@ -635,8 +667,8 @@ export function createProductType<Fields extends ProductFields>(
   // Effect override
   const createWithEffect = <E extends EffectTag>(
     newEffect: E
-  ): ProductTypeBuilder<Fields> & { effect: E } => {
-    return createProductType<Fields>({ ...config, effect: newEffect }) as any;
+  ): ProductTypeBuilder<Fields, HKT, Instance> & { effect: E } => {
+    return createProductType<Fields, HKT, Instance>({ ...config, effect: newEffect }) as any;
   };
   
   // HKT integration
@@ -765,30 +797,39 @@ export function createProductType<Fields extends ProductFields>(
 /**
  * Extract HKT kind from sum type builder
  */
-export type ExtractSumTypeHKT<Builder> = Builder extends SumTypeBuilder<any>
-  ? Builder['HKT']
+export type ExtractSumTypeHKT<Builder> = Builder extends SumTypeBuilder<any, infer H, any, any>
+  ? H
   : never;
 
 /**
  * Extract HKT kind from product type builder
  */
-export type ExtractProductTypeHKT<Builder> = Builder extends ProductTypeBuilder<any>
-  ? Builder['HKT']
+export type ExtractProductTypeHKT<Builder> = Builder extends ProductTypeBuilder<any, infer H, any, any>
+  ? H
   : never;
 
 /**
  * Extract instance type from sum type builder
  */
-export type ExtractSumTypeInstance<Builder> = Builder extends SumTypeBuilder<any>
-  ? Builder['Instance']
+export type ExtractSumTypeInstance<Builder> = Builder extends SumTypeBuilder<any, any, infer I, any>
+  ? I
   : never;
 
 /**
  * Extract instance type from product type builder
  */
-export type ExtractProductTypeInstance<Builder> = Builder extends ProductTypeBuilder<any>
-  ? Builder['Instance']
-  : never;
+export type ExtractProductTypeInstance<Builder> = 
+  Builder extends ProductTypeBuilder<any, any, infer I, any> ? I :
+  Builder extends ProductTypeBuilder<any, any, infer I> ? I :
+  never;
+
+/**
+ * Extract kind arity from builder
+ */
+export type ExtractKindArity<Builder> =
+  Builder extends SumTypeBuilder<any, any, any, infer A> ? A :
+  Builder extends ProductTypeBuilder<any, any, any, infer A> ? A :
+  never;
 
 // ============================================================================
 // Derivable Instance Integration
@@ -798,7 +839,7 @@ export type ExtractProductTypeInstance<Builder> = Builder extends ProductTypeBui
  * Register sum type for derivable instances
  */
 function registerSumTypeForDerivableInstances<Spec extends ConstructorSpec>(
-  builder: SumTypeBuilder<Spec>
+  builder: SumTypeBuilder<Spec, any, any>
 ): void {
   // This would integrate with the existing derivable instances system
   // For now, we'll create a placeholder implementation
@@ -851,7 +892,7 @@ function registerSumTypeForDerivableInstances<Spec extends ConstructorSpec>(
  * Register product type for derivable instances
  */
 function registerProductTypeForDerivableInstances<Fields extends ProductFields>(
-  builder: ProductTypeBuilder<Fields>
+  builder: ProductTypeBuilder<Fields, any, any>
 ): void {
   // This would integrate with the existing derivable instances system
   // For now, we'll create a placeholder implementation
@@ -913,7 +954,7 @@ function registerProductTypeForDerivableInstances<Fields extends ProductFields>(
 export function createMaybeType<A>(): SumTypeBuilder<{
   Just: (value: A) => { value: A };
   Nothing: () => {};
-}> {
+}, unknown, unknown> {
   return createSumType({
     Just: (value: A) => ({ value }),
     Nothing: () => ({})
@@ -945,7 +986,7 @@ export function createMaybeType<A>(): SumTypeBuilder<{
 export function createEitherType<L, R>(): SumTypeBuilder<{
   Left: (value: L) => { value: L };
   Right: (value: R) => { value: R };
-}> {
+}, unknown, unknown> {
   return createSumType({
     Left: (value: L) => ({ value }),
     Right: (value: R) => ({ value })
@@ -977,7 +1018,7 @@ export function createEitherType<L, R>(): SumTypeBuilder<{
 export function createResultType<E, A>(): SumTypeBuilder<{
   Err: (value: E) => { value: E };
   Ok: (value: A) => { value: A };
-}> {
+}, unknown, unknown> {
   return createSumType({
     Err: (value: E) => ({ value }),
     Ok: (value: A) => ({ value })
@@ -1006,7 +1047,7 @@ export function createResultType<E, A>(): SumTypeBuilder<{
 export function createPointType(): ProductTypeBuilder<{
   x: number;
   y: number;
-}> {
+}, unknown, unknown> {
   return createProductType<{ x: number; y: number }>({
     name: 'Point',
     effect: 'Pure',
@@ -1032,7 +1073,7 @@ export function createPointType(): ProductTypeBuilder<{
 export function createRectangleType(): ProductTypeBuilder<{
   width: number;
   height: number;
-}> {
+}, unknown, unknown> {
   return createProductType<{ width: number; height: number }>({
     name: 'Rectangle',
     effect: 'Pure',
@@ -1041,7 +1082,6 @@ export function createRectangleType(): ProductTypeBuilder<{
     derive: ['Eq', 'Ord', 'Show']
   });
 }
-
 // ============================================================================
 // Laws Documentation
 // ============================================================================

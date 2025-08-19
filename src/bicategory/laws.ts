@@ -6,7 +6,7 @@
  * on sample inputs using a provided evaluator.
  */
 
-import { Kind2, Apply } from '../../fp-hkt';
+import { Kind2, Apply } from 'fp-hkt';
 import { makeProfunctorBicategory } from './profunctor-bicategory';
 
 export interface LawEvidence {
@@ -39,22 +39,32 @@ export function mkEqP<P extends Kind2, A, B>(
   };
 }
 
-// Whiskering helpers using horiz with identity 2-cells
-function whiskerLeft<P extends Kind2, A, B, C>(
+// Whiskering helpers using horiz with identity 2-cells - all return NatP<P, A, E> for consistent endpoints
+function whiskerLeft<P extends Kind2, A, B, E>(
   B: ReturnType<typeof makeProfunctorBicategory<P>>,
-  beta: (p: Apply<P, [B, C]>) => Apply<P, [B, C]>,
+  beta: (p: Apply<P, [B, E]>) => Apply<P, [B, E]>,
   f: Apply<P, [A, B]>
-) {
+): (p: Apply<P, [A, E]>) => Apply<P, [A, E]> {
   return B.horiz(beta, B.id2(f));
 }
 
-function whiskerRight<P extends Kind2, A, B, C>(
+function whiskerRight<P extends Kind2, A, B, E>(
   B: ReturnType<typeof makeProfunctorBicategory<P>>,
-  f: Apply<P, [B, C]>,
+  f: Apply<P, [B, E]>,
   alpha: (p: Apply<P, [A, B]>) => Apply<P, [A, B]>
-) {
+): (p: Apply<P, [A, E]>) => Apply<P, [A, E]> {
   return B.horiz(B.id2(f), alpha);
 }
+
+// BEGIN PATCH: whisker middle leg
+function whiskerMiddle<P extends Kind2, A, B, C, D>(
+  B: ReturnType<typeof makeProfunctorBicategory<P>>,
+  k: Apply<P, [C, D]>,
+  alpha: (p: Apply<P, [A, C]>) => Apply<P, [A, C]>
+): (p: Apply<P, [A, D]>) => Apply<P, [A, D]> {
+  return B.horiz(B.id2(k), alpha);
+}
+// END PATCH
 
 export function runPentagonLaw<P extends Kind2, A, B, C, D, E>(
   B: ReturnType<typeof makeProfunctorBicategory<P>>,
@@ -73,30 +83,45 @@ export function runPentagonLaw<P extends Kind2, A, B, C, D, E>(
 
   const eqPE = mkEqP<P, A, E>(evalP, eqE, samplesA);
 
-  // Base left-associated composite: (((k ∘ h) ∘ g) ∘ f)
-  const kh = B.compose1(k, h);
-  const kh_g = B.compose1(kh, g);
-  const leftAssoc = B.compose1(kh_g, f);
+  // Build the base composite: ((k ∘ h) ∘ g) ∘ f
+  const hg = B.compose1(h, g);
+  const khg = B.compose1(k, hg);
+  const fghk = B.compose1(khg, f);
 
-  // Derived associators
-  const a_k_h_gf = B.associator(k, h, B.compose1(g, f));
-  const a_kh_g_f = B.associator(B.compose1(k, h), g, f);
-  const a_k_hg_f = B.associator(k, B.compose1(h, g), f);
-  const a_k_h_g = B.associator(k, h, g);
-  const a_h_g_f = B.associator(h, g, f);
+  // Pentagon law: two ways to reassociate a 4-fold composition
+  // Following monoidal pattern: Path 1: (α_{A,B,C} ⊗ id_D) ; α_{A,B⊗C,D} ; (id_A ⊗ α_{B,C,D})
+  //                            Path 2: α_{A,B,C⊗D} ; α_{A⊗B,C,D}
+  
+  // Get associators - all have endpoints A→E for the 4-fold composition f∘g∘h∘k
+  const gh = B.compose1(h, g);
+  const fg = B.compose1(g, f);
+  const hk = B.compose1(k, h);
+  
+  const assoc_ABC = B.associator(f, g, h);           // α_{A,B,C}: NatP<P, A, D>
+  const assoc_A_BC_D = B.associator(f, gh, k);      // α_{A,B⊗C,D}: NatP<P, A, E>  
+  const assoc_BCD = B.associator(g, h, k);          // α_{B,C,D}: NatP<P, B, E>
+  const assoc_AB_C_D = B.associator(fg, h, k);      // α_{A⊗B,C,D}: NatP<P, A, E>
+  const assoc_A_B_CD = B.associator(f, g, hk);      // α_{A,B,C⊗D}: NatP<P, A, E>
 
-  // Path 1: a_{k,h,g∘f} ∘ a_{k∘h,g,f}
-  const path1 = B.vert(a_k_h_gf, a_kh_g_f);
+  // Path 1: (α_{A,B,C} ⊗ id_D) ; α_{A,B⊗C,D} ; (id_A ⊗ α_{B,C,D})
+  // Step 1: α_{A,B,C} ⊗ id_D - whisk α_{A,B,C} with id_D to get NatP<P, A, E>
+  const step1_1 = whiskerRight(B, k, assoc_ABC);    // NatP<P, A, E>
+  
+  // Step 2: compose with α_{A,B⊗C,D} - both have endpoints A→E
+  const step1_2 = B.vert(assoc_A_BC_D, step1_1);   // NatP<P, A, E>
+  
+  // Step 3: id_A ⊗ α_{B,C,D} - whisk id_A with α_{B,C,D} to get NatP<P, A, E>
+  const step1_3 = whiskerLeft(B, assoc_BCD, f);     // NatP<P, A, E>
+  
+  // Final path 1 composition - both have endpoints A→E
+  const path1 = B.vert(step1_3, step1_2);           // NatP<P, A, E>
 
-  // Path 2: (id ⋄ a_{h,g,f}) ∘ a_{k,h∘g,f} ∘ (a_{k,h,g} ⋄ id)
-  const stepL = whiskerLeft(B, a_k_h_g, f); // a_{k,h,g} ⋄ id_f
-  const stepM = a_k_hg_f;
-  const stepR = whiskerRight(B, k, a_h_g_f); // id_k ⋄ a_{h,g,f}
-  const path2 = B.vert(B.vert(stepR, stepM), stepL);
+  // Path 2: α_{A,B,C⊗D} ; α_{A⊗B,C,D} - both have endpoints A→E
+  const path2 = B.vert(assoc_AB_C_D, assoc_A_B_CD);  // NatP<P, A, E>
 
-  // Apply both 2-cells to left-associated composite and compare
-  const p1 = path1(leftAssoc);
-  const p2 = path2(leftAssoc);
+  // Apply both paths to the base composite and compare
+  const p1 = path1(fghk);
+  const p2 = path2(fghk);
 
   if (!eqPE(p1, p2)) {
     fails.push('Pentagon coherence failed');
@@ -123,16 +148,25 @@ export function runTriangleLaw<P extends Kind2, A, B, C>(
   // Base composite: g ∘ f
   const gf = B.compose1(g, f);
 
-  // Triangle: (ρ_g ⋄ id_f) ∘ α_{g,id,f} ∘ (id_g ⋄ λ_f) = id
-  const id_mid = B.id1<any>();
-  const alpha = B.associator(g, id_mid, f);
-  const left = whiskerRight(B, g, B.leftUnitor(f)); // id_g ⋄ λ_f
-  const right = whiskerLeft(B, B.rightUnitor(g), f); // ρ_g ⋄ id_f
-  const lhs = B.vert(right, B.vert(alpha, left));
-  const rhs = B.id2(gf);
+  // Triangle law: (id_f ⊗ λ_g) ; α_{f,1,g} = ρ_f ⊗ id_g
+  // Where λ is left unitor, ρ is right unitor, α is associator
+  
+  // Get unitors and associator
+  const leftUnitor_g = B.leftUnitor(g);    // λ_g: 1⊗g → g  
+  const rightUnitor_f = B.rightUnitor(f);  // ρ_f: f⊗1 → f
+  const associator_f_1_g = B.associator(f, B.id1(), g); // α_{f,1,g}: f⊗(1⊗g) → (f⊗1)⊗g
 
-  const l = lhs(gf);
-  const r = rhs(gf);
+  // Path 1: (id_f ⊗ λ_g) ; α_{f,1,g}
+  const step1 = whiskerLeft(B, leftUnitor_g, f);     // id_f ⊗ λ_g
+  const path1 = B.vert(associator_f_1_g, step1);     // ; α_{f,1,g}
+
+  // Path 2: ρ_f ⊗ id_g  
+  const path2 = whiskerRight(B, g, rightUnitor_f);   // ρ_f ⊗ id_g
+
+  // Apply both paths to the base composite and compare
+  const l = path1(gf);
+  const r = path2(gf);
+  
   if (!eqPC(l, r)) {
     fails.push('Triangle coherence failed');
   }

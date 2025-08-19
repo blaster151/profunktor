@@ -19,7 +19,7 @@ export function mapFree<F extends Kind1, A, B>(F: Functor<F>, fa: Free<F, A>, f:
     case 'Pure':
       return FreePure(f(fa.value));
     case 'Impure':
-      return FreeImpure(F.map(fa.fx, (inner) => mapFree(F, inner, f)) as any);
+      return FreeImpure(F.map(fa.fx, (inner) => mapFree(F, inner, f)));
   }
 }
 
@@ -29,7 +29,7 @@ export function foldFree<F extends Kind1, A>(F: Functor<F>, phi: (fa: Apply<F, [
     case 'Pure':
       return fa.value;
     case 'Impure':
-      const mapped = F.map(fa.fx, (inner) => foldFree(F, phi, inner)) as any as Apply<F, [A]>;
+      const mapped: Apply<F, [A]> = F.map(fa.fx, (inner) => foldFree(F, phi, inner));
       return phi(mapped);
   }
 }

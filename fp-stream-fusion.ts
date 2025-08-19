@@ -31,7 +31,10 @@ import { detectBoundary, OptimizationBoundary } from './fp-stream-boundaries';
 type UnaryFn = (a: unknown) => unknown;
 
 export interface StreamPlanNode {
-  type: 'map' | 'scan' | 'filter' | 'filterMap' | 'flatMap' | 'compose' | 'parallel';
+  type:
+    | 'map' | 'scan' | 'filter' | 'filterMap' | 'flatMap' | 'compose' | 'parallel'
+    // FRP bridge nodes:
+    | 'source' | 'conversion' | 'take' | 'skip';
   fn?: UnaryFn;
   scanFn?: StateFn<any, unknown>;
   predicate?: (a: unknown) => boolean;

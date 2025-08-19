@@ -293,13 +293,15 @@ export const ArrayMonoidK: MonoidK<ArrayK> = {
  * MonoidK for Maybe
  */
 export const MaybeMonoidK: MonoidK<MaybeK> = {
-  empty: Nothing() as any,
-  concat: <A>(a: Maybe<A>, b: Maybe<A>): Maybe<A> => {
-    return matchMaybe(a, {
-      Just: () => a,
-      Nothing: () => b
-    });
-  }
+  empty: Nothing() as Apply<MaybeK, [any]>,
+    concat: <A>(a: Apply<MaybeK, [A]>, b: Apply<MaybeK, [A]>): Apply<MaybeK, [A]> => {
+      const maybeA = a as Maybe<A>;
+      const maybeB = b as Maybe<A>;
+      return matchMaybe(maybeA, {
+        Just: () => maybeA,
+        Nothing: () => maybeB
+      }) as Apply<MaybeK, [A]>;
+    }
 };
 
 // ============================================================================

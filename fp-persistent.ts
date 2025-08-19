@@ -118,6 +118,13 @@ export class PersistentList<T> {
   }
   
   /**
+   * Get the length of the list (alias for size)
+   */
+  get length(): number {
+    return this._size;
+  }
+  
+  /**
    * Create an empty persistent list
    */
   static empty<T>(): PersistentList<T> {
@@ -654,6 +661,13 @@ export class PersistentMap<K, V> {
   }
   
   /**
+   * Create a persistent map from entries (static constructor)
+   */
+  static of<K, V>(entries: Iterable<[K, V]> | Array<[K, V]>): PersistentMap<K, V> {
+    return PersistentMap.fromEntries(Array.from(entries));
+  }
+  
+  /**
    * Get a value by key
    */
   get(key: K): V | undefined {
@@ -815,6 +829,30 @@ export class PersistentMap<K, V> {
     for (const [k, v] of this.entries()) {
       fn(v, k);
     }
+  }
+
+  /**
+   * Map over values (expected by fluent layer)
+   */
+  mapValues<V2>(f: (v: V) => V2): PersistentMap<K, V2> {
+    const out = Array.from(this.entries()).map(([k, v]) => [k, f(v)] as [K, V2]);
+    return PersistentMap.fromEntries(out);
+  }
+
+  /**
+   * Map over keys (expected by fluent layer)
+   */
+  mapKeys<K2>(f: (k: K) => K2): PersistentMap<K2, V> {
+    const out = Array.from(this.entries()).map(([k, v]) => [f(k), v] as [K2, V]);
+    return PersistentMap.fromEntries(out);
+  }
+
+  /**
+   * Bimap over both keys and values (expected by fluent layer)
+   */
+  bimap<K2, V2>(fk: (k: K) => K2, fv: (v: V) => V2): PersistentMap<K2, V2> {
+    const out = Array.from(this.entries()).map(([k, v]) => [fk(k), fv(v)] as [K2, V2]);
+    return PersistentMap.fromEntries(out);
   }
 
 
@@ -1037,6 +1075,13 @@ export class PersistentSet<T> {
   }
   
   /**
+   * Create a persistent set from items (static constructor)
+   */
+  static of<A>(items: Iterable<A> | Array<A>): PersistentSet<A> {
+    return PersistentSet.fromArray(Array.from(items));
+  }
+  
+  /**
    * Add a value to the set
    */
   add(value: T): PersistentSet<T> {
@@ -1160,6 +1205,13 @@ export class PersistentSet<T> {
     for (const value of this) {
       fn(value);
     }
+  }
+
+  /**
+   * Get values iterator (alias for Symbol.iterator to match usage in fluent layer)
+   */
+  values(): IterableIterator<T> {
+    return this.internalMap.keys();
   }
 
 
@@ -1861,6 +1913,27 @@ const PersistentSetFluentImpl: FluentImpl<any> = {
 applyFluentOps(PersistentList.prototype, PersistentListFluentImpl);
 applyFluentOps(PersistentMap.prototype, PersistentMapFluentImpl);
 applyFluentOps(PersistentSet.prototype, PersistentSetFluentImpl);
+
+// ============================================================================
+// Part 11: Type Declaration Merges for Fluent Compatibility
+// ============================================================================
+
+/**
+ * Interface merges to ensure compatibility with fluent layer
+ */
+export interface PersistentMap<K, V> {
+  mapValues<V2>(f: (v: V) => V2): PersistentMap<K, V2>;
+  mapKeys<K2>(f: (k: K) => K2): PersistentMap<K2, V>;
+  bimap<K2, V2>(fk: (k: K) => K2, fv: (v: V) => V2): PersistentMap<K2, V2>;
+}
+
+export interface PersistentSet<T> {
+  values(): IterableIterator<T>;
+}
+
+export interface PersistentList<T> {
+  length: number;
+}
 
 // ============================================================================
 // Part 12: Registration

@@ -1,7 +1,7 @@
 /**
  * Anamorphisms (Unfolds) — minimal, adapter-free implementation
- * No imports; zero side-effects.
  */
+import { Maybe, Either } from './fp-hkt';
 
 export type Build<T, Seed> =
   | { tag: 'Done'; node: T }
@@ -32,8 +32,6 @@ export function anaRecursive<T, Seed>(
   return go;
 }
 
-export type Maybe<A> = { tag: 'Just'; value: A } | { tag: 'Nothing' };
-export type Either<L, R> = { tag: 'Left'; value: L } | { tag: 'Right'; value: R };
 export type Result<A, E> = { tag: 'Ok'; value: A } | { tag: 'Err'; error: E };
 
 export function anaMaybe<A, Seed>(

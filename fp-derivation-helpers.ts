@@ -152,12 +152,12 @@ export function deriveFunctor<F extends Kind1>(
       // Default implementation for tagged unions
       if (typeof fa === 'object' && fa !== null && 'tag' in (fa as any)) {
         return (fa as any).match({
-          Just: ({ value }) => ({ tag: 'Just', value: f(value) }),
+          Just: ({ value }: { value: any }) => ({ tag: 'Just', value: f(value) }),
           Nothing: () => ({ tag: 'Nothing' }),
-          Left: ({ value }) => ({ tag: 'Left', value }),
-          Right: ({ value }) => ({ tag: 'Right', value: f(value) }),
-          Ok: ({ value }) => ({ tag: 'Ok', value: f(value) }),
-          Err: ({ error }) => ({ tag: 'Err', error }),
+          Left: ({ value }: { value: any }) => ({ tag: 'Left', value }),
+          Right: ({ value }: { value: any }) => ({ tag: 'Right', value: f(value) }),
+          Ok: ({ value }: { value: any }) => ({ tag: 'Ok', value: f(value) }),
+          Err: ({ error }: { error: any }) => ({ tag: 'Err', error }),
           _: (tag: string, payload: any) => ({ tag, ...payload })
         });
       }
@@ -193,7 +193,7 @@ export function deriveApplicative<F extends Kind1>(
     ap: <A, B>(fab: Apply<F, [(a: A) => B]>, fa: Apply<F, [A]>): Apply<F, [B]> => {
       // Default implementation for Maybe
       return (fab as any).match({
-        Just: ({ value: f }) => functor.map(fa, f),
+        Just: ({ value: f }: { value: any }) => functor.map(fa, f),
         Nothing: () => ({ tag: 'Nothing' }),
         _: () => functor.map(fa, (a: A) => (fab as any).value(a))
       });
@@ -222,12 +222,12 @@ export function deriveMonad<F extends Kind1>(
 
       // Default implementation for Maybe
       return (fa as any).match({
-        Just: ({ value }) => f(value),
+        Just: ({ value }: { value: any }) => f(value),
         Nothing: () => ({ tag: 'Nothing' }),
-        Left: ({ value }) => ({ tag: 'Left', value }),
-        Right: ({ value }) => f(value),
-        Ok: ({ value }) => f(value),
-        Err: ({ error }) => ({ tag: 'Err', error }),
+        Left: ({ value }: { value: any }) => ({ tag: 'Left', value }),
+        Right: ({ value }: { value: any }) => f(value),
+        Ok: ({ value }: { value: any }) => f(value),
+        Err: ({ error }: { error: any }) => ({ tag: 'Err', error }),
         _: (tag: string, payload: any) => ({ tag, ...payload })
       });
     }
@@ -419,7 +419,7 @@ export function deriveShow<A>(config: DerivationConfig = {}): Show<A> {
           Left: ({ value }) => `Left(${JSON.stringify(value)})`,
           Right: ({ value }) => `Right(${JSON.stringify(value)})`,
           Ok: ({ value }) => `Ok(${JSON.stringify(value)})`,
-          Err: ({ error }) => `Err(${JSON.stringify(error)})`,
+          Err: ({ error }: { error: unknown }) => `Err(${JSON.stringify(error)})`,
           _: (tag: string, payload: any) => `${tag}(${JSON.stringify(payload)})`
         });
       }

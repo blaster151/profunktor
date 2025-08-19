@@ -1,5 +1,5 @@
 // fp-stream-resource.ts
-import { Kind1, Apply } from '../fp-hkt';
+import { Kind1, Apply } from 'fp-hkt';
 import { StreamK } from './fp-stream-core';
 import { makeResource, Bracket, Resource } from './fp-resource';
 import { Pull, streamFromPull } from './fp-stream-pull';

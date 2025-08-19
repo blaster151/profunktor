@@ -55,7 +55,7 @@ const opaqueEffect: FusionSafety = { __brand: 'OpaqueEffect' };
 
 // Shape for stateless, pure transformations
 interface MapShape<Input, Output> extends StreamShape<Input, Output, never> {
-  readonly __brand: 'MapShape';
+  readonly __tag: 'MapShape';
   readonly multiplicity: Multiplicity; // Always 1-to-1
   readonly isStateless: true;
   readonly isPure: true;
@@ -63,8 +63,8 @@ interface MapShape<Input, Output> extends StreamShape<Input, Output, never> {
 }
 
 // Shape for filtering operations
-interface FilterShape<Input> extends StreamShape<Input, Input, never> {
-  readonly __brand: 'FilterShape';
+interface FilterShape<Input> extends StreamShape<Input, Input | null, never> {
+  readonly __tag: 'FilterShape';
   readonly multiplicity: Multiplicity; // 0-or-1
   readonly isStateless: true;
   readonly isPure: boolean; // Depends on predicate
@@ -73,7 +73,7 @@ interface FilterShape<Input> extends StreamShape<Input, Input, never> {
 
 // Shape for stateful operations
 interface ScanShape<Input, Output, State> extends StreamShape<Input, Output, State> {
-  readonly __brand: 'ScanShape';
+  readonly __tag: 'ScanShape';
   readonly multiplicity: Multiplicity; // Always 1-to-1
   readonly isStateless: false;
   readonly isPure: boolean; // Depends on reducer
@@ -109,7 +109,7 @@ class MapMaterial<Input, Output> implements StreamMaterial<MapShape<Input, Outpu
   constructor(
     private readonly fn: (input: Input) => Output,
     readonly shape: MapShape<Input, Output> = {
-      __brand: 'MapShape',
+      __tag: 'MapShape',
       multiplicity: finite(1),
       isStateless: true,
       isPure: true,
@@ -129,7 +129,7 @@ class FilterMaterial<Input> implements StreamMaterial<FilterShape<Input>> {
   constructor(
     private readonly predicate: (input: Input) => boolean,
     readonly shape: FilterShape<Input> = {
-      __brand: 'FilterShape',
+      __tag: 'FilterShape',
       multiplicity: { __brand: 'InfiniteMultiplicity' }, // 0-or-1
       isStateless: true,
       isPure: true, // Assuming pure predicate
@@ -152,7 +152,7 @@ class ScanMaterial<Input, Output, State> implements StreamMaterial<ScanShape<Inp
     private readonly reducer: (state: State, input: Input) => [State, Output],
     private readonly initialState: State,
     readonly shape: ScanShape<Input, Output, State> = {
-      __brand: 'ScanShape',
+      __tag: 'ScanShape',
       multiplicity: finite(1),
       isStateless: false,
       isPure: false, // Stateful operations are typically impure
@@ -205,7 +205,7 @@ type ComposeMultiplicity<A extends Multiplicity, B extends Multiplicity> =
 // Shape composition
 interface ComposedShape<A extends StreamShape<any, any, any>, B extends StreamShape<any, any, any>> 
   extends StreamShape<A['InputType'], B['OutputType'], A['StateType'] | B['StateType']> {
-  readonly __brand: 'ComposedShape';
+  readonly __tag: 'ComposedShape';
   readonly multiplicity: ComposeMultiplicity<A['multiplicity'], B['multiplicity']>;
   readonly isStateless: A['isStateless'] & B['isStateless'];
   readonly isPure: A['isPure'] & B['isPure'];
@@ -290,7 +290,7 @@ function demonstrateMaterialShapeSeparation() {
   );
   
   console.log("1. Shape Analysis (Static Reasoning):");
-  console.log(`   Map shape: ${mapMaterial.shape.__brand}`);
+  console.log(`   Map shape: ${mapMaterial.shape.__tag}`);
   console.log(`   - Multiplicity: ${mapMaterial.shape.multiplicity.__brand}`);
   console.log(`   - Stateless: ${mapMaterial.shape.isStateless}`);
   console.log(`   - Pure: ${mapMaterial.shape.isPure}`);
@@ -437,6 +437,11 @@ export {
 };
 
 // Run the demonstration
-if (require.main === module) {
+declare const require: any | undefined;
+declare const module: any | undefined;
+
+if (typeof require !== 'undefined' &&
+    typeof module !== 'undefined' &&
+    require.main === module) {
   demonstrateMaterialShapeSeparation();
 }

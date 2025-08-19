@@ -22,7 +22,7 @@
 // left f (Left a) = let (b, f') = f a in (Left b, left f')
 // left f (Right c) = (Right c, left f) -- machine unchanged on Right
 
-import { Kind2, Apply, Either } from '../../fp-hkt';
+import { Kind2, Apply, Either } from 'fp-hkt';
 
 // ---------- Core representation ----------
 export type Mealy<A, B> = (a: A) => [B, Mealy<A, B>];

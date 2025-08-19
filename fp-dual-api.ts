@@ -15,6 +15,7 @@ import type {
   Apply, 
   Type 
 } from './fp-typeclasses';
+import type { Kind1, Kind2 } from './fp-hkt';
 
 // ============================================================================
 // Core Typeclass Operations
@@ -56,43 +57,43 @@ export const TYPECLASS_OPERATIONS = {
 /**
  * Functor operations - data-last standalone functions
  */
-export const map = <F extends Kind<[Type, Type]>, A, B>(F_: Functor<F>) =>
+export const map = <F extends Kind1, A, B>(F_: Functor<F>) =>
   (f: (a: A) => B) => (fa: Apply<F, [A]>) => F_.map(fa, f);
 
 /**
  * Applicative operations - data-last standalone functions
  */
-export const of = <F extends Kind<[Type, Type]>, A>(F_: Applicative<F>) =>
+export const of = <F extends Kind1, A>(F_: Applicative<F>) =>
   (a: A) => F_.of(a);
 
-export const ap = <F extends Kind<[Type, Type]>, A, B>(F_: Applicative<F>) =>
+export const ap = <F extends Kind1, A, B>(F_: Applicative<F>) =>
   (fab: Apply<F, [(a: A) => B]>) => (fa: Apply<F, [A]>) => F_.ap(fab, fa);
 
 /**
  * Monad operations - data-last standalone functions
  */
-export const chain = <F extends Kind<[Type, Type]>, A, B>(F_: Monad<F>) =>
+export const chain = <F extends Kind1, A, B>(F_: Monad<F>) =>
   (f: (a: A) => Apply<F, [B]>) => (fa: Apply<F, [A]>) => F_.chain(fa, f);
 
 /**
  * Bifunctor operations - data-last standalone functions
  */
-export const bimap = <F extends Kind<[Type, Type, Type]>, A, B, C, D>(F_: Bifunctor<F>) =>
+export const bimap = <F extends Kind2, A, B, C, D>(F_: Bifunctor<F>) =>
   (f: (a: A) => C) => (g: (b: B) => D) => (fab: Apply<F, [A, B]>) => F_.bimap(fab, f, g);
 
-export const mapLeft = <F extends Kind<[Type, Type, Type]>, A, B, C>(F_: Bifunctor<F>) =>
+export const mapLeft = <F extends Kind2, A, B, C>(F_: Bifunctor<F>) =>
   (f: (a: A) => C) => (fab: Apply<F, [A, B]>) => F_.mapLeft?.(fab, f) ?? F_.bimap(fab, f, (b: B) => b);
 
 /**
  * Profunctor operations - data-last standalone functions
  */
-export const dimap = <F extends Kind<[Type, Type, Type]>, A, B, C, D>(F_: Profunctor<F>) =>
+export const dimap = <F extends Kind2, A, B, C, D>(F_: Profunctor<F>) =>
   (f: (c: C) => A) => (g: (b: B) => D) => (p: Apply<F, [A, B]>) => F_.dimap(p, f, g);
 
-export const lmap = <F extends Kind<[Type, Type, Type]>, A, B, C>(F_: Profunctor<F>) =>
+export const lmap = <F extends Kind2, A, B, C>(F_: Profunctor<F>) =>
   (f: (c: C) => A) => (p: Apply<F, [A, B]>) => F_.lmap?.(p, f) ?? F_.dimap(p, f, (b: B) => b);
 
-export const rmap = <F extends Kind<[Type, Type, Type]>, A, B, D>(F_: Profunctor<F>) =>
+export const rmap = <F extends Kind2, A, B, D>(F_: Profunctor<F>) =>
   (g: (b: B) => D) => (p: Apply<F, [A, B]>) => F_.rmap?.(p, g) ?? F_.dimap(p, (a: A) => a, g);
 
 // ============================================================================
@@ -226,15 +227,33 @@ export const EitherAPI = createDualAPI({
 });
 
 /**
+ * ObservableLite local constructor (since ObservableLite is just an interface)
+ */
+const OL = {
+  of: <A>(a: A): ObservableLite<A> => {
+    const result: ObservableLite<A> = {
+      map: f => OL.of(f(a)),
+      chain: f => f(a),
+      filter: p => p(a) ? result : OL.of(a), // Return self if predicate passes
+      dimap: (f, g) => OL.of(g(a)),
+      lmap: _ => result, // Ignore the left map for simple values
+      rmap: g => OL.of(g(a)),
+      ap: <B>(fab: ObservableLite<any>) => fab.map((fn: any) => fn(a))
+    };
+    return result;
+  }
+};
+
+/**
  * ObservableLite dual API
  */
 export const ObservableLiteAPI = createDualAPI({
   name: 'ObservableLite',
   instance: {
     map: <A, B>(fa: ObservableLite<A>, f: (a: A) => B): ObservableLite<B> => fa.map(f),
-    of: <A>(a: A): ObservableLite<A> => ObservableLite.of(a),
-    ap: <A, B>(fab: ObservableLite<(a: A) => B>, fa: ObservableLite<A>): ObservableLite<B> => 
-      fab.ap(fa),
+    of: <A>(a: A): ObservableLite<A> => OL.of(a),
+    ap: <A, B>(fab: ObservableLite<(a: A) => B>, fa: ObservableLite<A>): ObservableLite<B> =>
+      fab.chain(f => fa.map(f)),
     chain: <A, B>(fa: ObservableLite<A>, f: (a: A) => ObservableLite<B>): ObservableLite<B> => 
       fa.chain(f),
     filter: <A>(fa: ObservableLite<A>, predicate: (a: A) => boolean): ObservableLite<A> => 
@@ -273,8 +292,7 @@ export interface ObservableLite<A> {
   dimap<C, D>(f: (c: C) => A, g: (a: A) => D): ObservableLite<D>;
   lmap<C>(f: (c: C) => A): ObservableLite<A>;
   rmap<D>(g: (a: A) => D): ObservableLite<D>;
-  ap<B>(other: ObservableLite<(a: A) => B>): ObservableLite<B>;
-  static of<A>(a: A): ObservableLite<A>;
+  ap<B>(fa: ObservableLite<any>): ObservableLite<B>; // relaxed — we avoid calling it directly anyway
 }
 
 // ============================================================================

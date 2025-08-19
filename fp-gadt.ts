@@ -593,7 +593,7 @@ export type HigherOrderGADT<F extends Kind1> =
  * HigherOrderGADT as HKT
  */
 export interface HigherOrderGADTK extends Kind1 {
-  readonly type: HigherOrderGADT<this['arg0']>;
+  readonly type: this['arg0'] extends Kind1 ? HigherOrderGADT<this['arg0']> : never;
 }
 
 /**

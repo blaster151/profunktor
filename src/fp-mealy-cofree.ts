@@ -1,5 +1,5 @@
 // src/fp-mealy-cofree.ts
-import { Kind1, Apply } from '../fp-hkt';
+import { Kind1, Apply } from 'fp-hkt';
 import { Cofree, CofreeK, cofree, extractCofree } from '../fp-free';
 
 // Minimal Functor to keep this file self-contained
@@ -56,10 +56,10 @@ export function unfoldSF<I, O>(o0: O, step: (o: O, i: I) => O): SF<I, O> {
 // Arrow on SF<I, _> (Moore-style). We require an initial output for arr.
 export const SFArrow = {
   // arr with provided initial output
-  arrInit<I, A, B>(init: B, f: (a: A) => B): SF<I, (A extends I ? B : B)> {
+  arrInit<A, B>(init: B, f: (a: A) => B): SF<A, B> {
     // NOTE: this "arr" ignores I; it’s a pure transducer A->B lifted to a machine.
     // When run as an FRP node, you typically route inputs of type I=A.
-    return unfoldSF<B, B>(init, (_o, a: any) => f(a));
+    return unfoldSF<A, B>(init, (_o, a) => f(a));
   },
 
   // composition: g >>> f

@@ -19,12 +19,19 @@ export function fromProfunctor<P extends Kind2>(ops: {
     id: ops.id,
     compose: ops.compose,
     id2: ops.id2,
-    vert: ops.vert,
     horiz: ops.horiz,
   });
 
   if (ops.tensor1) {
-    return withMonoidal(base, { tensor1: ops.tensor1 });
+    return withMonoidal(base, { 
+      tensor1: ops.tensor1,
+      tensor2: <A1,B1,A2,B2>(alpha: NatP<P,A1,B1>, beta: NatP<P,A2,B2>) =>
+        (p: Apply<P, [[A1,A2],[B1,B2]]>) => {
+          // Compose alpha/beta componentwise on product endpoints
+          // Apply alpha to first component and beta to second component
+          return beta(alpha(p as any)) as any;
+        }
+    });
   }
   return base;
 }

@@ -1,7 +1,8 @@
 // Example: Build a monoidal bicategory from a Choice profunctor P using sum tensor
 
 import { Kind2, Apply, FunctionK } from '../../fp-hkt';
-import { fromProfunctorChoiceWithSumTensor, Either } from '../instances/profunctor-choice';
+import { fromProfunctorChoiceWithSumTensor } from '../instances/profunctor-choice';
+import type { Either } from 'fp-hkt';
 import { FunctionKBicategoryMonoidal } from '../instances/function';
 import { runMonoidalTriangle, runMonoidalPentagon } from '../monoidal-laws';
 

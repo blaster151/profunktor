@@ -13,7 +13,7 @@
 // This matches the standard CoKleisli Arrow for product strength.
 // (ArrowChoice `left` is intentionally omitted here; it requires extra structure)
 
-import { Kind1, Kind2, Apply } from '../../fp-hkt';
+import { Kind1, Kind2, Apply } from 'fp-hkt';
 import { Cofree, mapCofree, duplicateCofree, extractCofree } from '../../fp-free';
 
 // ---------- Step functor ----------

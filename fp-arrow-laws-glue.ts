@@ -10,6 +10,7 @@
 // runArrowChoiceLaws(dict, gens, eq, samples?)
 
 import { Kind1 } from './fp-hkt';
+import { Left, Right } from './fp-either-unified';
 import {
   runCategoryLaws,
   runArrowLaws,
@@ -28,9 +29,6 @@ import {
 // -----------------------------
 // Tiny test domain + eq helpers
 // -----------------------------
-type Either<L, R> = { left: L } | { right: R };
-const Left = <L, R = never>(left: L): Either<L, R> => ({ left });
-const Right = <R, L = never>(right: R): Either<L, R> => ({ right });
 type Gen<T> = () => T;
 function sampler<T>(xs: T[]): Gen<T> {
   let i = 0;
@@ -40,7 +38,7 @@ function sampler<T>(xs: T[]): Gen<T> {
 const genNum: Gen<number> = sampler([-2, -1, 0, 1, 2, 3]);
 const genStr: Gen<string> = sampler(['a', 'b', 'c', 'd']);
 const genPairNumStr: Gen<[number, string]> = sampler([[-1, 'x'], [0, 'y'], [2, 'z']]);
-const genEitherNumStr: Gen<Either<number, string>> = (() => {
+const genEitherNumStr: Gen<ReturnType<typeof Left> | ReturnType<typeof Right>> = (() => {
   let i = 0;
   return () => ((i++ & 1) === 0) ? Left(genNum()) : Right(genStr());
 })();
@@ -53,8 +51,11 @@ const genFnNumNum: Gen<(n: number) => number> = sampler([
 const eqNum = (x: number, y: number) => x === y;
 const eqStr = (x: string, y: string) => x === y;
 const eqPairNumStr = (x: [number, string], y: [number, string]) => eqNum(x[0], y[0]) && eqStr(x[1], y[1]);
-const eqEitherNumStr = (x: Either<number, string>, y: Either<number, string>) =>
-  ('left' in x) === ('left' in y) && ('left' in x ? eqNum(x.left, (y as any).left) : eqStr((x as any).right, (y as any).right));
+const eqEitherNumStr = (x: any, y: any) =>
+  (x as { tag: string; value: any }).tag === (y as { tag: string; value: any }).tag &&
+  ((x as { tag: string; value: any }).tag === 'Left'
+    ? eqNum((x as { value: number }).value, (y as { value: number }).value)
+    : eqStr((x as { value: string }).value, (y as { value: string }).value));
 
 // -----------------------------
 // Optional registry shape
@@ -97,9 +98,43 @@ export function registerAndTestCoKleisliArrowChoice<W extends Kind1>(
     eqPairBC: eqPairNumStr,
     eqEitherBC: eqEitherNumStr
   };
-  const catRes = runCategoryLaws(dict as any, gens, eqs, samples);
-  const arrRes = runArrowLaws(dict as any, gens, eqs, samples);
-  const choRes = runArrowChoiceLaws(dict as any, gens, eqs, samples);
+  // Build config objects for each law runner for CoKleisli
+  const catRes = runCategoryLaws(dict as any, {
+    lift: (f: any) => dict.arr(f),
+    evalP: (p: any) => p,
+    genA: gens.genA,
+    genB: gens.genB,
+  genC: genStr,
+    genD: gens.genC, // Use genC for D if no genD is available
+    eqD: eqs.eqC,    // Use eqC for D if no eqD is available
+    samples
+  });
+  const arrRes = runArrowLaws(dict as any, {
+    evalP: (p: any) => p,
+    genA: gens.genA,
+    genB: gens.genB,
+  genC: genStr,
+    genD: gens.genC, // Use genC for D if no genD is available
+    eq: {
+      AB: eqs.eqB,
+      AC: eqPairNumStr,
+      BC: eqPairNumStr,
+      DC: eqPairNumStr
+    },
+    samples
+  });
+  const choRes = runArrowChoiceLaws(dict as any, {
+    evalP: (p: any) => p,
+    genA: gens.genA,
+    genB: gens.genB,
+    genC: gens.genC,
+    eq: { EB: eqEitherNumStr },
+    sum: {
+      left: <X>(x: X) => Left(x) as any,
+      right: <X>(x: X) => Right(x) as any
+    },
+    samples
+  });
   console.log(`🧪 CoKleisli ${hktName} — Category:`, catRes);
   console.log(`🧪 CoKleisli ${hktName} — Arrow: `, arrRes);
   console.log(`🧪 CoKleisli ${hktName} — Choice: `, choRes);
@@ -137,9 +172,43 @@ export function registerAndTestSFArrowChoice(
     eqPairBC: eqPairNumStr,
     eqEitherBC: eqEitherNumStr
   };
-  const catRes = runCategoryLaws(arrowSF as any, gens, eqs, samples);
-  const arrRes = runArrowLaws(arrowSF as any, gens, eqs, samples);
-  const choRes = runArrowChoiceLaws(arrowChoiceSF as any, gens, eqs, samples);
+  // Build config objects for each law runner
+  const catRes = runCategoryLaws(arrowSF as any, {
+    lift: (f: any) => arrowSF.arr(f),
+  evalP: (p: any) => (x: any) => p.step(x)[0],
+    genA: gens.genA,
+    genB: gens.genB,
+  genC: genStr,
+    genD: gens.genC, // Use genC for D if no genD is available
+    eqD: eqs.eqC,    // Use eqC for D if no eqD is available
+    samples
+  });
+  const arrRes = runArrowLaws(arrowSF as any, {
+  evalP: (p: any) => (x: any) => p.step(x)[0],
+    genA: gens.genA,
+    genB: gens.genB,
+  genC: genStr,
+    genD: gens.genC, // Use genC for D if no genD is available
+    eq: {
+      AB: eqs.eqB,
+      AC: eqPairNumStr,
+      BC: eqPairNumStr,
+      DC: eqPairNumStr
+    },
+    samples
+  });
+  const choRes = runArrowChoiceLaws(arrowChoiceSF as any, {
+  evalP: (p: any) => (x: any) => p.step(x)[0],
+    genA: gens.genA,
+    genB: gens.genB,
+    genC: gens.genC,
+    eq: { EB: eqEitherNumStr },
+    sum: {
+      left: <X>(x: X) => Left(x) as any,
+      right: <X>(x: X) => Right(x) as any
+    },
+    samples
+  });
   console.log(`🧪 SF ${hktName} — Category:`, catRes);
   console.log(`🧪 SF ${hktName} — Arrow: `, arrRes);
   console.log(`🧪 SF ${hktName} — Choice: `, choRes);

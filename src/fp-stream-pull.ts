@@ -47,7 +47,7 @@ export function streamFromPull<F extends Kind1, O>(runF: <X>(fx: Apply<F, [X]>) 
     evalMap<B>(k: (o: O) => Apply<F, [B]>): StreamK<F, B> {
       const go = async function* (self: StreamImpl) {
         // simple interpreter to arrays; compile.fold below is the better API
-        const arr = await compileFold(self, [] as B[], async (acc, b: B) => { acc.push(b); return acc; });
+        const arr = await compileFold<B[]>(self, [] as B[], async (acc, b: O) => { acc.push(b as any); return acc; });
         yield* arr;
       };
       // keep it simple: reuse map + compileFold where needed
@@ -92,11 +92,11 @@ export function streamFromPull<F extends Kind1, O>(runF: <X>(fx: Apply<F, [X]>) 
     // public interpreter: fold all outputs with an effect runner
     compile = {
       fold: async <B>(init: B, step: (b: B, o: O) => Promise<B>): Promise<B> =>
-        compileFold<O, F, B>(this, init, step)
+        compileFold<B>(this, init, step)
     };
   };
 
-  async function compileFold<O, F extends Kind1, B>(
+  async function compileFold<B>(
     s: any,
     init: B,
     step: (b: B, o: O) => Promise<B>

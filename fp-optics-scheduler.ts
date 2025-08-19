@@ -7,12 +7,17 @@ import { Bazaar } from './fp-bazaar-traversable-bridge';
 import { AsyncEffect } from './src/fp-stream-concurrent';
 import { Bracket } from './src/fp-resource';
 import {
-  Plan,
-  planOf,
+  makeParTraverseIf,
   optimizePlan,
-  compilePlanToStream,
-  runPlan
+  compilePlanToStream
 } from './fp-bazaar-planner';
+import type { GenericPlan } from './fp-bazaar-planner';
+
+// Stream compilation types
+type Foldable<B> = {
+  fold<X>(seed: X, step: (acc: X, b: B) => Promise<X> | X): Promise<X>;
+};
+type Compiled<B> = { compile: Foldable<B> };
 
 // ---------------------------------------------
 // Latency estimator (EMA)
@@ -58,33 +63,33 @@ export function scheduleOptic<A, B, S, T>(
   source: S,
   handlerAsync: (a: A) => Promise<B>,
   opts: SchedulerOpts = {}
-): Plan {
+): GenericPlan {
   const concurrency = clamp(
     opts.initialConcurrency ?? 4,
     opts.minConcurrency ?? 1,
     opts.maxConcurrency ?? 64
   );
-  const par: Plan = {
-    tag: 'ParTraverse',
-    baz: bazaar as any,
-    s: source as any,
-    kAsync: handlerAsync as any,
-    concurrency,
-    preserveOrder: !!opts.preserveOrder
-  };
-  const steps: Plan[] = [par];
-  if (opts.chunkSize && opts.chunkSize > 0) steps.push({ tag: 'Batch', size: opts.chunkSize });
-  return { tag: 'Seq', steps, ann: { cost: 1, canReorder: false } };
+  const par = makeParTraverseIf(
+    bazaar as any,
+    source as any,
+    async () => true,         // unconditional traverse (no filter)
+    handlerAsync,             // your worker
+    { concurrency, preserveOrder: !!opts.preserveOrder }
+  );
+  // For now, just return the ParTraverseIf plan directly
+  // Complex chunking/batching can be handled at the optimization layer
+  return par;
 }
 
-export function tunePlanWithLatency(plan: Plan, estimator: LatencyEstimator, opts: SchedulerOpts = {}): Plan {
-  // Attach coarse cost from EMA; then let optimizePlan flip Traverse->ParTraverse or add Batch
+export function tunePlanWithLatency(plan: GenericPlan, estimator: LatencyEstimator, opts: SchedulerOpts = {}): GenericPlan {
+  // Attach a coarse cost and let optimizePlan (no-op for now) decide later
   const ms = estimator.valueMs;
   const toCost = opts.latencyToCost ?? ((x: number) => x / 10); // 10ms -> cost 1
   const annCost = ms !== undefined ? toCost(ms) : 1;
-  const autoPar = { thresholdCost: 2, concurrency: clamp(opts.initialConcurrency ?? 4, opts.minConcurrency ?? 1, opts.maxConcurrency ?? 64), preserveOrder: !!opts.preserveOrder };
-  const autoChunk = typeof opts.chunkSize === 'number' ? opts.chunkSize : undefined;
-  return optimizePlan({ ...plan, ann: { ...(plan as any).ann, cost: annCost } }, { fuse: !!opts.fuse, autoPar, autoChunk });
+  return optimizePlan(
+    { ...(plan as any), ann: { ...(plan as any).ann, cost: annCost } },
+    { fuse: !!opts.fuse }
+  );
 }
 
 // ---------------------------------------------
@@ -103,8 +108,8 @@ export async function runScheduled<F extends Kind1, A, B, S, T>(
 ): Promise<B[]> {
   const base = scheduleOptic(bazaar, source, handlerAsync, opts);
   const tuned = tunePlanWithLatency(base, latencyEMA(), opts);
-  const stream = compilePlanToStream(runEffect, applicativeF, asyncF, bracket, tuned);
-  const out = await (stream as any).compile.fold<B[]>([], async (acc: B[], b: B) => { acc.push(b); return acc; });
+  const stream = compilePlanToStream(runEffect, applicativeF, asyncF, bracket, tuned) as Compiled<B>;
+  const out = await stream.compile.fold<B[]>([], async (acc: B[], b: B) => { acc.push(b); return acc; });
   return out;
 }
 

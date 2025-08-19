@@ -436,16 +436,24 @@ export type HasGuardedFallback<Handlers> =
   'otherwise' extends keyof Handlers ? true : false;
 
 /**
+ * Helper type for runtime exhaustiveness checking
+ */
+type IsHandlerExhaustive<H, Payload> = H extends GuardedPattern<Payload, any>[]
+  ? H extends never[] 
+    ? false 
+    : true
+  : H extends { patterns?: GuardedPattern<Payload, any>[]; fallback?: any }
+    ? H extends { patterns: never[]; fallback?: never } 
+      ? false 
+      : true
+    : true;
+
+/**
  * Utility type to check if a handler configuration might be non-exhaustive at runtime
  */
 export type IsRuntimeExhaustive<Tag extends string, Payload, Handlers> = {
   [K in Tag]: Handlers extends { [P in K]: infer H }
-    ? H extends GuardedPattern<Payload, any>[]
-      ? H extends never[] ? false : true
-      : H extends { patterns?: GuardedPattern<Payload, any>[]; fallback?: any }
-        ? H extends { patterns: never[]; fallback?: never } ? false : true
-        : true
-      : true
+    ? IsHandlerExhaustive<H, Payload>
     : false;
 };
 

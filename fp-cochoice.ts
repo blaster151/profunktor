@@ -5,7 +5,7 @@
 // Includes a lightweight law runner (naturality + extract coherence) and a
 // ready-to-use Reader instance (pinned environment variant).
 
-import { Kind1, Apply } from './fp-hkt';
+import { Kind1, Apply, Either } from './fp-hkt';
 
 // Minimal Comonad shape (aligned with your comonad elsewhere)
 export interface Comonad<W extends Kind1> {
@@ -15,7 +15,6 @@ export interface Comonad<W extends Kind1> {
 }
 
 // Either helpers (matching fp-hkt's shape: { left } | { right })
-export type Either<L, R> = { left: L } | { right: R };
 export const Left = <L, R = never>(left: L): Either<L, R> => ({ left });
 export const Right = <R, L = never>(right: R): Either<L, R> => ({ right });
 export const bimap = <L, R, L2, R2>(

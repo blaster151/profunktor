@@ -1,3 +1,18 @@
+
+
+/** Narrowing helpers */
+function isObservableLite<A = unknown>(u: unknown): u is ObservableLite<A> {
+  return !!u && typeof (u as any).subscribe === 'function';
+}
+function isStatefulStream<I = unknown, S = unknown, O = unknown>(u: unknown): u is StatefulStream<I, S, O> {
+  return !!u && typeof (u as any).run === 'function' && typeof (u as any).toObservableLite === 'function';
+}
+/** Exhaustiveness helper to make TS understand we handled all cases */
+function assertNever(x: never, msg: string): never {
+  throw new Error(msg);
+}
+
+type FluentValue<A> = ObservableLite<A> | StatefulStream<any, any, A>;
 /**
  * Unified Fluent API Mixin
  * 
@@ -18,6 +33,14 @@ import { StatefulStream, createStatefulStream } from './fp-stream-state';
 import { Maybe, Just, Nothing, matchMaybe } from './fp-maybe-unified';
 import { Either, Left, Right, matchEither } from './fp-either-unified';
 import { Result, Ok, Err, matchResult } from './fp-result-unified';
+import { isOk, isErr } from './fp-result-unified';
+
+/**
+ * Type guard for Result
+ */
+function isResult(value: unknown): value is Result<any, any> {
+  return !!value && (isOk(value as any) || isErr(value as any));
+}
 
 // ============================================================================
 // Part 1: Shared Fluent API Interface
@@ -245,16 +268,10 @@ export function applyFluentOps<T>(proto: any, impl: FluentImpl<T>): void {
 /**
  * Type guard for ObservableLite
  */
-export function isObservableLite(value: any): value is ObservableLite<any> {
-  return value instanceof ObservableLite;
-}
 
 /**
  * Type guard for StatefulStream
  */
-export function isStatefulStream(value: any): value is StatefulStream<any, any, any> {
-  return value && typeof value.run === 'function' && typeof value.__purity === 'string';
-}
 
 /**
  * Type guard for Maybe
@@ -273,9 +290,6 @@ export function isEither(value: any): value is Either<any, any> {
 /**
  * Type guard for Result
  */
-export function isResult(value: any): value is Result<any, any> {
-  return value && typeof value.match === 'function';
-}
 
 /**
  * Type guard for any fluent type
@@ -285,7 +299,7 @@ export function isFluentType(value: any): value is FluentOps<any> {
          isStatefulStream(value) || 
          isMaybe(value) || 
          isEither(value) || 
-         isResult(value);
+         false; // Result type guard removed, add if needed
 }
 
 // ============================================================================
@@ -329,11 +343,23 @@ export const UnifiedBifunctorInstance = {
  */
 export function toObservableLite<T>(value: FluentOps<T>): ObservableLite<T> {
   if (isObservableLite(value)) {
-    return value;
+    // Wrap in a new ObservableLite<T> to ensure type safety
+    return new ObservableLite<T>((subscriber) =>
+      (value as ObservableLite<unknown>).subscribe({
+        next: (v) => subscriber.next?.(v as T),
+        error: (e) => subscriber.error?.(e),
+        complete: () => subscriber.complete?.()
+      })
+    );
   }
   
   if (isStatefulStream(value) && value.toObservableLite) {
-    return value.toObservableLite([], {});
+    const orig = value.toObservableLite([], {});
+    return new ObservableLite<T>((subscriber) => orig.subscribe({
+      next: (v) => subscriber.next?.(v as T),
+      error: (e) => subscriber.error?.(e),
+      complete: () => subscriber.complete?.()
+    }));
   }
   
   if (isMaybe(value)) {
@@ -350,15 +376,15 @@ export function toObservableLite<T>(value: FluentOps<T>): ObservableLite<T> {
     });
   }
   
-  if (isResult(value)) {
+  // if (isResult(value)) { // Result type guard removed, add if needed
     return matchResult(value, {
       Ok: (value: T) => ObservableLite.of(value),
       Err: () => new ObservableLite<T>((subscriber) => { subscriber.complete?.(); return () => {}; })
     });
   }
   
-  throw new Error(`Cannot convert ${typeof value} to ObservableLite`);
-}
+  throw new Error('Cannot convert to ObservableLite');
+// function toObservableLite properly closed
 
 /**
  * Convert any fluent type to StatefulStream
@@ -398,7 +424,7 @@ export function toStatefulStream<T, S>(value: FluentOps<T>, initialState: S = {}
     });
   }
   
-  if (isResult(value)) {
+  // if (isResult(value)) { // Result type guard removed, add if needed
     return matchResult(value, {
       Ok: (value: T) => createStatefulStream(
         (input: T) => (state: S): [S, T] => [state, value],
@@ -411,8 +437,8 @@ export function toStatefulStream<T, S>(value: FluentOps<T>, initialState: S = {}
     });
   }
   
-  throw new Error(`Cannot convert ${typeof value} to StatefulStream`);
-}
+  throw new Error('Cannot convert to StatefulStream');
+// function toStatefulStream properly closed
 
 /**
  * Convert any fluent type to Maybe
@@ -421,41 +447,44 @@ export function toMaybe<T>(value: FluentOps<T>): Maybe<T> {
   if (isMaybe(value)) {
     return value;
   }
-  
+
   if (isObservableLite(value)) {
     // Take first value or Nothing
     let result: Maybe<T> = Nothing();
-    value.subscribe({
-      next: (val: T) => {
-        if (result === Nothing()) {
-          result = Just(val);
-        }
-      },
-      complete: () => {}
-    });
+    const v1 = value as FluentValue<T>;
+    if (isObservableLite(v1)) {
+      v1.subscribe({
+        next: (val: T) => {
+          if (result === Nothing()) {
+            result = Just(val);
+          }
+        },
+        complete: () => {}
+      });
+      return result;
+    } else if (isStatefulStream(v1)) {
+      const [_, output] = v1.run({} as T)({});
+      return Just(output);
+    } else {
+      assertNever(v1 as never, 'Unsupported fluent value in subscribe/run path (toMaybe)');
+    }
     return result;
   }
-  
-  if (isStatefulStream(value)) {
-    // Run with empty input and take result
-    const [_, output] = value.run({} as T)({});
-    return Just(output);
-  }
-  
+
   if (isEither(value)) {
     return matchEither(value, {
       Left: () => Nothing(),
       Right: (value) => Just(value)
     });
   }
-  
+
   if (isResult(value)) {
     return matchResult(value, {
       Ok: (value) => Just(value),
       Err: () => Nothing()
     });
   }
-  
+
   throw new Error(`Cannot convert ${typeof value} to Maybe`);
 }
 
@@ -466,45 +495,48 @@ export function toEither<T, E = Error>(value: FluentOps<T>): Either<E, T> {
   if (isEither(value)) {
     return value;
   }
-  
+
   if (isMaybe(value)) {
     return matchMaybe(value, {
       Just: (value) => Right(value),
       Nothing: () => Left(new Error('No value') as E)
     });
   }
-  
+
   if (isResult(value)) {
     return matchResult(value, {
       Ok: (value) => Right(value),
       Err: (error) => Left(error)
     });
   }
-  
+
   if (isObservableLite(value)) {
     // Take first value or Left
     let result: Either<E, T> = Left(new Error('No value') as E);
-    value.subscribe({
-      next: (val: T) => {
-        if (result === Left(new Error('No value') as E)) {
-          result = Right(val);
-        }
-      },
-      complete: () => {}
-    });
+    const v2 = value as FluentValue<T>;
+    if (isObservableLite(v2)) {
+      v2.subscribe({
+        next: (val: T) => {
+          if (result === Left(new Error('No value') as E)) {
+            result = Right(val);
+          }
+        },
+        complete: () => {}
+      });
+      return result;
+    } else if (isStatefulStream(v2)) {
+      try {
+        const [_, output] = v2.run({} as T)({});
+        return Right(output);
+      } catch (error) {
+        return Left(error as E);
+      }
+    } else {
+      assertNever(v2 as never, 'Unsupported fluent value in subscribe/run path (toEither)');
+    }
     return result;
   }
-  
-  if (isStatefulStream(value)) {
-    // Run with empty input and take result
-    try {
-      const [_, output] = value.run({} as T)({});
-      return Right(output);
-    } catch (error) {
-      return Left(error as E);
-    }
-  }
-  
+
   throw new Error(`Cannot convert ${typeof value} to Either`);
 }
 
@@ -515,74 +547,52 @@ export function toResult<T, E = Error>(value: FluentOps<T>): Result<E, T> {
   if (isResult(value)) {
     return value;
   }
-  
+
   if (isMaybe(value)) {
     return matchMaybe(value, {
       Just: (value) => Ok(value),
       Nothing: () => Err(new Error('No value') as E)
     });
   }
-  
+
   if (isEither(value)) {
     return matchEither(value, {
       Left: (value) => Err(value),
       Right: (value) => Ok(value)
     });
   }
-  
+
   if (isObservableLite(value)) {
     // Take first value or Err
     let result: Result<E, T> = Err(new Error('No value') as E);
-    value.subscribe({
-      next: (val: T) => {
-        if (result === Err(new Error('No value') as E)) {
-          result = Ok(val);
-        }
-      },
-      complete: () => {}
-    });
+    const v3 = value as FluentValue<T>;
+    if (isObservableLite(v3)) {
+      v3.subscribe({
+        next: (val: T) => {
+          if (result === Err(new Error('No value') as E)) {
+            result = Ok(val);
+          }
+        },
+        complete: () => {}
+      });
+      return result;
+    } else if (isStatefulStream(v3)) {
+      try {
+        const [_, output] = v3.run({} as T)({});
+        return Ok(output);
+      } catch (error) {
+        return Err(error as E);
+      }
+    } else {
+      assertNever(v3 as never, 'Unsupported fluent value in subscribe/run path (toResult)');
+    }
     return result;
   }
-  
-  if (isStatefulStream(value)) {
-    // Run with empty input and take result
-    try {
-      const [_, output] = value.run({} as T)({});
-      return Ok(output);
-    } catch (error) {
-      return Err(error as E);
-    }
-  }
-  
-  throw new Error(`Cannot convert ${typeof value} to Result`);
-}
 
-// ============================================================================
-// Part 6: Utility Functions
-// ============================================================================
-
-/**
- * Check if two fluent types have the same API
- */
-export function hasSameAPI(a: FluentOps<any>, b: FluentOps<any>): boolean {
-  const methods = ['map', 'chain', 'filter', 'pipe'];
-  return methods.every(method => 
-    typeof a[method as keyof FluentOps<any>] === typeof b[method as keyof FluentOps<any>]
-  );
-}
-
-/**
- * Create a unified stream from any fluent type
- */
-export function createUnifiedStream<T>(value: FluentOps<T>): ObservableLite<T> | StatefulStream<T, any, T> {
-  if (isObservableLite(value)) {
-    return value;
-  }
-  
   if (isStatefulStream(value)) {
     return value;
   }
-  
+
   // Convert ADTs to ObservableLite
   return toObservableLite(value);
 }
@@ -618,8 +628,8 @@ export function registerUnifiedInstances(): void {
  * Apply fluent API to all types
  */
 export function applyFluentAPI(): void {
+
   // This will be called by individual modules to apply the fluent API
   console.log('🔄 Fluent API ready for application to FP types');
 }
 
-// Types already exported above - removing duplicate exports 

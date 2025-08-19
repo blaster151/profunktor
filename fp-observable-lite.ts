@@ -1868,7 +1868,7 @@ export type ObservableLiteWithEffect<A> = ObservableLite<A> & { readonly __effec
 /**
  * Type alias for applying ObservableLiteK to type arguments
  */
-export type ApplyObservableLite<Args extends TypeArgs<any>> = Apply<ObservableLiteK, Args>;
+export type ApplyObservableLite<Args extends readonly unknown[]> = Apply<ObservableLiteK, Args>;
 
 /**
  * Type alias for ObservableLite of a specific type

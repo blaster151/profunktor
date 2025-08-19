@@ -4,7 +4,7 @@
 //
 // Works with your existing Functor, Kind1, Apply and Free/Cofree modules.
 
-import { Kind1, Apply } from '../../fp-hkt';
+import { Kind1, Apply } from 'fp-hkt';
 
 // Minimal Functor (local) to keep this file self-contained
 export interface Functor<F extends Kind1> {

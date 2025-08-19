@@ -193,15 +193,17 @@ export function markDoMResult<F extends Kind1, A, E extends EffectTag>(
   value: Apply<F, [A]>,
   effect: E
 ): MonadicValue<F, A, E> {
-  return attachPurityMarker(value, effect) as MonadicValue<F, A, E>;
+  const marked = attachPurityMarker(value as object, effect);
+  return marked as MonadicValue<F, A, E>;
 }
 
 /**
  * Infer effect from monadic value
  */
 export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag {
-  if (hasPurityMarker(value)) {
-    return extractPurityMarker(value).effect;
+  const valueObj = value as object;
+  if (hasPurityMarker(valueObj)) {
+    return extractPurityMarker(valueObj).effect;
   }
   
   // Default effect inference based on type

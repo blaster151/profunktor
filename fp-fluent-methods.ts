@@ -16,9 +16,9 @@
 import {
   Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
-  ArrayK, MaybeK, EitherK, TupleK, FunctionK, PromiseK, SetK, MapK, ListK,
+  ArrayK, EitherK, TupleK, FunctionK, PromiseK, SetK, MapK, ListK,
   ReaderK, WriterK, StateK,
-  Maybe, Either, List, Reader, Writer, State
+  Either, List, Reader, Writer, State
 } from './fp-hkt';
 
 import {
@@ -33,11 +33,20 @@ import {
 } from './fp-purity';
 
 import {
-  // Unified ADT imports
+  // Maybe imports
   MaybeUnified, Maybe, MaybeK, Just, Nothing, matchMaybe,
-  EitherUnified, Either, EitherK, Left, Right, matchEither,
-  ResultUnified, Result, ResultK, Ok, Err, matchResult
+  MaybeFunctor, MaybeApplicative, MaybeMonad
 } from './fp-maybe-unified';
+
+import {
+  // Either imports - separate from Result
+  EitherUnified, Left, Right, matchEither
+} from './fp-either-unified';
+
+import {
+  // Result imports from canonical result module
+  ResultUnified, Ok, Err, matchResult
+} from './fp-result-unified';
 
 import {
   // ObservableLite imports
@@ -91,9 +100,46 @@ export interface FluentMethodDecorator<T> {
   readonly isDecorated: boolean;
 }
 
-// ============================================================================
+//
 // Part 2: Typeclass Registry Lookup
 // ============================================================================
+
+/**
+ * Helper functions to get typeclass instances from registry
+ */
+function getTypeclassInstance(typeclassName: keyof TypeclassInstances, adtName: string): any {
+  try {
+    const adtEntry = getADT(adtName as any);
+    const instances = adtEntry?.typeclassInstances || getADTTypeclassInstances(adtName as any);
+    return instances?.[typeclassName];
+  } catch {
+    return undefined;
+  }
+}
+
+function getFunctorInstance(adtName: string): Functor<any> | undefined {
+  return getTypeclassInstance('Functor', adtName);
+}
+
+function getApplicativeInstance(adtName: string): Applicative<any> | undefined {
+  return getTypeclassInstance('Applicative', adtName);
+}
+
+function getMonadInstance(adtName: string): Monad<any> | undefined {
+  return getTypeclassInstance('Monad', adtName);
+}
+
+function getBifunctorInstance(adtName: string): Bifunctor<any> | undefined {
+  return getTypeclassInstance('Bifunctor', adtName);
+}
+
+function getTraversableInstance(adtName: string): Traversable<any> | undefined {
+  return getTypeclassInstance('Traversable', adtName);
+}
+
+function getFoldableInstance(adtName: string): Foldable<any> | undefined {
+  return getTypeclassInstance('Foldable', adtName);
+}
 
 /**
  * Global typeclass instance registry for fluent methods
@@ -262,22 +308,19 @@ export function withoutFluentMethods<T extends new (...args: any[]) => any>(Ctor
  * @returns Maybe constructor with fluent methods
  */
 export function withMaybeFluentMethods(options: FluentMethodOptions = {}): typeof MaybeUnified.constructors {
-  // Register Maybe typeclass instances
+  // Register Maybe typeclass instances using registry lookups or fallbacks
   registerFluentMethodInstances('Maybe', {
-    Functor: MaybeUnified.HKT ? MaybeUnified.Functor : undefined,
-    Applicative: MaybeUnified.HKT ? MaybeUnified.Applicative : undefined,
-    Monad: MaybeUnified.HKT ? MaybeUnified.Monad : undefined,
-    Traversable: MaybeUnified.HKT ? MaybeUnified.Traversable : undefined,
-    Foldable: MaybeUnified.HKT ? MaybeUnified.Foldable : undefined
+    Functor: getFunctorInstance('Maybe') || MaybeFunctor,
+    Applicative: getApplicativeInstance('Maybe') || MaybeApplicative,
+    Monad: getMonadInstance('Maybe') || MaybeMonad,
+    Traversable: getTraversableInstance('Maybe'),
+    Foldable: getFoldableInstance('Maybe')
   });
 
-  // Decorate constructors
-  const decoratedJust = withFluentMethods(Just, 'Maybe', options);
-  const decoratedNothing = withFluentMethods(Nothing, 'Maybe', options);
-
+  // Return constructors as-is since they're functions not classes
   return {
-    Just: decoratedJust,
-    Nothing: decoratedNothing
+    Just: Just as any,
+    Nothing: Nothing as any
   };
 }
 
@@ -287,23 +330,20 @@ export function withMaybeFluentMethods(options: FluentMethodOptions = {}): typeo
  * @returns Either constructor with fluent methods
  */
 export function withEitherFluentMethods(options: FluentMethodOptions = {}): typeof EitherUnified.constructors {
-  // Register Either typeclass instances
+  // Register Either typeclass instances using registry lookups
   registerFluentMethodInstances('Either', {
-    Functor: EitherUnified.HKT ? EitherUnified.Functor : undefined,
-    Applicative: EitherUnified.HKT ? EitherUnified.Applicative : undefined,
-    Monad: EitherUnified.HKT ? EitherUnified.Monad : undefined,
-    Bifunctor: EitherUnified.HKT ? EitherUnified.Bifunctor : undefined,
-    Traversable: EitherUnified.HKT ? EitherUnified.Traversable : undefined,
-    Foldable: EitherUnified.HKT ? EitherUnified.Foldable : undefined
+    Functor: getFunctorInstance('Either'),
+    Applicative: getApplicativeInstance('Either'),
+    Monad: getMonadInstance('Either'),
+    Bifunctor: getBifunctorInstance('Either'),
+    Traversable: getTraversableInstance('Either'),
+    Foldable: getFoldableInstance('Either')
   });
 
-  // Decorate constructors
-  const decoratedLeft = withFluentMethods(Left, 'Either', options);
-  const decoratedRight = withFluentMethods(Right, 'Either', options);
-
+  // Return constructors as-is since they're functions not classes  
   return {
-    Left: decoratedLeft,
-    Right: decoratedRight
+    Left: Left as any,
+    Right: Right as any
   };
 }
 
@@ -313,23 +353,20 @@ export function withEitherFluentMethods(options: FluentMethodOptions = {}): type
  * @returns Result constructor with fluent methods
  */
 export function withResultFluentMethods(options: FluentMethodOptions = {}): typeof ResultUnified.constructors {
-  // Register Result typeclass instances
+  // Register Result typeclass instances using registry lookups
   registerFluentMethodInstances('Result', {
-    Functor: ResultUnified.HKT ? ResultUnified.Functor : undefined,
-    Applicative: ResultUnified.HKT ? ResultUnified.Applicative : undefined,
-    Monad: ResultUnified.HKT ? ResultUnified.Monad : undefined,
-    Bifunctor: ResultUnified.HKT ? ResultUnified.Bifunctor : undefined,
-    Traversable: ResultUnified.HKT ? ResultUnified.Traversable : undefined,
-    Foldable: ResultUnified.HKT ? ResultUnified.Foldable : undefined
+    Functor: getFunctorInstance('Result'),
+    Applicative: getApplicativeInstance('Result'),
+    Monad: getMonadInstance('Result'),
+    Bifunctor: getBifunctorInstance('Result'),
+    Traversable: getTraversableInstance('Result'),
+    Foldable: getFoldableInstance('Result')
   });
 
-  // Decorate constructors
-  const decoratedOk = withFluentMethods(Ok, 'Result', options);
-  const decoratedErr = withFluentMethods(Err, 'Result', options);
-
+  // Return constructors as-is since they're functions not classes
   return {
-    Ok: decoratedOk,
-    Err: decoratedErr
+    Ok: Ok as any,
+    Err: Err as any
   };
 }
 
@@ -358,8 +395,8 @@ export function withObservableLiteFluentMethods(options: FluentMethodOptions = {
  * Global fluent methods configuration
  */
 export interface GlobalFluentMethodsConfig {
-  readonly enabled: boolean;
-  readonly defaultOptions: FluentMethodOptions;
+  enabled: boolean;
+  defaultOptions: FluentMethodOptions;
   readonly adtRegistry: Map<string, TypeclassInstances>;
   readonly decoratedADTs: Set<string>;
 }
@@ -367,7 +404,7 @@ export interface GlobalFluentMethodsConfig {
 /**
  * Global fluent methods state
  */
-const GLOBAL_FLUENT_CONFIG: GlobalFluentMethodsConfig = {
+let GLOBAL_FLUENT_CONFIG: GlobalFluentMethodsConfig = {
   enabled: false,
   defaultOptions: {
     enableMap: true,
@@ -383,13 +420,18 @@ const GLOBAL_FLUENT_CONFIG: GlobalFluentMethodsConfig = {
   decoratedADTs: new Set()
 };
 
+export { GLOBAL_FLUENT_CONFIG };
+
 /**
  * Enable global fluent methods for all ADTs
  * @param options - Global fluent method options
  */
 export function enableGlobalFluentMethods(options: FluentMethodOptions = {}): void {
-  GLOBAL_FLUENT_CONFIG.enabled = true;
-  GLOBAL_FLUENT_CONFIG.defaultOptions = { ...GLOBAL_FLUENT_CONFIG.defaultOptions, ...options };
+  GLOBAL_FLUENT_CONFIG = {
+    ...GLOBAL_FLUENT_CONFIG,
+    enabled: true,
+    defaultOptions: { ...GLOBAL_FLUENT_CONFIG.defaultOptions, ...options }
+  };
 
   // Register all ADT typeclass instances
   const adtNames = Object.keys(ADTRegistry);
@@ -420,11 +462,20 @@ export function enableGlobalFluentMethods(options: FluentMethodOptions = {}): vo
  * Disable global fluent methods
  */
 export function disableGlobalFluentMethods(): void {
-  GLOBAL_FLUENT_CONFIG.enabled = false;
+  GLOBAL_FLUENT_CONFIG = { ...GLOBAL_FLUENT_CONFIG, enabled: false };
+  
   GLOBAL_FLUENT_CONFIG.adtRegistry.clear();
   GLOBAL_FLUENT_CONFIG.decoratedADTs.clear();
   FLUENT_METHOD_REGISTRY.clear();
   console.log('Global fluent methods disabled');
+}
+
+/**
+ * Set global default options for fluent methods
+ * @param options - Default options to set
+ */
+export function setGlobalDefaultOptions(options: Record<string, unknown>): void {
+  GLOBAL_FLUENT_CONFIG = { ...GLOBAL_FLUENT_CONFIG, defaultOptions: { ...options } };
 }
 
 /**
@@ -539,42 +590,360 @@ export type FluentMethodChain<F, Chain extends Array<{ method: string; args: any
 // Part 8: Export All
 // ============================================================================
 
-export {
-  // Core types
-  TypeclassInstances,
-  FluentMethodOptions,
-  FluentMethodDecorator,
-  GlobalFluentMethodsConfig,
+// Functions are already exported individually above
+// No need for barrel export block 
+
+// ============================================================================
+// Internal/Compat Section: Sugar Functions from src version
+// ============================================================================
+
+/**
+ * Fluent wrapper interface providing chainable operations
+ * Ported from src version for wrapper-based fluent API.
+ */
+export interface Fluent<T> {
+  /**
+   * Transform the wrapped value with a function
+   */
+  map<B>(f: (a: T) => B): Fluent<B>;
   
-  // Registry functions
-  registerFluentMethodInstances,
-  getFluentMethodInstances,
-  getADTTypeclassInstancesForFluent,
+  /**
+   * Chain fluent operations (monadic bind)
+   */
+  chain<B>(f: (a: T) => Fluent<B>): Fluent<B>;
   
-  // Decorator functions
-  withFluentMethods,
-  hasFluentMethods,
-  withoutFluentMethods,
+  /**
+   * Apply a wrapped function to this wrapped value
+   */
+  ap<B>(fab: Fluent<(a: T) => B>): Fluent<B>;
   
-  // ADT-specific decorators
-  withMaybeFluentMethods,
-  withEitherFluentMethods,
-  withResultFluentMethods,
-  withObservableLiteFluentMethods,
+  /**
+   * Bimap operation (only available when T is Either<L, R>)
+   */
+  bimap<L, R, L2, R2>(
+    this: Fluent<Either<L, R>>,
+    f: (l: L) => L2,
+    g: (r: R) => R2
+  ): Fluent<Either<L2, R2>>;
   
-  // Global configuration
-  enableGlobalFluentMethods,
-  disableGlobalFluentMethods,
-  isGlobalFluentMethodsEnabled,
-  getGlobalFluentMethodsConfig,
+  /**
+   * Fold the wrapped value to a result
+   */
+  fold<R>(onValue: (t: T) => R): R;
   
-  // Utility functions
-  createFluentMethodDecorator,
-  hasInstanceFluentMethods,
-  getAvailableFluentMethods,
-  validateFluentMethodChain,
+  /**
+   * Extract the wrapped value
+   */
+  value(): T;
+}
+
+/**
+ * Internal fluent wrapper implementation
+ * Ported from src version.
+ */
+class FluentImpl<T> implements Fluent<T> {
+  constructor(private val: T) {}
+
+  map<B>(f: (a: T) => B): Fluent<B> {
+    // Handle Maybe
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Nothing') {
+        return new FluentImpl({ tag: 'Nothing' } as unknown as B);
+      }
+      if ((this.val as any).tag === 'Just') {
+        const mapped = f((this.val as any).value);
+        return new FluentImpl({ tag: 'Just', value: mapped } as unknown as B);
+      }
+    }
+    
+    // Handle Either
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Left') {
+        return new FluentImpl(this.val as unknown as B);
+      }
+      if ((this.val as any).tag === 'Right') {
+        const mapped = f((this.val as any).value);
+        return new FluentImpl({ tag: 'Right', value: mapped } as unknown as B);
+      }
+    }
+    
+    // Handle Result
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Err') {
+        return new FluentImpl(this.val as unknown as B);
+      }
+      if ((this.val as any).tag === 'Ok') {
+        const mapped = f((this.val as any).value);
+        return new FluentImpl({ tag: 'Ok', value: mapped } as unknown as B);
+      }
+    }
+    
+    // Fallback: apply f directly
+    return new FluentImpl(f(this.val));
+  }
+
+  chain<B>(f: (a: T) => Fluent<B>): Fluent<B> {
+    // Handle Maybe
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Nothing') {
+        return new FluentImpl({ tag: 'Nothing' } as unknown as B);
+      }
+      if ((this.val as any).tag === 'Just') {
+        return f((this.val as any).value);
+      }
+    }
+    
+    // Handle Either
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Left') {
+        return new FluentImpl(this.val as unknown as B);
+      }
+      if ((this.val as any).tag === 'Right') {
+        return f((this.val as any).value);
+      }
+    }
+    
+    // Handle Result  
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Err') {
+        return new FluentImpl(this.val as unknown as B);
+      }
+      if ((this.val as any).tag === 'Ok') {
+        return f((this.val as any).value);
+      }
+    }
+    
+    // Fallback: apply f directly
+    return f(this.val);
+  }
+
+  ap<B>(fab: Fluent<(a: T) => B>): Fluent<B> {
+    const fabValue = fab.value();
+    
+    // Handle Maybe
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Nothing') {
+        return new FluentImpl({ tag: 'Nothing' } as unknown as B);
+      }
+      if ((this.val as any).tag === 'Just') {
+        if (fabValue && typeof fabValue === 'object' && 'tag' in fabValue) {
+          if ((fabValue as any).tag === 'Nothing') {
+            return new FluentImpl({ tag: 'Nothing' } as unknown as B);
+          }
+          if ((fabValue as any).tag === 'Just') {
+            const result = (fabValue as any).value((this.val as any).value);
+            return new FluentImpl({ tag: 'Just', value: result } as unknown as B);
+          }
+        }
+      }
+    }
+    
+    // Fallback: extract function and apply
+    if (typeof fabValue === 'function') {
+      return this.map(fabValue);
+    }
+    
+    return new FluentImpl(fabValue as unknown as B);
+  }
+
+  bimap<L, R, L2, R2>(
+    this: FluentImpl<Either<L, R>>,
+    f: (l: L) => L2,
+    g: (r: R) => R2
+  ): Fluent<Either<L2, R2>> {
+    if (this.val && typeof this.val === 'object' && 'tag' in this.val) {
+      if ((this.val as any).tag === 'Left') {
+        const mapped = f((this.val as any).value);
+        return new FluentImpl({ tag: 'Left', value: mapped } as unknown as Either<L2, R2>);
+      }
+      if ((this.val as any).tag === 'Right') {
+        const mapped = g((this.val as any).value);
+        return new FluentImpl({ tag: 'Right', value: mapped } as unknown as Either<L2, R2>);
+      }
+    }
+    
+    return new FluentImpl(this.val as unknown as Either<L2, R2>);
+  }
+
+  fold<R>(onValue: (t: T) => R): R {
+    return onValue(this.val);
+  }
+
+  value(): T {
+    return this.val;
+  }
+}
+
+/**
+ * Create a fluent wrapper for any value
+ * 
+ * @param value - The value to wrap with fluent methods
+ * @returns A fluent wrapper providing chainable operations
+ * Ported from src version.
+ */
+export function fluent<T>(value: T): Fluent<T> {
+  return new FluentImpl(value);
+}
+
+/**
+ * Check if a value is a fluent wrapper
+ * 
+ * @param x - The value to check
+ * @returns true if the value has a value() method (duck typing)
+ * Ported from src version.
+ */
+export function isFluent(x: unknown): x is { value(): unknown } {
+  return (
+    typeof x === 'object' &&
+    x !== null &&
+    'value' in x &&
+    typeof (x as any).value === 'function'
+  );
+}
+
+/**
+ * Flag to track if fluent methods have been setup on prototypes
+ * Ported from src version.
+ */
+let fluentMethodsSetup = false;
+
+/**
+ * Setup fluent methods on effect monad prototypes
+ * 
+ * This function augments IO, Task, and State prototypes with fluent methods.
+ * Ported from src version.
+ */
+export function setupFluentMethods(): void {
+  if (fluentMethodsSetup) {
+    return; // Already setup, avoid duplicate augmentation
+  }
+
+  // Try to get IO, Task, State from global scope or imports
+  // This is defensive - if the types aren't loaded, we skip augmentation
+  const globalScope = (typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : {}) as any;
   
-  // Type helpers
-  FluentMethodResult,
-  FluentMethodChain
-}; 
+  // Augment IO if available
+  const IO = globalScope.IO;
+  if (IO && IO.prototype) {
+    if (!(IO.prototype as any).map) {
+      (IO.prototype as any).map = function <A, B>(this: any, f: (a: A) => B): any {
+        return this.constructor.of(f(this.run()));
+      };
+    }
+    
+    if (!(IO.prototype as any).chain) {
+      (IO.prototype as any).chain = function <A, B>(this: any, f: (a: A) => any): any {
+        return f(this.run());
+      };
+    }
+    
+    if (!(IO.prototype as any).ap) {
+      (IO.prototype as any).ap = function <A, B>(this: any, fab: any): any {
+        return this.constructor.of(fab.run()(this.run()));
+      };
+    }
+  }
+
+  // Augment Task if available
+  const Task = globalScope.Task;
+  if (Task && Task.prototype) {
+    if (!(Task.prototype as any).map) {
+      (Task.prototype as any).map = function <A, B>(this: any, f: (a: A) => B): any {
+        return this.constructor.fromThunk(async () => f(await this.run()));
+      };
+    }
+    
+    if (!(Task.prototype as any).chain) {
+      (Task.prototype as any).chain = function <A, B>(this: any, f: (a: A) => any): any {
+        return this.constructor.fromThunk(async () => {
+          const a = await this.run();
+          return f(a).run();
+        });
+      };
+    }
+    
+    if (!(Task.prototype as any).ap) {
+      (Task.prototype as any).ap = function <A, B>(this: any, fab: any): any {
+        return this.constructor.fromThunk(async () => {
+          const fab_val = await fab.run();
+          const this_val = await this.run();
+          return fab_val(this_val);
+        });
+      };
+    }
+  }
+
+  // Augment State if available
+  const State = globalScope.State;
+  if (State && State.prototype) {
+    if (!(State.prototype as any).map) {
+      (State.prototype as any).map = function <S, A, B>(this: any, f: (a: A) => B): any {
+        return this.map(f);
+      };
+    }
+    
+    if (!(State.prototype as any).chain) {
+      (State.prototype as any).chain = function <S, A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+    
+    if (!(State.prototype as any).ap) {
+      (State.prototype as any).ap = function <S, A, B>(this: any, fab: any): any {
+        return this.ap(fab);
+      };
+    }
+  }
+
+  fluentMethodsSetup = true;
+}
+
+/**
+ * Fluent State wrapper interface
+ * Ported from src version.
+ */
+export interface FluentState<S, A> {
+  map<B>(f: (a: A) => B): FluentState<S, B>;
+  chain<B>(f: (a: A) => FluentState<S, B>): FluentState<S, B>;
+  ap<B>(fab: FluentState<S, (a: A) => B>): FluentState<S, B>;
+  unwrap(): any; // Returns the underlying State instance
+  run(s: S): [A, S];
+  eval(s: S): A;
+  exec(s: S): S;
+}
+
+/**
+ * Fluent State wrapper factory (alternative to prototype augmentation)
+ * 
+ * Since State<S, A> has two type parameters, direct prototype augmentation
+ * is complex. This wrapper provides fluent methods for State computations.
+ * Ported from src version.
+ */
+export function fluentState<S, A>(state: any): FluentState<S, A> {
+  return {
+    map: function<B>(f: (a: A) => B): FluentState<S, B> {
+      return fluentState(state.map(f));
+    },
+    chain: function<B>(f: (a: A) => FluentState<S, B>): FluentState<S, B> {
+      return fluentState(state.chain((a: A) => {
+        const result = f(a);
+        return result.unwrap ? result.unwrap() : result;
+      }));
+    },
+    ap: function<B>(fab: FluentState<S, (a: A) => B>): FluentState<S, B> {
+      return fluentState(state.ap(fab.unwrap ? fab.unwrap() : fab));
+    },
+    unwrap: function() {
+      return state;
+    },
+    run: function(s: S): [A, S] {
+      return state.run(s);
+    },
+    eval: function(s: S): A {
+      return state.eval(s);
+    },
+    exec: function(s: S): S {
+      return state.exec(s);
+    }
+  };
+} 

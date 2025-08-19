@@ -42,12 +42,12 @@ export const listToMaybe: Natural<PersistentListK, MaybeK> =
   };
 
 // ---------------------- List ↔ Either (Right-biased)
-export const eitherToList: Natural<EitherK, PersistentListK> =
-  <A>(fa: Apply<EitherK,[unknown, A]>) => {
-    const e = fa as { left: unknown } | { right: A };
+export const eitherToList: Natural2to1<EitherK, PersistentListK> =
+  <L, A>(fa: Apply<EitherK, [L, A]>) => {
+    const e = fa as { left: L } | { right: A };
     return 'right' in e
-      ? PersistentList.of(e.right) as Apply<PersistentListK,[A]>
-      : PersistentList.empty<A>() as Apply<PersistentListK,[A]>;
+      ? PersistentList.of(e.right) as Apply<PersistentListK, [A]>
+      : PersistentList.empty<A>() as Apply<PersistentListK, [A]>;
   };
 
 // ---------------------- Set ↔ Array/Maybe/Either
@@ -69,12 +69,12 @@ export const maybeToSet: Natural<MaybeK, PersistentSetK> =
       : PersistentSet.empty<A>() as Apply<PersistentSetK,[A]>;
   };
 
-export const eitherToSet: Natural<EitherK, PersistentSetK> =
-  <A>(fa: Apply<EitherK,[unknown, A]>) => {
-    const e = fa as { left: unknown } | { right: A };
+export const eitherToSet: Natural2to1<EitherK, PersistentSetK> =
+  <L, A>(fa: Apply<EitherK, [L, A]>) => {
+    const e = fa as { left: L } | { right: A };
     return 'right' in e
-      ? PersistentSet.fromArray([e.right]) as Apply<PersistentSetK,[A]>
-      : PersistentSet.empty<A>() as Apply<PersistentSetK,[A]>;
+      ? PersistentSet.fromArray([e.right]) as Apply<PersistentSetK, [A]>
+      : PersistentSet.empty<A>() as Apply<PersistentSetK, [A]>;
   };
 
 // ---------------------- Map ↔ Array<[K,V]>

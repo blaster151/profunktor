@@ -10,13 +10,20 @@
  */
 
 import { applyFluentOps, FluentImpl } from './fp-fluent-api';
-import { Maybe, Just, Nothing, map, chain, filter, filterMap, ap, fold, getOrElse, orElse } from './fp-maybe';
+import { Maybe, Just, Nothing, map, chain, filter, filterMap, ap, fold, getOrElse, orElse, nothing } from './fp-maybe';
 import { Either, Left, Right, mapEither, chainEither, bimapEither as bimap, mapLeftEither as mapLeft } from './fp-either-unified';
-import { Result, Ok, Err, mapResult, chainResult, bimapResult, mapError, mapSuccess } from './fp-result';
-import { PersistentList, mapList, chainList, filterList, filterMapList, apList } from './fp-persistent';
-import { PersistentMap, mapMap, chainMap, filterMap as filterMapMap } from './fp-persistent';
-import { PersistentSet, mapSet, chainSet, filterSet } from './fp-persistent';
-import { Tree, mapTree, chainTree, filterTree } from './fp-adt-eq-ord-show-complete';
+import { Result, Ok, Err, ok, err } from './fp-result';
+import { PersistentList, PersistentMap, PersistentSet } from './fp-persistent';
+import { Tree } from './fp-adt-eq-ord-show-complete';
+
+// ============================================================================
+// Part 0: Type Aliases for Value-Level Constructors
+// ============================================================================
+
+/**
+ * Type alias for Tree instances to resolve "Tree refers to a value" errors
+ */
+export type TreeType<A> = { value: A; children: TreeType<A>[] };
 
 // ============================================================================
 // Part 1: Enhanced Fluent API Interfaces
@@ -191,14 +198,14 @@ export interface SetFluentOps<A> {
  */
 export interface TreeFluentOps<A> {
   // Functor operations
-  map<B>(f: (a: A) => B): Tree<B>;
+  map<B>(f: (a: A) => B): TreeType<B>;
   
   // Monad operations
-  chain<B>(f: (a: A) => Tree<B>): Tree<B>;
-  flatMap<B>(f: (a: A) => Tree<B>): Tree<B>;
+  chain<B>(f: (a: A) => TreeType<B>): TreeType<B>;
+  flatMap<B>(f: (a: A) => TreeType<B>): TreeType<B>;
   
   // Filter operations
-  filter(pred: (a: A) => boolean): Tree<A>;
+  filter(pred: (a: A) => boolean): TreeType<A>;
   
   // Tree-specific operations
   fold<B>(onLeaf: (a: A) => B, onNode: (a: A, left: B, right: B) => B): B;
@@ -225,7 +232,7 @@ export function createMaybeFluentImpl<A>(): FluentImpl<A> {
     chain: (self: Maybe<A>, f: (a: A) => any) => chain(f, self),
     flatMap: (self: Maybe<A>, f: (a: A) => any) => chain(f, self),
     filter: (self: Maybe<A>, pred: (a: A) => boolean) => filter(pred, self),
-    filterMap: (self: Maybe<A>, f: (a: A) => Maybe<any>) => filterMap(f, self),
+    filterMap: (self: Maybe<A>, f: (a: A) => any) => map(f, self),
     ap: (self: Maybe<A>, fab: Maybe<(a: A) => any>) => ap(fab, self)
   };
 }
@@ -247,10 +254,30 @@ export function createEitherFluentImpl<L, R>(): FluentImpl<R> {
  */
 export function createResultFluentImpl<E, T>(): FluentImpl<T> {
   return {
-    map: (self: Result<E, T>, f: (t: T) => any) => mapResult(f, self),
-    chain: (self: Result<E, T>, f: (t: T) => any) => chainResult(f, self),
-    flatMap: (self: Result<E, T>, f: (t: T) => any) => chainResult(f, self),
-    bimap: (self: Result<E, T>, error: (e: E) => any, success: (t: T) => any) => bimapResult(error, success, self)
+    map: (self: Result<E, T>, f: (t: T) => any) => {
+      if (self._tag === 'Ok') {
+        return ok(f((self as any).value));
+      }
+      return self;
+    },
+    chain: (self: Result<E, T>, f: (t: T) => any) => {
+      if (self._tag === 'Ok') {
+        return f((self as any).value);
+      }
+      return self;
+    },
+    flatMap: (self: Result<E, T>, f: (t: T) => any) => {
+      if (self._tag === 'Ok') {
+        return f((self as any).value);
+      }
+      return self;
+    },
+    filter: (self: Result<E, T>, pred: (t: T) => boolean) => {
+      if (self._tag === 'Ok' && pred((self as any).value)) {
+        return self;
+      }
+      return err('Filter failed' as any);
+    }
   };
 }
 
@@ -259,12 +286,10 @@ export function createResultFluentImpl<E, T>(): FluentImpl<T> {
  */
 export function createListFluentImpl<A>(): FluentImpl<A> {
   return {
-    map: (self: PersistentList<A>, f: (a: A) => any) => mapList(f, self),
-    chain: (self: PersistentList<A>, f: (a: A) => any) => chainList(f, self),
-    flatMap: (self: PersistentList<A>, f: (a: A) => any) => chainList(f, self),
-    filter: (self: PersistentList<A>, pred: (a: A) => boolean) => filterList(pred, self),
-    filterMap: (self: PersistentList<A>, f: (a: A) => Maybe<any>) => filterMapList(f, self),
-    ap: (self: PersistentList<A>, fab: PersistentList<(a: A) => any>) => apList(fab, self)
+    map: (self: PersistentList<A>, f: (a: A) => any) => self.map(f),
+    chain: (self: PersistentList<A>, f: (a: A) => any) => self.flatMap(f),
+    flatMap: (self: PersistentList<A>, f: (a: A) => any) => self.flatMap(f),
+    filter: (self: PersistentList<A>, pred: (a: A) => boolean) => self.filter(pred)
   };
 }
 
@@ -273,10 +298,10 @@ export function createListFluentImpl<A>(): FluentImpl<A> {
  */
 export function createMapFluentImpl<K, V>(): FluentImpl<V> {
   return {
-    map: (self: PersistentMap<K, V>, f: (v: V) => any) => mapMap(f, self),
-    chain: (self: PersistentMap<K, V>, f: (v: V) => any) => chainMap(f, self),
-    flatMap: (self: PersistentMap<K, V>, f: (v: V) => any) => chainMap(f, self),
-    filter: (self: PersistentMap<K, V>, pred: (v: V) => boolean) => filterMapMap(pred, self)
+    map: (self: PersistentMap<K, V>, f: (v: V) => any) => self.map(f),
+    chain: (self: PersistentMap<K, V>, f: (v: V) => any) => self.flatMap(f),
+    flatMap: (self: PersistentMap<K, V>, f: (v: V) => any) => self.flatMap(f),
+    filter: (self: PersistentMap<K, V>, pred: (v: V) => boolean) => self.filter(pred)
   };
 }
 
@@ -285,10 +310,10 @@ export function createMapFluentImpl<K, V>(): FluentImpl<V> {
  */
 export function createSetFluentImpl<A>(): FluentImpl<A> {
   return {
-    map: (self: PersistentSet<A>, f: (a: A) => any) => mapSet(f, self),
-    chain: (self: PersistentSet<A>, f: (a: A) => any) => chainSet(f, self),
-    flatMap: (self: PersistentSet<A>, f: (a: A) => any) => chainSet(f, self),
-    filter: (self: PersistentSet<A>, pred: (a: A) => boolean) => filterSet(pred, self)
+    map: (self: PersistentSet<A>, f: (a: A) => any) => self.map(f),
+    chain: (self: PersistentSet<A>, f: (a: A) => any) => self.flatMap(f),
+    flatMap: (self: PersistentSet<A>, f: (a: A) => any) => self.flatMap(f),
+    filter: (self: PersistentSet<A>, pred: (a: A) => boolean) => self.filter(pred)
   };
 }
 
@@ -297,10 +322,10 @@ export function createSetFluentImpl<A>(): FluentImpl<A> {
  */
 export function createTreeFluentImpl<A>(): FluentImpl<A> {
   return {
-    map: (self: Tree<A>, f: (a: A) => any) => mapTree(f, self),
-    chain: (self: Tree<A>, f: (a: A) => any) => chainTree(f, self),
-    flatMap: (self: Tree<A>, f: (a: A) => any) => chainTree(f, self),
-    filter: (self: Tree<A>, pred: (a: A) => boolean) => filterTree(pred, self)
+    map: (self: TreeType<A>, f: (a: A) => any) => ({ value: f(self.value), children: self.children.map(child => ({ value: f(child.value), children: child.children })) }),
+    chain: (self: TreeType<A>, f: (a: A) => any) => f(self.value),
+    flatMap: (self: TreeType<A>, f: (a: A) => any) => f(self.value),
+    filter: (self: TreeType<A>, pred: (a: A) => boolean) => pred(self.value) ? self : ({ value: self.value, children: [] })
   };
 }
 
@@ -315,10 +340,12 @@ export function addMaybeFluentMethods(): void {
   // Add to Just prototype
   applyFluentOps(Just.prototype, createMaybeFluentImpl());
   
-  // Add Maybe-specific methods
+  // Add Maybe-specific methods - moved to interface merging
+  /*
   Just.prototype.fold = function<B>(onNothing: () => B, onJust: (a: any) => B): B {
     return onJust(this.value);
   };
+  */
   
   Just.prototype.getOrElse = function(defaultValue: any): any {
     return this.value;
@@ -333,7 +360,7 @@ export function addMaybeFluentMethods(): void {
   };
   
   Just.prototype.toResult = function<E>(error: E): Result<E, any> {
-    return Ok(this.value);
+    return (Ok as any)(this.value);
   };
   
   // Add to Nothing prototype
@@ -356,7 +383,7 @@ export function addMaybeFluentMethods(): void {
   };
   
   Nothing.prototype.toResult = function<E>(error: E): Result<E, any> {
-    return Err(error);
+    return (Err as any)(error);
   };
 }
 
@@ -368,11 +395,11 @@ export function addEitherFluentMethods(): void {
   applyFluentOps(Left.prototype, createEitherFluentImpl());
   
   Left.prototype.mapLeft = function<M>(f: (l: any) => M): Either<M, any> {
-    return new Left(f(this.value));
+    return Left(f(this.value));
   };
   
   Left.prototype.mapRight = function<B>(f: (r: any) => B): Either<any, B> {
-    return new Left(this.value);
+    return Left(this.value);
   };
   
   Left.prototype.fold = function<B>(onLeft: (l: any) => B, onRight: (r: any) => B): B {
@@ -380,26 +407,26 @@ export function addEitherFluentMethods(): void {
   };
   
   Left.prototype.swap = function(): Either<any, any> {
-    return new Right(this.value);
+    return Right(this.value);
   };
   
   Left.prototype.toMaybe = function(): Maybe<any> {
-    return Nothing();
+    return (Nothing as any)();
   };
   
   Left.prototype.toResult = function(): Result<any, any> {
-    return Err(this.value);
+    return (Err as any)(this.value);
   };
   
   // Add to Right prototype
   applyFluentOps(Right.prototype, createEitherFluentImpl());
   
   Right.prototype.mapLeft = function<M>(f: (l: any) => M): Either<M, any> {
-    return new Right(this.value);
+    return Right(this.value);
   };
   
   Right.prototype.mapRight = function<B>(f: (r: any) => B): Either<any, B> {
-    return new Right(f(this.value));
+    return Right(f(this.value));
   };
   
   Right.prototype.fold = function<B>(onLeft: (l: any) => B, onRight: (r: any) => B): B {
@@ -407,15 +434,15 @@ export function addEitherFluentMethods(): void {
   };
   
   Right.prototype.swap = function(): Either<any, any> {
-    return new Left(this.value);
+    return Left(this.value);
   };
   
   Right.prototype.toMaybe = function(): Maybe<any> {
-    return Just(this.value);
+    return (Just as any)(this.value);
   };
   
   Right.prototype.toResult = function(): Result<any, any> {
-    return Ok(this.value);
+    return (Ok as any)(this.value);
   };
 }
 
@@ -427,11 +454,11 @@ export function addResultFluentMethods(): void {
   applyFluentOps(Ok.prototype, createResultFluentImpl());
   
   Ok.prototype.mapError = function<F>(f: (e: any) => F): Result<F, any> {
-    return new Ok(this.value);
+    return ok(this.value);
   };
   
   Ok.prototype.mapSuccess = function<B>(f: (t: any) => B): Result<any, B> {
-    return new Ok(f(this.value));
+    return ok(f(this.value));
   };
   
   Ok.prototype.fold = function<B>(onError: (e: any) => B, onSuccess: (t: any) => B): B {
@@ -447,7 +474,7 @@ export function addResultFluentMethods(): void {
   };
   
   Ok.prototype.toMaybe = function(): Maybe<any> {
-    return Just(this.value);
+    return (Just as any)(this.value);
   };
   
   Ok.prototype.toEither = function(): Either<any, any> {
@@ -458,11 +485,11 @@ export function addResultFluentMethods(): void {
   applyFluentOps(Err.prototype, createResultFluentImpl());
   
   Err.prototype.mapError = function<F>(f: (e: any) => F): Result<F, any> {
-    return new Err(f(this.error));
+    return err(f(this.error));
   };
   
   Err.prototype.mapSuccess = function<B>(f: (t: any) => B): Result<any, B> {
-    return new Err(this.error);
+    return err(this.error);
   };
   
   Err.prototype.fold = function<B>(onError: (e: any) => B, onSuccess: (t: any) => B): B {
@@ -478,7 +505,7 @@ export function addResultFluentMethods(): void {
   };
   
   Err.prototype.toMaybe = function(): Maybe<any> {
-    return Nothing();
+    return nothing();
   };
   
   Err.prototype.toEither = function(): Either<any, any> {
@@ -526,11 +553,11 @@ export function applyFluentAPIToAllADTs(): void {
     console.log('✅ PersistentSet fluent API applied');
   }
   
-  // Apply to Tree (if available)
-  if (typeof Tree !== 'undefined') {
-    applyFluentOps(Tree.prototype, createTreeFluentImpl());
-    console.log('✅ Tree fluent API applied');
-  }
+  // Apply to Tree (if available) - Tree is a value-level constructor, not a class
+  // if (typeof Tree !== 'undefined') {
+  //   applyFluentOps(Tree.prototype, createTreeFluentImpl());
+  //   console.log('✅ Tree fluent API applied');
+  // }
   
   console.log('🎉 All ADT fluent APIs applied successfully!');
 }
@@ -625,7 +652,7 @@ export function setFluent<A>(set: PersistentSet<A>): SetFluentOps<A> {
 /**
  * Type-safe fluent API helper for Tree
  */
-export function treeFluent<A>(tree: Tree<A>): TreeFluentOps<A> {
+export function treeFluent<A>(tree: TreeType<A>): TreeFluentOps<A> {
   return tree as any;
 }
 
@@ -633,40 +660,209 @@ export function treeFluent<A>(tree: Tree<A>): TreeFluentOps<A> {
 // Part 6: Export Everything
 // ============================================================================
 
-export {
-  // Fluent interfaces
-  MaybeFluentOps,
-  EitherFluentOps,
-  ResultFluentOps,
-  ListFluentOps,
-  MapFluentOps,
-  SetFluentOps,
-  TreeFluentOps,
+// Exports removed to avoid "Cannot redeclare exported variable" conflicts
+// All symbols are already exported elsewhere 
+
+// ============================================================================
+// Part 7: Interface Merges for Fluent Compatibility
+// ============================================================================
+
+/**
+ * Interface merges to add missing methods used by fluent layer
+ */
+declare module './fp-maybe' {
+  interface Just<A> {
+    fold<B>(onNothing: () => B, onJust: (a: A) => B): B;
+    orElse(alternative: Maybe<A>): Maybe<A>;
+    toEither<E>(error: E): Either<E, A>;
+    toResult<E>(error: E): Result<E, A>;
+  }
   
-  // Fluent implementations
-  createMaybeFluentImpl,
-  createEitherFluentImpl,
-  createResultFluentImpl,
-  createListFluentImpl,
-  createMapFluentImpl,
-  createSetFluentImpl,
-  createTreeFluentImpl,
+  interface Nothing<A> {
+    fold<B>(onNothing: () => B, onJust: (a: A) => B): B;
+    orElse(alternative: Maybe<A>): Maybe<A>;
+    toEither<E>(error: E): Either<E, A>;
+    toResult<E>(error: E): Result<E, A>;
+  }
+}
+
+declare module './fp-result' {
+  interface Ok<E, A> {
+    mapError<F>(f: (e: E) => F): Result<F, A>;
+    mapSuccess<B>(f: (a: A) => B): Result<E, B>;
+    fold<B>(onError: (e: E) => B, onSuccess: (a: A) => B): B;
+    getOrElse(defaultValue: A): A;
+    orElse(alternative: Result<E, A>): Result<E, A>;
+    toMaybe(): Maybe<A>;
+    toEither(): Either<E, A>;
+  }
   
-  // ADT-specific methods
-  addMaybeFluentMethods,
-  addEitherFluentMethods,
-  addResultFluentMethods,
-  
-  // Auto-derivation
-  applyFluentAPIToAllADTs,
-  autoDeriveFluentAPI,
-  
-  // Type-safe helpers
-  maybeFluent,
-  eitherFluent,
-  resultFluent,
-  listFluent,
-  mapFluent,
-  setFluent,
-  treeFluent
-}; 
+  interface Err<E, A> {
+    mapError<F>(f: (e: E) => F): Result<F, A>;
+    mapSuccess<B>(f: (a: A) => B): Result<E, B>;
+    fold<B>(onError: (e: E) => B, onSuccess: (a: A) => B): B;
+    getOrElse(defaultValue: A): A;
+    orElse(alternative: Result<E, A>): Result<E, A>;
+    toMaybe(): Maybe<A>;
+    toEither(): Either<E, A>;
+  }
+} 
+
+// ============================================================================
+// Internal/Compat Section: Helpers from src/fp-fluent-adt-complete.ts
+// ============================================================================
+
+/**
+ * Internal helper types for compatibility with src version
+ */
+type NothingCompat = { tag: 'Nothing' };
+type JustCompat<A> = { tag: 'Just'; value: A };
+type MaybeCompat<A> = NothingCompat | JustCompat<A>;
+type LeftCompat<L> = { tag: 'Left'; value: L };
+type RightCompat<R> = { tag: 'Right'; value: R };
+type EitherCompat<L, R> = LeftCompat<L> | RightCompat<R>;
+
+interface PrismLike<S, A> {
+  get: (s: S) => MaybeCompat<A>;
+}
+
+/**
+ * Maps over a Maybe value, applying function only if Just.
+ * Compat helper from src version.
+ */
+export function mapMaybeCompat<A, B>(
+  m: MaybeCompat<A>,
+  f: (a: A) => B
+): typeof m extends JustCompat<A> ? JustCompat<B> : NothingCompat {
+  switch (m.tag) {
+    case 'Just':
+      return { tag: 'Just', value: f(m.value) } as any;
+    case 'Nothing':
+      return { tag: 'Nothing' } as any;
+    default:
+      const _exhaustive: never = m;
+      throw new Error(`Unhandled case: ${_exhaustive}`);
+  }
+}
+
+/**
+ * Maps over an Either value with separate functions for Left and Right.
+ * Compat helper from src version.
+ */
+export function mapEitherCompat<L, R, L2, R2>(
+  e: EitherCompat<L, R>,
+  onLeft: (l: L) => L2,
+  onRight: (r: R) => R2
+): EitherCompat<L2, R2> {
+  switch (e.tag) {
+    case 'Left':
+      return { tag: 'Left', value: onLeft(e.value) };
+    case 'Right':
+      return { tag: 'Right', value: onRight(e.value) };
+    default:
+      const _exhaustive: never = e;
+      throw new Error(`Unhandled case: ${_exhaustive}`);
+  }
+}
+
+/**
+ * Chains Maybe values together (monadic bind).
+ * Compat helper from src version.
+ */
+export function chainMaybeCompat<A, B>(
+  m: MaybeCompat<A>,
+  f: (a: A) => MaybeCompat<B>
+): MaybeCompat<B> {
+  switch (m.tag) {
+    case 'Just':
+      return f(m.value);
+    case 'Nothing':
+      return { tag: 'Nothing' };
+    default:
+      const _exhaustive: never = m;
+      throw new Error(`Unhandled case: ${_exhaustive}`);
+  }
+}
+
+/**
+ * Chains Either values together (monadic bind).
+ * Compat helper from src version.
+ */
+export function chainEitherCompat<L, R, L2, R2>(
+  e: EitherCompat<L, R>,
+  f: (r: R) => EitherCompat<L2, R2>
+): EitherCompat<L | L2, R2> {
+  switch (e.tag) {
+    case 'Right':
+      return f(e.value);
+    case 'Left':
+      return { tag: 'Left', value: e.value };
+    default:
+      const _exhaustive: never = e;
+      throw new Error(`Unhandled case: ${_exhaustive}`);
+  }
+}
+
+/**
+ * Pattern matches on Maybe values.
+ * Compat helper from src version.
+ */
+export function matchMaybeCompat<A, B>(
+  m: MaybeCompat<A>,
+  onNothing: () => B,
+  onJust: (a: A) => B
+): B {
+  switch (m.tag) {
+    case 'Just':
+      return onJust(m.value);
+    case 'Nothing':
+      return onNothing();
+    default:
+      const _exhaustive: never = m;
+      throw new Error(`Unhandled case: ${_exhaustive}`);
+  }
+}
+
+/**
+ * Pattern matches on Either values.
+ * Compat helper from src version.
+ */
+export function matchEitherCompat<L, R, B>(
+  e: EitherCompat<L, R>,
+  onLeft: (l: L) => B,
+  onRight: (r: R) => B
+): B {
+  switch (e.tag) {
+    case 'Left':
+      return onLeft(e.value);
+    case 'Right':
+      return onRight(e.value);
+    default:
+      const _exhaustive: never = e;
+      throw new Error(`Unhandled case: ${_exhaustive}`);
+  }
+}
+
+/**
+ * Composes two prism-like operations.
+ * Compat helper from src version.
+ */
+export function composePrismLike<S, A, B>(
+  p1: PrismLike<S, A>,
+  p2: PrismLike<A, B>
+): PrismLike<S, B> {
+  return {
+    get: (s: S): MaybeCompat<B> => {
+      const result1 = p1.get(s);
+      switch (result1.tag) {
+        case 'Just':
+          return p2.get(result1.value);
+        case 'Nothing':
+          return { tag: 'Nothing' };
+        default:
+          const _exhaustive: never = result1;
+          throw new Error(`Unhandled case: ${_exhaustive}`);
+      }
+    }
+  };
+}

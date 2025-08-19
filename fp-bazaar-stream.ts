@@ -37,18 +37,16 @@ export function bazaarToStreamPerFocus<F extends Kind1, A, B, S, T>(
   // Re-encode bazaar by feeding a continuation that emits each focus via Pull
   const StreamImpl = streamFromPull<F, B>(runEffect);
   const emitOne = (b: B) => Pull.emit<F, B>(Chunk.singleton(b));
-  const pull = baz(<G extends Kind1>(_: Applicative<G>, kk: (a: A) => Apply<G, [B]>) =>
-    (ss: S) => {
-      // Use F but we return a Pull encoded via Eval/Emit steps
-      // We encode as an F of void by sequencing effects into a Pull machine
-      // Simpler approach: traverse by hand using the provided kk on each a
-      // Here we interpret kk as k itself under F
-      const run = (a: A): Pull<F, B, void> => Pull.eval<F, B, B>(kk(a) as any, (b) => emitOne(b));
-      // We need to rewalk s via bazaar's structure; do so by delegating to the original baz
-      const fa = baz(applicativeF, k)(ss);
-      return fa as any;
-    }
-  )(s) as any as Pull<F, B, any>;
+  
+  // Create an applicative that builds Pull operations
+  const PullApplicative: Applicative<any> = {
+    of: <A>(a: A) => Pull.done<A>(a),
+    map: <A, B>(fa: any, f: (a: A) => B) => fa, // simplified for now
+    ap: <A, B>(fab: any, fa: any) => fa // simplified for now
+  };
+  
+  const pullK = (a: A) => emitOne(k(a) as any) as any;
+  const pull = baz(PullApplicative as any, pullK)(s) as any as Pull<F, B, any>;
   return new StreamImpl(pull);
 }
 

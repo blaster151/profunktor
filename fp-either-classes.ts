@@ -7,11 +7,17 @@ import { Either, Left, Right, isLeft, isRight } from './fp-either-unified';
 import { EITHER_OPS } from './fp-either-ops-table';
 
 const toUnified = <L, R>(x: Either<L, R> | LeftClass<L> | RightClass<R>): Either<L, R> =>
-  x instanceof LeftClass ? Left<L>(x.value as L) as any
-  : x instanceof RightClass ? Right<R>(x.value as R) as any
+  x instanceof LeftClass ? Left<L>(x.value) as Either<L, R>
+  : x instanceof RightClass ? Right<R>(x.value) as Either<L, R>
   : (x as Either<L, R>);
 
-const wrap = <L, R>(e: Either<L, R>) => (isLeft(e) ? new LeftClass<L>(e.value as L) : new RightClass<R>(e.value as R));
+const wrap = <L, R>(e: Either<L, R>) => {
+  if (isLeft(e)) {
+    return new LeftClass<L>((e as any).value);
+  } else {
+    return new RightClass<R>((e as any).value);
+  }
+};
 
 export class LeftClass<L> {
   readonly tag = 'Left' as const;

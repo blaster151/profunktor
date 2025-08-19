@@ -14,6 +14,46 @@
  * 6. Tests - Law compliance and round-trip safety
  */
 
+// ============================================================================
+// Collection Utilities
+// ============================================================================
+
+/**
+ * Safe length utility for persistent collections
+ */
+function listLength<A>(collection: any): number {
+  if (collection && typeof collection.size === 'number') {
+    return collection.size;
+  }
+  if (collection && typeof collection.length === 'number') {
+    return collection.length;
+  }
+  if (collection && typeof collection.count === 'function') {
+    return collection.count();
+  }
+  // Fallback to array conversion
+  if (collection && typeof collection.toArray === 'function') {
+    return collection.toArray().length;
+  }
+  return 0;
+}
+
+/**
+ * Safe values utility for collection iteration
+ */
+function safeValues<A>(collection: any): A[] {
+  if (collection && typeof collection.values === 'function') {
+    return Array.from(collection.values());
+  }
+  if (collection && typeof collection.toArray === 'function') {
+    return collection.toArray();
+  }
+  if (Array.isArray(collection)) {
+    return collection;
+  }
+  return [];
+}
+
 import {
   deriveEqInstance,
   deriveOrdInstance,
@@ -28,10 +68,14 @@ import {
   ObservableLiteK
 } from './fp-observable-lite';
 
-import {
-  TaskEither,
-  TaskEitherK
+import type {
+  TaskEither
 } from './fp-bimonad-extended';
+
+import type {
+  Kind1,
+  TaskEitherK
+} from './fp-hkt';
 
 import {
   IO,
@@ -65,7 +109,7 @@ import {
  */
 export const Tree = createSumType({
   Leaf: <A>(value: A) => ({ value }),
-  Node: <A>(value: A, left: Tree<A>, right: Tree<A>) => ({ value, left, right })
+  Node: <A>(value: A, left: any, right: any) => ({ value, left, right })
 }, {
   name: 'Tree',
   effect: 'Pure',
@@ -75,10 +119,20 @@ export const Tree = createSumType({
 });
 
 /**
+ * Type alias for Tree values - use interface for recursive type
+ */
+export interface TreeOf<A> {
+  readonly _tag: 'Leaf' | 'Node';
+  readonly value: A;
+  readonly left?: TreeOf<A>;
+  readonly right?: TreeOf<A>;
+}
+
+/**
  * Tree HKT kind
  */
 export interface TreeK extends Kind1 {
-  readonly type: Tree<this['arg0']>;
+  readonly type: TreeOf<this['arg0']>;
 }
 
 // ============================================================================
@@ -188,7 +242,7 @@ export const IOEq = deriveEqInstance({
  * This provides reference equality as a fallback
  */
 export const TaskEq = deriveEqInstance({
-  customOrd: <A>(a: Task<A>, b: Task<A>): boolean => {
+  customEq: <A>(a: Task<A>, b: Task<A>): boolean => {
     // Task cannot have meaningful equality due to async function nature
     // Return reference equality as fallback
     return a === b;
@@ -213,23 +267,24 @@ export const StateEq = deriveEqInstance({
 // ============================================================================
 
 /**
+ * Tolerant accessor for PersistentList
+ */
+const toArray = (pl: PersistentList<any>): any[] =>
+  (pl as any).toArray?.() ??
+  Array.from((pl as any).values?.() ?? []) ??
+  [];
+
+/**
  * Enhanced PersistentList Eq instance with deep equality
  */
 export const PersistentListEqEnhanced = deriveEqInstance({
   customEq: <A>(a: PersistentList<A>, b: PersistentList<A>): boolean => {
-    if (a.length !== b.length) return false;
-    
-    // Compare elements recursively
-    for (let i = 0; i < a.length; i++) {
-      const aVal = a.get(i);
-      const bVal = b.get(i);
-      
-      // Use JSON.stringify for deep equality of complex objects
-      if (JSON.stringify(aVal) !== JSON.stringify(bVal)) {
-        return false;
-      }
+    const aa = toArray(a);
+    const bb = toArray(b);
+    if (aa.length !== bb.length) return false;
+    for (let i = 0; i < aa.length; i++) {
+      if (JSON.stringify(aa[i]) !== JSON.stringify(bb[i])) return false;
     }
-    
     return true;
   }
 });
@@ -239,23 +294,22 @@ export const PersistentListEqEnhanced = deriveEqInstance({
  */
 export const PersistentListOrdEnhanced = deriveOrdInstance({
   customOrd: <A>(a: PersistentList<A>, b: PersistentList<A>): number => {
-    const minLength = Math.min(a.length, b.length);
+    const aa = toArray(a);
+    const bb = toArray(b);
+    const minLength = Math.min(aa.length, bb.length);
     
     for (let i = 0; i < minLength; i++) {
-      const aVal = a.get(i);
-      const bVal = b.get(i);
-      
       // Use JSON.stringify for consistent comparison
-      const aStr = JSON.stringify(aVal);
-      const bStr = JSON.stringify(bVal);
+      const aStr = JSON.stringify(aa[i]);
+      const bStr = JSON.stringify(bb[i]);
       
       if (aStr < bStr) return -1;
       if (aStr > bStr) return 1;
     }
     
     // If all elements are equal, shorter list comes first
-    if (a.length < b.length) return -1;
-    if (a.length > b.length) return 1;
+    if (aa.length < bb.length) return -1;
+    if (aa.length > bb.length) return 1;
     return 0;
   }
 });
@@ -265,14 +319,10 @@ export const PersistentListOrdEnhanced = deriveOrdInstance({
  */
 export const PersistentListShowEnhanced = deriveShowInstance({
   customShow: <A>(a: PersistentList<A>): string => {
-    const elements = [];
-    for (let i = 0; i < a.length; i++) {
-      elements.push(JSON.stringify(a.get(i)));
-    }
-    return `PersistentList([${elements.join(', ')}])`;
+    const arr = toArray(a).map((x: any) => JSON.stringify(x));
+    return `PersistentList([${arr.join(', ')}])`;
   }
 });
-
 /**
  * Enhanced PersistentMap Eq instance with deep equality
  */
@@ -333,7 +383,7 @@ export const PersistentMapOrdEnhanced = deriveOrdInstance({
  */
 export const PersistentMapShowEnhanced = deriveShowInstance({
   customShow: <K, V>(a: PersistentMap<K, V>): string => {
-    const entries = [];
+    const entries: string[] = [];
     for (const [key, value] of a.entries()) {
       entries.push(`${JSON.stringify(key)}: ${JSON.stringify(value)}`);
     }
@@ -342,42 +392,41 @@ export const PersistentMapShowEnhanced = deriveShowInstance({
 });
 
 /**
+ * Tolerant accessor for PersistentSet
+ */
+const setToArray = <A>(ps: PersistentSet<A>) =>
+  Array.from(((ps as any).values?.() ?? (ps as any)) as Iterable<A>);
+
+/**
  * Enhanced PersistentSet Eq instance with deep equality
  */
 export const PersistentSetEqEnhanced = deriveEqInstance({
   customEq: <A>(a: PersistentSet<A>, b: PersistentSet<A>): boolean => {
-    if (a.size !== b.size) return false;
+    const aa = setToArray(a);
+    const bb = setToArray(b);
+    if (aa.length !== bb.length) return false;
     
-    // Compare all elements
-    for (const value of a.values()) {
-      if (!b.has(value)) {
-        return false;
-      }
+    // Convert to sorted arrays for comparison
+    const aSorted = aa.map(x => JSON.stringify(x)).sort();
+    const bSorted = bb.map(x => JSON.stringify(x)).sort();
+    
+    for (let i = 0; i < aSorted.length; i++) {
+      if (aSorted[i] !== bSorted[i]) return false;
     }
     
     return true;
   }
 });
 
-/**
- * Enhanced PersistentSet Ord instance with lexicographic ordering
- */
 export const PersistentSetOrdEnhanced = deriveOrdInstance({
   customOrd: <A>(a: PersistentSet<A>, b: PersistentSet<A>): number => {
-    const aValues = Array.from(a.values()).sort();
-    const bValues = Array.from(b.values()).sort();
-    
+    const aValues = setToArray(a).slice().sort() as any[];
+    const bValues = setToArray(b).slice().sort() as any[];
     for (let i = 0; i < Math.min(aValues.length, bValues.length); i++) {
-      const aValueStr = JSON.stringify(aValues[i]);
-      const bValueStr = JSON.stringify(bValues[i]);
-      
-      if (aValueStr < bValueStr) return -1;
-      if (aValueStr > bValueStr) return 1;
+      if (aValues[i] < bValues[i]) return -1;
+      if (aValues[i] > bValues[i]) return 1;
     }
-    
-    if (aValues.length < bValues.length) return -1;
-    if (aValues.length > bValues.length) return 1;
-    return 0;
+    return aValues.length - bValues.length;
   }
 });
 
@@ -386,7 +435,7 @@ export const PersistentSetOrdEnhanced = deriveOrdInstance({
  */
 export const PersistentSetShowEnhanced = deriveShowInstance({
   customShow: <A>(a: PersistentSet<A>): string => {
-    const elements = Array.from(a.values()).map(v => JSON.stringify(v));
+    const elements = setToArray(a).map(v => JSON.stringify(v));
     return `PersistentSet([${elements.join(', ')}])`;
   }
 });
@@ -461,96 +510,95 @@ export function registerAllMissingADTInstances(): void {
 export function addFluentEqOrdShowMethods(): void {
   // Add to ObservableLite prototype
   if (ObservableLite.prototype) {
-    ObservableLite.prototype.equals = function<A>(this: ObservableLite<A>, other: ObservableLite<A>): boolean {
+    (ObservableLite.prototype as any).equals = function<A>(this: ObservableLite<A>, other: ObservableLite<A>): boolean {
       return ObservableLiteEq.equals(this, other);
     };
     
-    ObservableLite.prototype.compare = function<A>(this: ObservableLite<A>, other: ObservableLite<A>): number {
+    (ObservableLite.prototype as any).compare = function<A>(this: ObservableLite<A>, other: ObservableLite<A>): number {
       return ObservableLiteOrd.compare(this, other);
     };
     
-    ObservableLite.prototype.show = function<A>(this: ObservableLite<A>): string {
+    (ObservableLite.prototype as any).show = function<A>(this: ObservableLite<A>): string {
       return ObservableLiteShow.show(this);
     };
   }
   
-  // Add to TaskEither prototype
-  if (TaskEither.prototype) {
-    TaskEither.prototype.equals = function<E, A>(this: TaskEither<E, A>, other: TaskEither<E, A>): boolean {
+  // --- TaskEither prototype augment (only if a runtime exists) ---
+  const TaskEitherRuntime: any = (globalThis as any).TaskEither;
+  if (TaskEitherRuntime?.prototype) {
+    TaskEitherRuntime.prototype.equals = function (this: any, other: any): boolean {
       return TaskEitherEq.equals(this, other);
     };
-    
-    TaskEither.prototype.compare = function<E, A>(this: TaskEither<E, A>, other: TaskEither<E, A>): number {
+    TaskEitherRuntime.prototype.compare = function (this: any, other: any): number {
       return TaskEitherOrd.compare(this, other);
     };
-    
-    TaskEither.prototype.show = function<E, A>(this: TaskEither<E, A>): string {
+    TaskEitherRuntime.prototype.show = function (this: any): string {
       return TaskEitherShow.show(this);
     };
   }
   
   // Add to IO prototype
   if (IO.prototype) {
-    IO.prototype.equals = function<A>(this: IO<A>, other: IO<A>): boolean {
+    (IO.prototype as any).equals = function<A>(this: IO<A>, other: IO<A>): boolean {
       return IOEq.equals(this, other);
     };
   }
   
   // Add to Task prototype
   if (Task.prototype) {
-    Task.prototype.equals = function<A>(this: Task<A>, other: Task<A>): boolean {
+    (Task.prototype as any).equals = function<A>(this: Task<A>, other: Task<A>): boolean {
       return TaskEq.equals(this, other);
     };
   }
   
   // Add to State prototype
   if (State.prototype) {
-    State.prototype.equals = function<S, A>(this: State<S, A>, other: State<S, A>): boolean {
+    (State.prototype as any).equals = function<S, A>(this: State<S, A>, other: State<S, A>): boolean {
       return StateEq.equals(this, other);
     };
   }
   
   // Add to PersistentList prototype
   if (PersistentList.prototype) {
-    PersistentList.prototype.equals = function<A>(this: PersistentList<A>, other: PersistentList<A>): boolean {
+    (PersistentList as any).prototype.equals = function<A>(this: PersistentList<A>, other: PersistentList<A>): boolean {
       return PersistentListEqEnhanced.equals(this, other);
     };
     
-    PersistentList.prototype.compare = function<A>(this: PersistentList<A>, other: PersistentList<A>): number {
+    (PersistentList as any).prototype.compare = function<A>(this: PersistentList<A>, other: PersistentList<A>): number {
       return PersistentListOrdEnhanced.compare(this, other);
     };
     
-    PersistentList.prototype.show = function<A>(this: PersistentList<A>): string {
+    (PersistentList as any).prototype.show = function<A>(this: PersistentList<A>): string {
       return PersistentListShowEnhanced.show(this);
     };
   }
   
   // Add to PersistentMap prototype
   if (PersistentMap.prototype) {
-    PersistentMap.prototype.equals = function<K, V>(this: PersistentMap<K, V>, other: PersistentMap<K, V>): boolean {
+    (PersistentMap as any).prototype.equals = function<K, V>(this: PersistentMap<K, V>, other: PersistentMap<K, V>): boolean {
       return PersistentMapEqEnhanced.equals(this, other);
     };
     
-    PersistentMap.prototype.compare = function<K, V>(this: PersistentMap<K, V>, other: PersistentMap<K, V>): number {
+    (PersistentMap as any).prototype.compare = function<K, V>(this: PersistentMap<K, V>, other: PersistentMap<K, V>): number {
       return PersistentMapOrdEnhanced.compare(this, other);
     };
     
-    PersistentMap.prototype.show = function<K, V>(this: PersistentMap<K, V>): string {
+    (PersistentMap as any).prototype.show = function<K, V>(this: PersistentMap<K, V>): string {
       return PersistentMapShowEnhanced.show(this);
     };
   }
   
   // Add to PersistentSet prototype
   if (PersistentSet.prototype) {
-    PersistentSet.prototype.equals = function<A>(this: PersistentSet<A>, other: PersistentSet<A>): boolean {
+    (PersistentSet as any).prototype.equals = function<A>(this: PersistentSet<A>, other: PersistentSet<A>): boolean {
       return PersistentSetEqEnhanced.equals(this, other);
     };
     
-    PersistentSet.prototype.compare = function<A>(this: PersistentSet<A>, other: PersistentSet<A>): number {
+    (PersistentSet as any).prototype.compare = function<A>(this: PersistentSet<A>, other: PersistentSet<A>): number {
       return PersistentSetOrdEnhanced.compare(this, other);
     };
     
-    PersistentSet.prototype.show = function<A>(this: PersistentSet<A>): string {
+    (PersistentSet as any).prototype.show = function<A>(this: PersistentSet<A>): string {
       return PersistentSetShowEnhanced.show(this);
     };
   }

@@ -97,10 +97,15 @@ export function arrowChoiceCoKleisli<W extends Kind1>(
 
 // IdK functor/comonad
 export interface IdK extends Kind1 { readonly type: this['arg0']; }
+// Helper to force type for IdK (identity functor)
+function idExtract<A>(wa: Apply<IdK, [A]>): A {
+  // This is always safe for the identity functor
+  return wa as A;
+}
 const Id: Comonad<IdK> = {
-  extract: <A>(a: A) => a,
-  extend: <A, B>(a: A, f: (x: A) => B) => f(a),
-  map: <A, B>(a: A, f: (x: A) => B) => f(a)
+  extract: idExtract,
+  extend: <A, B>(wa: Apply<IdK, [A]>, f: (w: Apply<IdK, [A]>) => B) => f(wa) as Apply<IdK, [B]>,
+  map: <A, B>(wa: Apply<IdK, [A]>, f: (a: A) => B) => f(wa as A) as Apply<IdK, [B]>
 };
 
 const Choice_Id: ChoiceW<IdK> = {
@@ -119,7 +124,7 @@ export function registerArrowChoiceCoKleisli_Id(): void {
       const reg = getFPRegistry?.();
       if (!reg) return;
 
-      const base = ArrowFromCoKleisli(Id);
+  const base = ArrowFromCoKleisli(Id as Comonad<Kind1>);
       const ac = arrowChoiceCoKleisli(Id, base, Choice_Id);
       reg.register?.('CoKl<Id>', 'CoKleisliK<IdK>');
       // Fix register calls to use correct number of parameters
@@ -135,8 +140,8 @@ export function registerArrowChoiceCoKleisli_Id(): void {
 
 // Export test function for module testing
 export function runArrowChoiceCoKleisliTests(): void {
-  const base = ArrowFromCoKleisli(Id);
-  const AC = arrowChoiceCoKleisli(Id, base, Choice_Id);
+  const base = ArrowFromCoKleisli(Id as Comonad<Kind1>);
+  const AC = arrowChoiceCoKleisli(Id as Comonad<Kind1>, base, Choice_Id);
 
   const f = base.arr((n: number) => n + 1);
   const l = AC.left<number, number, string>(f);

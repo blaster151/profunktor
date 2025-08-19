@@ -268,16 +268,16 @@ export function deltaWSym<A>(
 ): Poly<string, Rational> {
   const poly: Poly<string, Rational> = new Map();
   
-  for (const [P, R] of deltaStream(tr)) {
+  for (const [P, trunk] of deltaStream(tr)) {
     // Determine the key based on mode
     let key: string;
     if (mode.kind === 'planar') {
       // Use existing structural key for planar mode
-      key = pairKey(P, R);
+      key = pairKey(P, trunk);
     } else {
       // For symmetric modes, use canonical codes
       const forestCode = canonicalize({ children: P.map(treeToCanonicalTree) }).code;
-      const trunkCode = canonicalize(treeToCanonicalTree(R)).code;
+      const trunkCode = canonicalize(treeToCanonicalTree(trunk)).code;
       key = `${forestCode}|${trunkCode}`;
     }
     
@@ -290,7 +290,7 @@ export function deltaWSym<A>(
     };
     
     // Emit with appropriate weight
-    const baseWeight = coefOf(P, R);
+    const baseWeight = coefOf(P, trunk);
     if (mode.kind === 'symmetric-orbit') {
       const aut = autSizeOf(treeToCanonicalTree(tr));
       const normalizedWeight = baseWeight.mul(R.inv(R.fromInt(aut)));

@@ -15,6 +15,7 @@ import {
   ExtractSumTypeInstance,
   ExtractProductTypeHKT,
   ExtractProductTypeInstance,
+  ExtractKindArity,
   ConstructorSpec,
   ProductFields,
   SumTypeConfig,
@@ -22,14 +23,38 @@ import {
   ADTPurityConfig
 } from './fp-adt-builders';
 
-import {
-  Kind1, Kind2, Kind3,
-  Apply, Type, TypeArgs, KindArity, KindResult
+import type {
+  Kind1, Kind2, Kind3, Kind,
+  KindArity, TypeArgs, KindResult,
+  Apply, Type
 } from './fp-hkt';
+
+import type {
+  Functor, Applicative, Monad, Bifunctor
+} from './fp-typeclasses-hkt';
+
+import {
+  ensureFPRegistry, register
+} from './fp-registry-init';
 
 import {
   EffectTag, EffectOf, Pure, IO, Async
 } from './fp-purity';
+
+// ============================================================================
+// Type Aliases for Enhanced Builders
+// ============================================================================
+
+export type EnhancedSumHKT<B> = ExtractSumTypeHKT<B>;
+export type EnhancedSumValue<B> = ExtractSumTypeInstance<B>;
+export type EnhancedProductHKT<B> = ExtractProductTypeHKT<B>;
+export type EnhancedProductValue<B> = ExtractProductTypeInstance<B>;
+
+// Builder-level type application
+export type ApplySum<B, Args extends TypeArgs> = 
+  EnhancedSumHKT<B> extends Kind<any> ? KindResult<EnhancedSumHKT<B>, Args> : never;
+export type ApplyProduct<B, Args extends TypeArgs> = 
+  EnhancedProductHKT<B> extends Kind<any> ? KindResult<EnhancedProductHKT<B>, Args> : never;
 
 // ============================================================================
 // Part 1: Enhanced Pattern Matching Types
@@ -149,6 +174,13 @@ export interface ImmutableADTInstance<Spec extends ConstructorSpec>
  */
 export interface EnhancedSumTypeBuilder<Spec extends ConstructorSpec> {
   
+  /** Kind arity (1 for Maybe, 2 for Either, etc.) – value-level for derivation switches */
+  readonly kindArity?: KindArity;
+  /** Phantom HKT carrier of the sum ADT (Kind1/Kind2/Kind3) */
+  readonly HKT: any;
+  /** Phantom value-level instance type the builder creates */
+  readonly Instance: any;
+  
   /**
    * Create an instance with pattern matching capabilities
    */
@@ -198,10 +230,19 @@ export interface EnhancedSumTypeBuilder<Spec extends ConstructorSpec> {
  */
 export function createSumType<Spec extends ConstructorSpec>(
   spec: Spec,
-  config: SumTypeConfig = {}
+  config: SumTypeConfig & { kindArity?: KindArity } = {}
 ): EnhancedSumTypeBuilder<Spec> {
-  // Create the base sum type
-  const baseBuilder = baseCreateSumType(spec, config);
+  // Determine HKT type based on kindArity
+  type SumKindFromArity<A extends KindArity> =
+    A extends 1 ? Kind1 : A extends 2 ? Kind2 : Kind3;
+  
+  type Instance = EnhancedADTInstance<Spec>;
+  type HKT = SumKindFromArity<NonNullable<typeof config['kindArity']>>;
+  type _HKT = HKT extends never ? Kind1 : HKT;
+  type Arity = NonNullable<typeof config['kindArity']> extends never ? 1 : NonNullable<typeof config['kindArity']>;
+
+  // Create the base sum type with HKT parameters
+  const baseBuilder = baseCreateSumType<Spec, _HKT, Instance>(spec, config);
   
   // Create the enhanced instance class
   class EnhancedADT implements EnhancedADTInstance<Spec> {
@@ -266,6 +307,10 @@ export function createSumType<Spec extends ConstructorSpec>(
   const enhancedBuilder: EnhancedSumTypeBuilder<Spec> = {
     ...baseBuilder,
     
+    // Phantom fields for type extraction (never read at runtime)
+    HKT: undefined as unknown as HKT,
+    Instance: undefined as unknown as Instance,
+    
     create<K extends keyof Spec>(
       tag: K,
       payload?: ReturnType<Spec[K]>
@@ -316,6 +361,13 @@ export function createSumType<Spec extends ConstructorSpec>(
  * Enhanced product type builder with pattern matching
  */
 export interface EnhancedProductTypeBuilder<Fields extends ProductFields> {
+  
+  /** Kind arity (usually 1 for product types) */
+  readonly kindArity?: KindArity;
+  /** Phantom HKT carrier of the product ADT */
+  readonly HKT: any;
+  /** Phantom value-level instance type the builder creates */
+  readonly Instance: any;
   
   /**
    * Create an instance with pattern matching capabilities
@@ -382,8 +434,11 @@ export interface ImmutableProductTypeInstance<Fields extends ProductFields>
 export function createProductType<Fields extends ProductFields>(
   config: ProductTypeConfig = {}
 ): EnhancedProductTypeBuilder<Fields> {
-  // Create the base product type
-  const baseBuilder = baseCreateProductType(config);
+  type Instance = EnhancedProductTypeInstance<Fields>;
+  type HKT = Kind1; // products are typically unary over their field record
+
+  // Create the base product type with HKT parameters
+  const baseBuilder = baseCreateProductType<Fields, HKT, Instance>(config);
   
   // Create the enhanced instance class
   class EnhancedProduct implements EnhancedProductTypeInstance<Fields> {
@@ -425,6 +480,10 @@ export function createProductType<Fields extends ProductFields>(
   // Enhanced builder methods
   const enhancedBuilder: EnhancedProductTypeBuilder<Fields> = {
     ...baseBuilder,
+    
+    // Phantom fields for type extraction (never read at runtime)
+    HKT: undefined as unknown as HKT,
+    Instance: undefined as unknown as Instance,
     
     create(fields: Fields): EnhancedProductTypeInstance<Fields> {
       return new EnhancedProduct(fields);
@@ -554,4 +613,49 @@ export function createProductMatcher<Fields extends ProductFields, Result>(
  * 2. Payload Inference: Payload types inferred from tag definitions
  * 3. Handler Types: Handler signatures inferred from tag payloads
  * 4. Fallback Types: Fallback handlers properly typed
- */ 
+ */
+
+// ============================================================================
+// Usage Examples and Tests
+// ============================================================================
+
+/*
+// Example: Unary ADT (Maybe) exposes Kind1 + instance shape
+const Maybe = createSumType({
+  Just: <A>(value: A) => ({ value }),
+  Nothing: <A>() => ({})
+}, { kindArity: 1 });
+
+type MaybeHKT = NonNullable<typeof Maybe['HKT']>;
+type MaybeInstance = NonNullable<typeof Maybe['Instance']>;
+
+// compile-only checks
+type _HKT_is_Kind1 = MaybeHKT extends Kind1 ? true : false; // should be true
+declare const m: MaybeInstance;
+const r = Maybe.match(m, {
+  Just: x => x,
+  Nothing: () => 0,
+  _: () => 0
+});
+
+// Binary ADT (Either) exposes Kind2
+const Either = createSumType({
+  Left: <L>(value: L) => ({ value }),
+  Right: <R>(value: R) => ({ value })
+}, { kindArity: 2 });
+
+type EitherHKT = NonNullable<typeof Either['HKT']>;
+type _HKT_is_Kind2 = EitherHKT extends Kind2 ? true : false; // should be true
+
+// Generic derivation usage
+declare function deriveFunctor<F extends Kind1>(F: F): { map: <A,B>(f:(a:A)=>B) => any };
+declare function sequenceK<F extends Kind1>(App: any, F: F): any;
+
+const FunctorMaybe = deriveFunctor(Maybe.HKT!);
+const sequenced = sequenceK({ of: (x:any)=>x, ap: (f:any)=>f }, Maybe.HKT!);
+
+// Product builder extractors
+const Person = createProductType<{ name: string; age: number }>();
+type PersonHKT = NonNullable<typeof Person['HKT']>;
+type PersonInstance = NonNullable<typeof Person['Instance']>;
+*/

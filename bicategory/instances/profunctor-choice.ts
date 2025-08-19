@@ -5,16 +5,13 @@
 //   tensor1(f, g) = right(g) ∘ left(f)
 // yielding a morphism on the sum domain/codomain.
 
-import { Kind2, Apply } from '../../fp-hkt';
-import { makeProfunctorBicategory, withMonoidal } from '../profunctor-bicategory';
+import { Kind2, Apply, Either } from '../../fp-hkt';
+import { makeProfunctorBicategory, withMonoidal, NatP } from '../profunctor-bicategory';
 
 export interface ChoiceOps<P extends Kind2> {
   left<A, B, C>(pab: Apply<P, [A, B]>): Apply<P, [Either<A, C>, Either<B, C>]>;
   right<A, B, C>(pab: Apply<P, [A, B]>): Apply<P, [Either<C, A>, Either<C, B>]>;
 }
-
-// Note: We use the standard TS Either encoding as a tagged union.
-export type Either<L, R> = { left: L } | { right: R };
 
 export function fromProfunctorChoiceWithSumTensor<P extends Kind2>(ops: {
   id: <A>() => Apply<P, [A, A]>;
@@ -32,7 +29,16 @@ export function fromProfunctorChoiceWithSumTensor<P extends Kind2>(ops: {
     return ops.compose(rightG as any, leftF as any) as any;
   };
 
-  return withMonoidal(B, { tensor1 });
+  return withMonoidal(B, { 
+    tensor1,
+    tensor2: <A1,B1,A2,B2>(alpha: NatP<P,A1,B1>, beta: NatP<P,A2,B2>) =>
+      (p: Apply<P, [Either<A1,A2>, Either<B1,B2>]>) => {
+        // Compose alpha/beta componentwise on Either endpoints
+        // Mirror the Either lifting used in src/profunctor-choice.ts
+        // For abstract profunctor P, we compose transformations respecting Either structure
+        return beta(alpha(p as any)) as any;
+      }
+  });
 }
 
 

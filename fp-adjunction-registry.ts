@@ -103,22 +103,28 @@ export function registerDerivedFromAdjunction<L extends Kind1, R extends Kind1>(
   const derivedC = comonadFromAdjunction(adj, functorL, functorR);
 
   try {
-    // HKT identifiers (symbolic) for composition
-    registry.registerHKT(monadName, `ComposeK<${rightName},${leftName}>`);
-    registry.registerHKT(comonadName, `ComposeK<${leftName},${rightName}>`);
+    // HKT (two arities)
+    registry.register(`HKT:${monadName}:1`, `ComposeK<${rightName},${leftName}>`);
+    registry.register(`HKT:${comonadName}:1`, `ComposeK<${leftName},${rightName}>`);
 
-    // Purity (reuse adjunction effect tag when available)
+    // Purity
     const effect = (adj as any).effectTag ?? 'Pure';
-    registry.registerPurity(monadName, effect);
-    registry.registerPurity(comonadName, effect);
+    registry.register(`Purity:${monadName}`, effect);
+    registry.register(`Purity:${comonadName}`, effect);
 
-    // Register typeclass dictionaries
-    registry.registerTypeclass(monadName, 'Monad', derivedM.monad);
-    registry.registerTypeclass(comonadName, 'Comonad', derivedC.comonad);
+    // Typeclasses
+    registry.register(`Typeclass:${monadName}:Monad`, derivedM.monad);
+    registry.register(`Typeclass:${comonadName}:Comonad`, derivedC.comonad);
 
-    // Mark derivable set
-    registry.registerDerivable(monadName, { monad: derivedM.monad, purity: { effect } });
-    registry.registerDerivable(comonadName, { comonad: derivedC.comonad, purity: { effect } });
+    // Derivable
+    registry.register(`Derivable:${monadName}`, { 
+      monad: derivedM.monad, 
+      purity: { effect } 
+    });
+    registry.register(`Derivable:${comonadName}`, { 
+      comonad: derivedC.comonad, 
+      purity: { effect } 
+    });
 
     console.log(`✅ Registered derived Monad ${monadName} and Comonad ${comonadName} from adjunction ${leftName} ⊣ ${rightName}`);
   } catch (error) {

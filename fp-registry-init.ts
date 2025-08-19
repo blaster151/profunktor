@@ -2,6 +2,7 @@
 
 export interface FPRegistry {
   readonly store: Map<string, any>;
+  readonly derivable: Map<string, any>;
   register: (key: string, value: any) => void;
   get: <T = unknown>(key: string) => T | undefined;
   has: (key: string) => boolean;
@@ -9,8 +10,10 @@ export interface FPRegistry {
 
 function createRegistry(): FPRegistry {
   const store = new Map<string, any>();
+  const derivable = new Map<string, any>();
   return {
     store,
+    derivable,
     register: (key, value) => { store.set(key, value); },
     get: (key) => store.get(key),
     has: (key) => store.has(key),
@@ -64,6 +67,7 @@ export function get<T = unknown>(name: string): T | undefined {
  */
 class GlobalFPRegistry implements FPRegistry {
   public store = new Map<string, any>();
+  public derivable = new Map<string, any>();
   register = (key: string, value: any) => { this.store.set(key, value); };
   get = <T = unknown>(key: string) => this.store.get(key) as T | undefined;
   has = (key: string) => this.store.has(key);
@@ -91,24 +95,46 @@ export function initializeFPRegistry(): FPRegistry {
 /**
  * Get the global FP registry
  */
-export function getFPRegistry(): FPRegistry | undefined {
-  return (globalThis as any)?.__FP_REGISTRY as FPRegistry | undefined;
+/**
+ * Get FP Registry - ensure it exists
+ */
+export function getFPRegistry(): FPRegistry { 
+  return ensureFPRegistry(); 
+}
+
+/**
+ * Get derivable instances from the registry
+ */
+export function getDerivableInstances(name: string): any { 
+  return getFPRegistry().derivable.get(name); 
 }
 
 /**
  * Get a typeclass instance from the registry
  */
-export function getTypeclassInstance(_name: string, _typeclass: string): any { return undefined; }
+export function getTypeclassInstance(name: string, tc: string): any {
+  const instances = getDerivableInstances(name);
+  if (!instances) return undefined;
+  
+  // Switch on typeclass name and return from derivable map
+  switch (tc) {
+    case 'Functor': return instances.Functor;
+    case 'Applicative': return instances.Applicative;
+    case 'Monad': return instances.Monad;
+    case 'Traversable': return instances.Traversable;
+    case 'Bifunctor': return instances.Bifunctor;
+    case 'Alternative': return instances.Alternative;
+    case 'MonadError': return instances.MonadError;
+    default: return instances[tc];
+  }
+}
 
 /**
  * Get purity effect from the registry
  */
-export function getPurityEffect(_name: string): string | undefined { return undefined; }
-
-/**
- * Get derivable instances from the registry
- */
-export function getDerivableInstances(_name: string): any { return undefined; }
+export function getPurityEffect(_name: string): string | undefined { 
+  return undefined; 
+}
 
 /**
  * Get usage bound for a type from the global registry

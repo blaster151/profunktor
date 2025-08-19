@@ -7,7 +7,7 @@
 // SF (signal functions) modeled as a CoKleisli category for Cofree<F, _>
 // with F<X> = (I) => [X, O].
 
-import { Kind1, Kind2, Apply } from '../../fp-hkt';
+import { Kind1, Kind2, Apply } from 'fp-hkt';
 import { Cofree, CofreeK, mapCofree, extractCofree, duplicateCofree } from '../../fp-free';
 
 // ---------- Typeclass dictionaries ----------

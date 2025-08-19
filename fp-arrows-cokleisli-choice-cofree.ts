@@ -53,7 +53,7 @@ function runSmokeTest() {
     registerArrowChoice_CoKleisli_Cofree(Functor_ArrayK, { hktName: 'CoKl<Cofree<ArrayK>>' });
 
     // Tiny runnable check (no laws): build a left over Either and run left(arr(+1))
-    const uL = uniformLeftCofree(Functor_ArrayK, 1, (n: number) => [n + 1, n + 2]);
+    const uL = uniformLeftCofree(Functor_ArrayK, 1 as number, (n: number) => [n + 1, n + 2]);
 
     const W = Comonad_Cofree(Functor_ArrayK) as any; // Cast to ensure map is required
     const base = arrowCoKleisli(W);

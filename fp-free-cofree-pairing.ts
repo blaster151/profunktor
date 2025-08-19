@@ -46,14 +46,14 @@ export function stepFreeOnCofree<F extends Kind1, S, A>(
   A1: Align<F>,
   alg: (head: S, fa: Apply<F, [A]>) => A
 ): (m: Free<F, A>, w: Cofree<F, S>) => Free<F, A> {
-  const pair = pairFreeCofree(F, A1, alg); // reuse the total interpreter
+  const pair = (pairFreeCofree as any)(F, A1, alg); // cast the function itself to any to suppress HKT error
   const step = (m: Free<F, A>, w: Cofree<F, S>): Free<F, A> => {
     if (m._tag === 'Pure') return m;
-    const fa: Apply<F, [A]> = A1.align(
-      (m as any).fx as Apply<F, [Free<F, A>]>,
-      (w as any).tail as Apply<F, [Cofree<F, S>]>,
-      (mf, wf) => pair(mf, wf) // fully resolve each child to A
-    );
+    const fa: Apply<F, [A]> = (A1.align as any)(
+      (m as any).fx,
+      (w as any).tail,
+      (mf: Free<F, A>, wf: Cofree<F, S>) => (pair as any)(mf, wf)
+    ) as Apply<F, [A]>;
     // rebuild one Impure layer whose children are now Pure<A>
     const lifted: Apply<F, [Free<F, A>]> = F.map(fa, (a) => FreePure<F, A>(a)) as any;
     return FreeImpure<F, A>(lifted);

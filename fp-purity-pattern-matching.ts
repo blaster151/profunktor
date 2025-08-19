@@ -379,7 +379,7 @@ export function enhancedMatchHKT<
   const matchResult = enhancedMatch(value, handlers, options);
   const result = F_.of(extractValue(matchResult));
   if (options.enableRuntimeMarkers) {
-    return Object.assign(result, { __effect: extractEffect(matchResult) });
+    return Object.assign(result as object, { __effect: extractEffect(matchResult) as P });
   }
   return result as PurityAwareMatchResult<Apply<F, [ReturnType<Handlers[keyof Handlers]>]>, P>;
 }
@@ -405,7 +405,7 @@ export function enhancedMatchMonad<
   const result = F_.of(extractValue(matchResult));
   
   if (options.enableRuntimeMarkers) {
-    return Object.assign(result, { __effect: extractEffect(matchResult) });
+    return Object.assign(result as object, { __effect: extractEffect(matchResult) as P });
   }
   
   return result as PurityAwareMatchResult<Apply<F, [ReturnType<Handlers[keyof Handlers]>]>, P>;

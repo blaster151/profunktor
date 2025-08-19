@@ -84,7 +84,7 @@ export function foldGeneric<T extends GADT<string, any>, R>(
 export type FoldExpr<A, R> = {
   Const: (value: A) => R;
   Add: (left: R, right: R) => R;
-  If: (cond: boolean, thenBranch: R, elseBranch: R) => R;
+  If: (cond: R, thenBranch: R, elseBranch: R) => R;
   Var: (name: string) => R;
   Let: (name: string, value: R, body: R) => R;
 };
@@ -117,7 +117,7 @@ export function cataExpr<A, R>(
     ))
     .with('If', ({ cond, then, else: else_ }) =>
       algebra.If(
-        foldBool(cond),
+        foldBool(cond) as unknown as R,
         cataExpr(then as any, algebra),
         cataExpr(else_ as any, algebra)
       )
@@ -342,7 +342,7 @@ export function evalExprAlgebra(): FoldExpr<number, number> {
   return {
     Const: (value) => value,
     Add: (l, r) => l + r,
-    If: (cond, t, e) => (cond ? t : e),
+    If: (cond, t, e) => ((cond as unknown as boolean) ? t : e),
     Var: (name) => { throw new Error(`Unbound variable: ${name}`); },
     Let: (_name, _value, body) => body
   };
@@ -355,7 +355,7 @@ export function evalExprRecursive(expr: Expr<number>): number {
   return cataExprRecursive(expr, {
     Const: n => n,
     Add: (l, r) => l + r,
-    If: (c, t, e) => c ? t : e,
+    If: (c, t, e) => ((c as unknown as boolean) ? t : e),
     Var: name => { throw new Error(`Unbound variable: ${name}`); },
     Let: (name, value, body) => body // Simplified: ignore name binding
   });
@@ -370,7 +370,7 @@ export function transformStringAlgebra(): FoldExpr<string, Expr<string>> {
     Add: (_l, _r) => { throw new Error("Cannot add strings in this context"); },
     If: (cond, thenBranch, elseBranch) => {
       // For transforming strings, we need to construct boolean expressions
-      const boolCond = typeof cond === 'boolean' ? Expr.Const(cond) : Expr.Const(true);
+      const boolCond = typeof cond === 'boolean' ? Expr.Const(cond as unknown as boolean) : Expr.Const((cond as unknown as boolean));
       return Expr.If(boolCond, thenBranch, elseBranch);
     },
     Var: (name) => Expr.Var(name),

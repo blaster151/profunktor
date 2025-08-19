@@ -10,7 +10,7 @@
  * - Make it easy to instantiate specialized bicategories (e.g., proarrow/profunctor-based)
  */
 
-import { Kind2, Apply } from '../../fp-hkt';
+import { Kind2, Apply } from 'fp-hkt';
 
 // ----------------------------------------------------------------------------
 // Helper type aliases

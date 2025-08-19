@@ -9,10 +9,57 @@
  */
 
 // ============================================================================
-// Imports
+// Core HKT System
 // ============================================================================
 
-import type { EitherGADT, Result } from './fp-gadt-enhanced';
+/**
+ * Base type for HKT system
+ */
+export type Type = unknown;
+
+// BEGIN PATCH: normalize helpers to Apply
+
+// A small helper to express "list of types" in our arity-dispatch world.
+export type TypeArgs = readonly Type[];
+
+// Arity helper: 1|2|3, inferred by the number of args the ADT expects.
+// You likely already have this; keep the existing export name/signature if so.
+export type KindArity = 1 | 2 | 3;
+
+// Generic arity extractor
+export type ArityOf<F> = F extends Kind3 ? 3 : F extends Kind2 ? 2 : 1;
+
+// Map (F, Args) -> F applied to Args. This is now just Apply.
+export type KindResult<F extends Kind<any>, Args extends TypeArgs> = Apply<F, Args>;
+
+// END PATCH
+
+/**
+ * Type-level application: plug Args into F's slots and read `type`
+ */
+// BEGIN PATCH: precise Apply for Kind1/2/3 by arity
+export type Apply<
+  F extends Kind<any>,
+  Args extends readonly Type[]
+> =
+  // unary: F<A>
+  Args extends [infer A]
+    ? (F & { arg0: A })['type']
+  // binary: F<A, B>
+  : Args extends [infer A, infer B]
+    ? (F & { arg0: A; arg1: B })['type']
+  // ternary: F<A, B, C>
+  : Args extends [infer A, infer B, infer C]
+    ? (F & { arg0: A; arg1: B; arg2: C })['type']
+  : never;
+// END PATCH
+
+/**
+ * Legacy Kind interface for backward compatibility
+ */
+export interface Kind<Args extends readonly Type[]> {
+  readonly type: Type;
+}
 
 // ============================================================================
 // Data Type Definitions
@@ -27,6 +74,13 @@ export type Maybe<A> = A | null | undefined;
  * Either type - represents values that can be one of two types
  */
 export type Either<L, R> = { left: L } | { right: R };
+
+/**
+ * Result ADT (Ok | Err) as a type alias (type-level only)
+ */
+export type Result<T, E> =
+  | { readonly tag: 'Ok';  readonly value: T }
+  | { readonly tag: 'Err'; readonly error: E };
 
 /**
  * List type - represents sequences of values
@@ -47,29 +101,6 @@ export type Writer<A, W> = [A, W];
  * State type - represents stateful computations
  */
 export type State<S, A> = (s: S) => [A, S];
-
-// ============================================================================
-// Core HKT Types
-// ============================================================================
-
-/**
- * Type-level "any" - represents any concrete type
- */
-export type Type = any;
-
-/**
- * Base kind type - represents a type constructor that takes type arguments
- * and returns a concrete type
- */
-export interface Kind<Args extends readonly Type[]> {
-  readonly type: Type;
-}
-
-/**
- * Type-level function application - applies a kind to type arguments
- */
-export type Apply<F extends Kind<any>, Args extends readonly Type[]> = 
-  F extends Kind<Args> ? F['type'] : never;
 
 // ============================================================================
 // Higher-Order Kinds (HOKs) Support
@@ -343,21 +374,6 @@ export function makeApplyLeftMeta(baseId: string, varianceTail?: ReadonlyArray<V
 // Helper Types for Introspection
 // ============================================================================
 
-/**
- * Extract the type arguments from a kind
- */
-export type TypeArgs<F extends Kind<any>> = F extends Kind<infer Args> ? Args : never;
-
-/**
- * Get the arity (number of type arguments) of a kind
- */
-export type KindArity<F extends Kind<any>> = TypeArgs<F>['length'];
-
-/**
- * Extract the result type from a kind
- */
-export type KindResult<F extends Kind<any>> = F['type'];
-
 // ============================================================================
 // Type Constructor Representations
 // ============================================================================
@@ -384,6 +400,13 @@ export interface EitherK extends Kind2 {
 }
 
 /**
+ * Result type constructor as HKT
+ */
+export interface ResultK extends Kind2 {
+  readonly type: Result<this['arg0'], this['arg1']>;
+}
+
+/**
  * Tuple type constructor as HKT
  */
 export interface TupleK extends Kind2 {
@@ -394,7 +417,17 @@ export interface TupleK extends Kind2 {
  * Function type constructor as HKT (contravariant in first arg, covariant in second)
  */
 export interface FunctionK extends Kind2 {
+  readonly tag: 'FunctionK';
   readonly type: (arg: this['arg0']) => this['arg1'];
+}
+
+/**
+ * Kleisli arrow type constructor as HKT
+ */
+export interface KleisliK<M extends Kind1> extends Kind2 {
+  readonly tag: 'KleisliK';
+  readonly monad: M;
+  readonly type: (a: this['arg0']) => Apply<M, [this['arg1']]>;
 }
 
 /**
@@ -619,4 +652,29 @@ export function hasArity(constructor: any, expectedArity: number): boolean {
  * 1. Apply<F, Args> should be a concrete type when F is a valid kind and Args match
  * 2. Apply should be distributive over composition
  * 3. Apply should preserve kind arity
- */ 
+ */
+
+/**
+ * HKT Laws:
+ * 
+ * 1. Identity: Apply<F, [A]> should be well-formed for any valid F and A
+ * 2. Composition: Apply<Compose<F, G>, [A]> = Apply<F, [Apply<G, [A]>]>
+ * 3. Naturality: Nat<F, G> should preserve structure
+ * 
+ * Kind Laws:
+ * 
+ * 1. Kind1: Takes exactly one type argument
+ * 2. Kind2: Takes exactly two type arguments
+ * 3. Kind3: Takes exactly three type arguments
+ * 
+ * Apply Laws:
+ * 
+ * 1. Apply<F, Args> should be a concrete type when F is a valid kind and Args match
+ * 2. Apply should be distributive over composition
+ * 3. Apply should preserve kind arity
+ */
+
+// HKT identity kind
+export interface IdK extends Kind1 {
+  readonly type: this['arg0']; // Apply<IdK, [A]> === A
+}

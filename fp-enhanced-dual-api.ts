@@ -137,7 +137,7 @@ export function createDualFactory<A, T extends TypeclassCapabilities>(
         ...options,
         enableTypeInference: true,
         enableTypeclassAwareness: true
-      });
+      }) as DeepFluentMethods<A, T, KindInfo>;
     },
     
     toDataFirst: (fluent: DeepFluentMethods<A, T, KindInfo>): A => {
@@ -185,7 +185,7 @@ export function createDualFactory<A, T extends TypeclassCapabilities>(
   };
   
   return {
-    fluent,
+  fluent: fluent as DeepFluentMethods<A, T, KindInfo>,
     dataFirst,
     crossStyle,
     typeInfo
@@ -525,7 +525,7 @@ export namespace ZeroCostAbstractions {
     value: A | DeepFluentMethods<A, T, KindInfo>,
     dualAPI: EnhancedDualAPI<A, T>
   ): DeepFluentMethods<A, T, KindInfo> | A {
-    if (typeof value === 'object' && 'chainState' in value) {
+  if (typeof value === 'object' && value !== null && 'chainState' in value) {
       return dualAPI.crossStyle.toDataFirst(value);
     } else {
       return dualAPI.crossStyle.toFluent(value as A);
@@ -537,11 +537,3 @@ export namespace ZeroCostAbstractions {
 // Export Everything
 // ============================================================================
 
-export {
-  createDualFactory,
-  createSharedMethodDefinitions,
-  createEnhancedDualAPI,
-  CrossStyleChaining,
-  CrossStyleTypeTests,
-  ZeroCostAbstractions
-};

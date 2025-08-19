@@ -20,6 +20,10 @@ import {
 } from './fp-gadt-enhanced';
 
 import {
+  ListGADT
+} from './fp-gadt';
+
+import {
   Fold as FoldBase,
   fold as foldBase,
   cataExpr as cataExprBase,
@@ -42,7 +46,7 @@ import {
 } from './fp-anamorphisms';
 
 import {
-  hylo as hyloBase, hyloRecursive as hyloRecursiveBase,
+  hyloRecursive as hyloRecursiveBase,
   hyloExpr as hyloExprBase, hyloExprRecursive as hyloExprRecursiveBase,
   hyloMaybe as hyloMaybeBase, 
   hyloEither as hyloEitherBase, 
@@ -56,12 +60,6 @@ import {
   ArrayK, MaybeK, EitherK, TupleK, FunctionK,
   Maybe, Either
 } from './fp-hkt';
-
-import {
-  Functor, Applicative, Monad, Traversable,
-  map, pure, bind, traverse,
-  lift2, composeK, sequence
-} from './fp-typeclasses-hkt';
 
 // ============================================================================
 // Unified Recursion-Schemes API
@@ -154,7 +152,9 @@ export function hyloExpr<A, Seed, R>(
   coalgebra: (seed: Seed) => Build<Expr<A>, Seed>,
   seed: Seed
 ): R {
-  return hyloExprRecursiveBase(algebra, coalgebra, seed);
+  // Use anaRecursive + catamorphism pattern
+  const expr = anaExpr(coalgebra, seed);
+  return cataExprBase(expr, algebra);
 }
 
 // ============================================================================
@@ -174,11 +174,11 @@ export function cataMaybe<A, Seed, R>(
 /**
  * Anamorphism for MaybeGADT<A> with aligned type parameters
  */
-export function anaMaybe<A, Seed, R>(
+export function anaMaybe<A, Seed>(
   coalgebra: (seed: Seed) => Build<MaybeGADT<A>, Seed>,
   seed: Seed
 ): MaybeGADT<A> {
-  return anaMaybeBase(coalgebra, seed);
+  return anaRecursive(coalgebra)(seed) as MaybeGADT<A>;
 }
 
 /**
@@ -189,7 +189,9 @@ export function hyloMaybe<A, Seed, R>(
   coalgebra: (seed: Seed) => Build<MaybeGADT<A>, Seed>,
   seed: Seed
 ): R {
-  return hyloMaybeBase(algebra, coalgebra, seed);
+  // Use anaRecursive + catamorphism pattern
+  const maybe = anaMaybe(coalgebra, seed);
+  return cataMaybeBase(maybe, algebra);
 }
 
 // ============================================================================
@@ -209,11 +211,11 @@ export function cataEither<L, R_inner, Seed, R>(
 /**
  * Anamorphism for EitherGADT<L, R> with aligned type parameters
  */
-export function anaEither<L, R_inner, Seed, R>(
+export function anaEither<L, R_inner, Seed>(
   coalgebra: (seed: Seed) => Build<EitherGADT<L, R_inner>, Seed>,
   seed: Seed
 ): EitherGADT<L, R_inner> {
-  return anaEitherBase(coalgebra, seed);
+  return anaRecursive(coalgebra)(seed) as EitherGADT<L, R_inner>;
 }
 
 /**
@@ -224,7 +226,9 @@ export function hyloEither<L, R_inner, Seed, R>(
   coalgebra: (seed: Seed) => Build<EitherGADT<L, R_inner>, Seed>,
   seed: Seed
 ): R {
-  return hyloEitherBase(algebra, coalgebra, seed);
+  // Use anaRecursive + catamorphism pattern
+  const either = anaEither(coalgebra, seed);
+  return cataEitherBase(either, algebra);
 }
 
 // ============================================================================
@@ -244,11 +248,11 @@ export function cataResult<A, E, Seed, R>(
 /**
  * Anamorphism for Result<A, E> with aligned type parameters
  */
-export function anaResult<A, E, Seed, R>(
+export function anaResult<A, E, Seed>(
   coalgebra: (seed: Seed) => Build<ResultGADT<A, E>, Seed>,
   seed: Seed
 ): ResultGADT<A, E> {
-  return anaResultBase(coalgebra, seed);
+  return anaRecursive(coalgebra)(seed) as ResultGADT<A, E>;
 }
 
 /**
@@ -259,7 +263,9 @@ export function hyloResult<A, E, Seed, R>(
   coalgebra: (seed: Seed) => Build<ResultGADT<A, E>, Seed>,
   seed: Seed
 ): R {
-  return hyloResultBase(algebra, coalgebra, seed);
+  // Use anaRecursive + catamorphism pattern
+  const result = anaResult(coalgebra, seed);
+  return cataResultBase(result, algebra);
 }
 
 // ============================================================================
@@ -275,7 +281,7 @@ export function cataList<A, Seed, R>(
 ): R {
   return list.tag === 'Nil' 
     ? algebra.Nil()
-    : algebra.Cons(list.head, cataList(list.tail, algebra));
+    : algebra.Cons(list.payload.head, cataList(list.payload.tail, algebra));
 }
 
 /**
@@ -296,7 +302,9 @@ export function hyloList<A, Seed, R>(
   coalgebra: (seed: Seed) => Build<ListGADT<A>, Seed>,
   seed: Seed
 ): R {
-  return hyloListBase(algebra, coalgebra, seed);
+  // Use anaRecursive + catamorphism pattern
+  const list = anaList(coalgebra, seed);
+  return cataList(list, algebra);
 }
 
 // ============================================================================
@@ -371,7 +379,7 @@ export const recSchemes = {
 
 // Export all types for convenience
 export type {
-  GADT, Expr, MaybeGADT, EitherGADT, ResultGADT, ListGADT,
+  GADT, Expr, MaybeGADT, EitherGADT, ResultGADT,
   FoldBase, FoldExpr, FoldMaybe, FoldEither, FoldResult,
   Build
 };

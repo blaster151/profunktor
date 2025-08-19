@@ -6,7 +6,7 @@
  * Extensional comparisons use an evaluator `evalP` and sample inputs.
  */
 
-import { Kind2, Apply } from '../../fp-hkt';
+import { Kind2, Apply } from 'fp-hkt';
 
 export interface LawEvidence {
   readonly name: string;

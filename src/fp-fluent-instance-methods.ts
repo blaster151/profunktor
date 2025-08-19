@@ -183,4 +183,5 @@ export function areFluentInstanceMethodsInstalled(): boolean {
  * Legacy alias for backward compatibility
  * @deprecated Use installFluentInstanceMethods() instead
  */
-export const installFluent = installFluentInstanceMethods;
+// Removed duplicate export alias to avoid "Cannot redeclare exported variable" conflicts
+// Use installFluentInstanceMethods directly or import from fp-fluent.ts

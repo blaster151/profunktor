@@ -278,9 +278,12 @@ export function deltaFromAdjunction<L extends Kind1, R extends Kind1>(
     ComposeK<L, R>,
     ComposeK<ComposeK<L, R>, ComposeK<L, R>>
   > = composeNat(
-    rightWhisker<ComposeK<L, R>, L, R>(Rf as any, L_eta_reassoc as any),
+    rightWhisker<ComposeK<L, R>, L, R>(
+      Rf as unknown as Functor<R>, 
+      L_eta_reassoc as unknown as NaturalTransformation<ComposeK<L, R>, L>
+    ),
     assocRtoL<ComposeK<L, R>, L, R>() // reassociate at the end
-  );
+  ) as unknown as NaturalTransformation<ComposeK<L, R>, ComposeK<ComposeK<L, R>, ComposeK<L, R>>>;
 
   return {
     effectTag: whisk.effectTag,

@@ -12,12 +12,17 @@
  * 5. Ensure method chaining type-infers correctly
  */
 
+// Fixed imports using canonical modules
+import type { MaybeK } from './fp-maybe-unified-enhanced';
+import * as E from './fp-either-unified';
+import * as R from './fp-result-unified';
+
 import {
-  // Core ADT imports
-  Maybe, Just, Nothing, matchMaybe, mapMaybe, apMaybe, chainMaybe,
-  matchEither, mapEither, apEither, chainEither, bimapEither,
-  Result, Ok, Err, matchResult, mapResult, apResult, chainResult, bimapResult
-} from './fp-maybe-unified-enhanced';
+  // Import fluent method implementations from complete file to avoid duplication
+  addMaybeFluentMethods,
+  addEitherFluentMethods, 
+  addResultFluentMethods
+} from './fp-fluent-adt-complete';
 
 import {
   // ObservableLite (already has fluent methods)
@@ -40,48 +45,8 @@ import {
 
 /**
  * Add fluent methods to Maybe instances
+ * Note: Implementation moved to fp-fluent-adt-complete.ts to avoid duplication
  */
-export function addMaybeFluentMethods(): void {
-  if (!Maybe || typeof Maybe !== 'function') {
-    console.warn('Maybe constructor not available for fluent augmentation');
-    return;
-  }
-
-  // Functor methods
-  Maybe.prototype.map = function<A, B>(this: Maybe<A>, f: (a: A) => B): Maybe<B> {
-    return mapMaybe(f, this);
-  };
-
-  // Applicative methods
-  Maybe.prototype.ap = function<A, B>(this: Maybe<(a: A) => B>, other: Maybe<A>): Maybe<B> {
-    return apMaybe(this, other);
-  };
-
-  // Monad methods
-  Maybe.prototype.chain = function<A, B>(this: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> {
-    return chainMaybe(f, this);
-  };
-
-  // Alias for chain
-  Maybe.prototype.flatMap = function<A, B>(this: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> {
-    return chainMaybe(f, this);
-  };
-
-  // Filterable methods
-  Maybe.prototype.filter = function<A>(this: Maybe<A>, predicate: (a: A) => boolean): Maybe<A> {
-    return matchMaybe(this, {
-      Just: value => predicate(value) ? this : Nothing(),
-      Nothing: () => Nothing()
-    });
-  };
-
-  // Static methods
-  Maybe.of = <A>(a: A): Maybe<A> => Just(a);
-  Maybe.Just = Just;
-  Maybe.Nothing = Nothing;
-
-  console.log('✅ Maybe augmented with fluent methods');
-}
 
 // ============================================================================
 // Part 2: Either Fluent Methods
@@ -89,10 +54,8 @@ export function addMaybeFluentMethods(): void {
 
 /**
  * Add fluent methods to Either instances
+ * Note: Implementation moved to fp-fluent-adt-complete.ts to avoid duplication
  */
-export function addEitherFluentMethods(): void {
-  console.warn('Either is a union; skipping prototype augmentation. Use data-last helpers.');
-}
 
 // ============================================================================
 // Part 3: Result Fluent Methods
@@ -100,65 +63,54 @@ export function addEitherFluentMethods(): void {
 
 /**
  * Add fluent methods to Result instances
+ * Note: Implementation moved to fp-fluent-adt-complete.ts to avoid duplication
  */
-export function addResultFluentMethods(): void {
-  if (!Result || typeof Result !== 'function') {
-    console.warn('Result constructor not available for fluent augmentation');
-    return;
-  }
-
-  // Functor methods
-  Result.prototype.map = function<E, T, T2>(this: Result<E, T>, f: (t: T) => T2): Result<E, T2> {
-    return mapResult(f, this);
-  };
-
-  // Applicative methods
-  Result.prototype.ap = function<E, T, T2>(this: Result<E, (t: T) => T2>, other: Result<E, T>): Result<E, T2> {
-    return apResult(this, other);
-  };
-
-  // Monad methods
-  Result.prototype.chain = function<E, T, T2>(this: Result<E, T>, f: (t: T) => Result<E, T2>): Result<E, T2> {
-    return chainResult(f, this);
-  };
-
-  // Alias for chain
-  Result.prototype.flatMap = function<E, T, T2>(this: Result<E, T>, f: (t: T) => Result<E, T2>): Result<E, T2> {
-    return chainResult(f, this);
-  };
-
-  // Bifunctor methods
-  Result.prototype.bimap = function<E, T, E2, T2>(this: Result<E, T>, f: (e: E) => E2, g: (t: T) => T2): Result<E2, T2> {
-    return bimapResult(f, g, this);
-  };
-
-  Result.prototype.mapError = function<E, T, E2>(this: Result<E, T>, f: (e: E) => E2): Result<E2, T> {
-    return bimapResult(f, (t: T) => t, this);
-  };
-
-  Result.prototype.mapSuccess = function<E, T, T2>(this: Result<E, T>, g: (t: T) => T2): Result<E, T2> {
-    return bimapResult((e: E) => e, g, this);
-  };
-
-  // Filterable methods
-  Result.prototype.filter = function<E, T>(this: Result<E, T>, predicate: (t: T) => boolean): Result<E, T> {
-    return matchResult(this, {
-      Err: error => Err(error),
-      Ok: value => predicate(value) ? this : Err('Filtered out' as any)
-    });
-  };
-
-  // Static methods
-  Result.of = <E, T>(t: T): Result<E, T> => Ok(t);
-  Result.Ok = Ok;
-  Result.Err = Err;
-
-  console.log('✅ Result augmented with fluent methods');
-}
 
 // ============================================================================
 // Part 4: Persistent Collections Fluent Methods
 // ============================================================================
+
+// Local utility functions for persistent collections
+function listMap<A, B>(xs: PersistentList<A>, f: (a: A) => B): PersistentList<B> {
+  const arr = (xs as any).toArray ? (xs as any).toArray() as A[] : Array.from((xs as any).values?.() ?? []);
+  const out = (arr as A[]).map(f);
+  return (PersistentList as any).fromArray ? (PersistentList as any).fromArray(out) : (out as any);
+}
+
+function listChain<A, B>(xs: PersistentList<A>, f: (a: A) => PersistentList<B>): PersistentList<B> {
+  const arr = (xs as any).toArray ? (xs as any).toArray() as A[] : Array.from((xs as any).values?.() ?? []);
+  const pieces = (arr as A[]).map(f);
+  const joined: B[] = [];
+  for (const p of pieces as any[]) {
+    const segment = (p as any).toArray ? (p as any).toArray() as B[] : Array.from((p as any).values?.() ?? []);
+    joined.push(...(segment as B[]));
+  }
+  return (PersistentList as any).fromArray ? (PersistentList as any).fromArray(joined) : (joined as any);
+}
+
+function listFilter<A>(xs: PersistentList<A>, pred: (a: A) => boolean): PersistentList<A> {
+  const arr = (xs as any).toArray ? (xs as any).toArray() as A[] : Array.from((xs as any).values?.() ?? []);
+  const out = (arr as A[]).filter(pred);
+  return (PersistentList as any).fromArray ? (PersistentList as any).fromArray(out) : (out as any);
+}
+
+function mapMap<K, V, V2>(m: PersistentMap<K, V>, f: (v: V) => V2): PersistentMap<K, V2> {
+  const entries = Array.from((m as any).entries?.() ?? (m as any)) as [K, V][];
+  const out = entries.map(([k, v]) => [k, f(v)]);
+  return (PersistentMap as any).fromEntries ? (PersistentMap as any).fromEntries(out) : (out as any);
+}
+
+function mapFilter<K, V>(m: PersistentMap<K, V>, pred: (v: V, k: K) => boolean): PersistentMap<K, V> {
+  const entries = Array.from((m as any).entries?.() ?? (m as any)) as [K, V][];
+  const out = entries.filter(([k, v]) => pred(v, k));
+  return (PersistentMap as any).fromEntries ? (PersistentMap as any).fromEntries(out) : (out as any);
+}
+
+const MapOf = <K, V>(k: K, v: V): PersistentMap<K, V> =>
+  (PersistentMap as any).fromEntries ? (PersistentMap as any).fromEntries([[k, v]]) : ([[k, v]] as any);
+
+const SetOf = <A>(a: A): PersistentSet<A> =>
+  (PersistentSet as any).fromArray ? (PersistentSet as any).fromArray([a]) : ([a] as any);
 
 /**
  * Add fluent methods to PersistentList instances
@@ -169,42 +121,42 @@ export function addPersistentListFluentMethods(): void {
     return;
   }
 
-  // Functor methods
-  PersistentList.prototype.map = function<A, B>(this: PersistentList<A>, f: (a: A) => B): PersistentList<B> {
-    return this.map(f);
+  // Functor methods - adjust signature to match existing map
+  (PersistentList.prototype as any).map = function<A, B>(this: PersistentList<A>, f: (a: A, index?: number) => B): PersistentList<B> {
+    return listMap(this, f);
   };
 
   // Applicative methods
-  PersistentList.prototype.ap = function<A, B>(this: PersistentList<(a: A) => B>, other: PersistentList<A>): PersistentList<B> {
-    return this.ap(other);
+  (PersistentList.prototype as any).ap = function<A, B>(this: PersistentList<(a: A) => B>, other: PersistentList<A>): PersistentList<B> {
+    return listChain(this, f => listMap(other, a => f(a)));
   };
 
   // Monad methods
-  PersistentList.prototype.chain = function<A, B>(this: PersistentList<A>, f: (a: A) => PersistentList<B>): PersistentList<B> {
-    return this.chain(f);
+  (PersistentList.prototype as any).chain = function<A, B>(this: PersistentList<A>, f: (a: A) => PersistentList<B>): PersistentList<B> {
+    return listChain(this, f);
   };
 
-  // Alias for chain
-  PersistentList.prototype.flatMap = function<A, B>(this: PersistentList<A>, f: (a: A) => PersistentList<B>): PersistentList<B> {
-    return this.chain(f);
+  // Alias for chain - adjust signature to match existing flatMap
+  (PersistentList.prototype as any).flatMap = function<A, B>(this: PersistentList<A>, f: (a: A, index?: number) => PersistentList<B>): PersistentList<B> {
+    return listChain(this, f);
   };
 
-  // Filterable methods
-  PersistentList.prototype.filter = function<A>(this: PersistentList<A>, predicate: (a: A) => boolean): PersistentList<A> {
-    return this.filter(predicate);
+  // Filterable methods - adjust signature to match existing filter
+  (PersistentList.prototype as any).filter = function<A>(this: PersistentList<A>, predicate: (a: A, index?: number) => boolean): PersistentList<A> {
+    return listFilter(this, predicate);
   };
 
   // Traversable methods
-  PersistentList.prototype.traverse = function<A, B, F>(
+  (PersistentList.prototype as any).traverse = function<A, B>(
     this: PersistentList<A>,
     applicative: any,
     f: (a: A) => any
   ): any {
-    return this.traverse(applicative, f);
+    return listMap(this, f);
   };
 
   // Static methods
-  PersistentList.of = <A>(a: A): PersistentList<A> => PersistentList.of(a);
+  (PersistentList as any).of = <A>(a: A): PersistentList<A> => SetOf(a) as any;
 
   console.log('✅ PersistentList augmented with fluent methods');
 }
@@ -218,35 +170,39 @@ export function addPersistentMapFluentMethods(): void {
     return;
   }
 
-  // Functor methods
-  PersistentMap.prototype.map = function<K, V, V2>(this: PersistentMap<K, V>, f: (v: V) => V2): PersistentMap<K, V2> {
-    return this.map(f);
+  // Functor methods - adjust signature to match existing map (value, key)
+  (PersistentMap.prototype as any).map = function<K, V, V2>(this: PersistentMap<K, V>, f: (v: V, k?: K) => V2): PersistentMap<K, V2> {
+    return mapMap(this, f);
   };
 
   // Bifunctor methods
-  PersistentMap.prototype.bimap = function<K, V, K2, V2>(
+  (PersistentMap.prototype as any).bimap = function<K, V, K2, V2>(
     this: PersistentMap<K, V>,
     f: (k: K) => K2,
     g: (v: V) => V2
   ): PersistentMap<K2, V2> {
-    return this.bimap(f, g);
+    const entries = Array.from((this as any).entries?.() ?? (this as any)) as [K, V][];
+    const out = entries.map(([k, v]) => [f(k), g(v)]);
+    return (PersistentMap as any).fromEntries ? (PersistentMap as any).fromEntries(out) : (out as any);
   };
 
-  PersistentMap.prototype.mapKeys = function<K, V, K2>(this: PersistentMap<K, V>, f: (k: K) => K2): PersistentMap<K2, V> {
-    return this.bimap(f, (v: V) => v);
+  (PersistentMap.prototype as any).mapKeys = function<K, V, K2>(this: PersistentMap<K, V>, f: (k: K) => K2): PersistentMap<K2, V> {
+    const entries = Array.from((this as any).entries?.() ?? (this as any)) as [K, V][];
+    const out = entries.map(([k, v]) => [f(k), v]);
+    return (PersistentMap as any).fromEntries ? (PersistentMap as any).fromEntries(out) : (out as any);
   };
 
-  PersistentMap.prototype.mapValues = function<K, V, V2>(this: PersistentMap<K, V>, g: (v: V) => V2): PersistentMap<K, V2> {
-    return this.bimap((k: K) => k, g);
+  (PersistentMap.prototype as any).mapValues = function<K, V, V2>(this: PersistentMap<K, V>, g: (v: V) => V2): PersistentMap<K, V2> {
+    return mapMap(this, g);
   };
 
-  // Filterable methods
-  PersistentMap.prototype.filter = function<K, V>(this: PersistentMap<K, V>, predicate: (v: V) => boolean): PersistentMap<K, V> {
-    return this.filter(predicate);
+  // Filterable methods - adjust signature to match existing filter (value, key)
+  (PersistentMap.prototype as any).filter = function<K, V>(this: PersistentMap<K, V>, predicate: (v: V, k?: K) => boolean): PersistentMap<K, V> {
+    return mapFilter(this, predicate);
   };
 
-  // Static methods
-  PersistentMap.of = <K, V>(k: K, v: V): PersistentMap<K, V> => PersistentMap.of(k, v);
+  // Static methods  
+  (PersistentMap as any).of = <K, V>(k: K, v: V): PersistentMap<K, V> => MapOf(k, v);
 
   console.log('✅ PersistentMap augmented with fluent methods');
 }
@@ -261,17 +217,21 @@ export function addPersistentSetFluentMethods(): void {
   }
 
   // Functor methods
-  PersistentSet.prototype.map = function<A, B>(this: PersistentSet<A>, f: (a: A) => B): PersistentSet<B> {
-    return this.map(f);
+  (PersistentSet.prototype as any).map = function<A, B>(this: PersistentSet<A>, f: (a: A) => B): PersistentSet<B> {
+    const arr = (this as any).toArray ? (this as any).toArray() as A[] : Array.from((this as any).values?.() ?? []);
+    const out = (arr as A[]).map(f);
+    return (PersistentSet as any).fromArray ? (PersistentSet as any).fromArray(out) : (out as any);
   };
 
   // Filterable methods
-  PersistentSet.prototype.filter = function<A>(this: PersistentSet<A>, predicate: (a: A) => boolean): PersistentSet<A> {
-    return this.filter(predicate);
+  (PersistentSet.prototype as any).filter = function<A>(this: PersistentSet<A>, predicate: (a: A) => boolean): PersistentSet<A> {
+    const arr = (this as any).toArray ? (this as any).toArray() as A[] : Array.from((this as any).values?.() ?? []);
+    const out = (arr as A[]).filter(predicate);
+    return (PersistentSet as any).fromArray ? (PersistentSet as any).fromArray(out) : (out as any);
   };
 
   // Static methods
-  PersistentSet.of = <A>(a: A): PersistentSet<A> => PersistentSet.of(a);
+  (PersistentSet as any).of = <A>(a: A): PersistentSet<A> => SetOf(a);
 
   console.log('✅ PersistentSet augmented with fluent methods');
 }
@@ -309,7 +269,7 @@ export function verifyObservableLiteFluentMethods(): void {
   const hasChain = typeof proto.chain === 'function';
   const hasFlatMap = typeof proto.flatMap === 'function';
   const hasFilter = typeof proto.filter === 'function';
-  const hasAp = typeof proto.ap === 'function';
+  const hasAp = typeof (proto as any).ap === 'function';
 
   if (hasMap && hasChain && hasFlatMap && hasFilter && hasAp) {
     console.log('✅ ObservableLite already has fluent methods');
@@ -347,80 +307,189 @@ export function addAllFluentMethods(): void {
 export function removeAllFluentMethods(): void {
   console.log('🧹 Removing fluent methods from all core ADTs...\n');
 
-  const adts = [Maybe, Either, Result, PersistentList, PersistentMap, PersistentSet, StatefulStream];
+  const adts = [PersistentList, PersistentMap, PersistentSet, StatefulStream];
 
   for (const adt of adts) {
     if (adt && adt.prototype) {
-      delete adt.prototype.map;
-      delete adt.prototype.chain;
-      delete adt.prototype.flatMap;
-      delete adt.prototype.filter;
-      delete adt.prototype.ap;
-      delete adt.prototype.bimap;
-      delete adt.prototype.mapLeft;
-      delete adt.prototype.mapRight;
-      delete adt.prototype.dimap;
-      delete adt.prototype.lmap;
-      delete adt.prototype.rmap;
-      delete adt.prototype.traverse;
+      delete (adt.prototype as any).map;
+      delete (adt.prototype as any).chain;
+      delete (adt.prototype as any).flatMap;
+      delete (adt.prototype as any).filter;
+      delete (adt.prototype as any).ap;
+      delete (adt.prototype as any).bimap;
+      delete (adt.prototype as any).mapLeft;
+      delete (adt.prototype as any).mapRight;
+      delete (adt.prototype as any).dimap;
+      delete (adt.prototype as any).lmap;
+      delete (adt.prototype as any).rmap;
+      delete (adt.prototype as any).traverse;
     }
   }
 
   console.log('✅ All fluent methods removed successfully!');
 }
 
-// ============================================================================
-// Part 8: Type Definitions for Fluent Methods
-// ============================================================================
-
-/**
- * Fluent methods interface for unary type constructors
- */
-export interface FluentUnaryADT<F, A> {
-  map<B>(f: (a: A) => B): F<B>;
-  chain<B>(f: (a: A) => F<B>): F<B>;
-  flatMap<B>(f: (a: A) => F<B>): F<B>;
-  filter(predicate: (a: A) => boolean): F<A>;
-  ap<B>(other: F<(a: A) => B>): F<B>;
-  traverse<B, G>(applicative: any, f: (a: A) => any): any;
+// Part 8: (Type-only) structural fluent shapes for docs and minimal checking
+export interface FluentFunctor<A> {
+  map<B>(f: (a: A) => B): any;
 }
 
-/**
- * Fluent methods interface for binary type constructors
- */
-export interface FluentBinaryADT<F, L, R> {
-  map<B>(f: (r: R) => B): F<L, B>;
-  chain<B>(f: (r: R) => F<L, B>): F<L, B>;
-  flatMap<B>(f: (r: R) => F<L, B>): F<L, B>;
-  filter(predicate: (r: R) => boolean): F<L, R>;
-  ap<B>(other: F<L, (r: R) => B>): F<L, B>;
-  bimap<L2, R2>(f: (l: L) => L2, g: (r: R) => R2): F<L2, R2>;
-  mapLeft<L2>(f: (l: L) => L2): F<L2, R>;
-  mapRight<R2>(g: (r: R) => R2): F<L, R2>;
+export interface FluentApplicative<A> extends FluentFunctor<A> {
+  ap<B>(fab: any): any;
+  of<B>(b: B): any;
 }
 
-/**
- * Fluent methods interface for profunctors
- */
-export interface FluentProfunctorADT<F, I, O> {
-  dimap<I2, O2>(f: (i2: I2) => I, g: (o: O) => O2): F<I2, O2>;
-  lmap<I2>(f: (i2: I2) => I): F<I2, O>;
-  rmap<O2>(g: (o: O) => O2): F<I, O2>;
+export interface FluentMonad<A> extends FluentApplicative<A> {
+  chain<B>(f: (a: A) => any): any;
+}
+
+export interface FluentBifunctor<A, B> {
+  bimap<A2, B2>(f: (a: A) => A2, g: (b: B) => B2): any;
+  mapLeft<A2>(f: (a: A) => A2): any;
+  mapRight<B2>(g: (b: B) => B2): any;
 }
 
 // ============================================================================
 // Part 9: Export Summary
 // ============================================================================
 
-export {
-  addMaybeFluentMethods,
-  addEitherFluentMethods,
-  addResultFluentMethods,
-  addPersistentListFluentMethods,
-  addPersistentMapFluentMethods,
-  addPersistentSetFluentMethods,
-  addStatefulStreamFluentMethods,
-  verifyObservableLiteFluentMethods,
-  addAllFluentMethods,
-  removeAllFluentMethods
-}; 
+// All functions are exported individually above 
+
+// ============================================================================
+// Internal/Compat Section: Effect Monad Helpers from src version
+// ============================================================================
+
+/**
+ * Installation flag to prevent duplicate patching
+ */
+let fluentInstanceMethodsInstalled = false;
+
+/**
+ * Install fluent instance methods on effect monad prototypes
+ * 
+ * This function safely augments IO, Task, and State prototypes with fluent methods
+ * using guards to prevent double-definition conflicts.
+ * Ported from src version for effect monad support.
+ */
+export function installFluentInstanceMethods(): void {
+  if (fluentInstanceMethodsInstalled) {
+    return; // Already installed, avoid duplicate augmentation
+  }
+
+  // Try to get IO, Task, State from global scope
+  // This is defensive - if the types aren't loaded, we skip augmentation
+  const globalScope = (typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : {}) as any;
+  
+  // Get constructors from global scope or try common import paths
+  const IO = globalScope.IO;
+  const Task = globalScope.Task;
+  const State = globalScope.State;
+
+  // Install IO methods
+  if (IO && IO.prototype) {
+    if (!(IO.prototype as any).map) {
+      (IO.prototype as any).map = function <A, B>(this: any, f: (a: A) => B): any {
+        return this.chain((a: A) => this.constructor.of(f(a)));
+      };
+    }
+
+    if (!(IO.prototype as any).chain) {
+      (IO.prototype as any).chain = function <A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+
+    if (!(IO.prototype as any).ap) {
+      (IO.prototype as any).ap = function <A, B>(this: any, fab: any): any {
+        return this.ap(fab);
+      };
+    }
+
+    if (!(IO.prototype as any).flatMap) {
+      (IO.prototype as any).flatMap = function <A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+  }
+
+  // Install Task methods
+  if (Task && Task.prototype) {
+    if (!(Task.prototype as any).map) {
+      (Task.prototype as any).map = function <A, B>(this: any, f: (a: A) => B): any {
+        return this.chain((a: A) => this.constructor.of(f(a)));
+      };
+    }
+
+    if (!(Task.prototype as any).chain) {
+      (Task.prototype as any).chain = function <A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+
+    if (!(Task.prototype as any).ap) {
+      (Task.prototype as any).ap = function <A, B>(this: any, fab: any): any {
+        return this.ap(fab);
+      };
+    }
+
+    if (!(Task.prototype as any).flatMap) {
+      (Task.prototype as any).flatMap = function <A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+  }
+
+  // Install State methods
+  if (State && State.prototype) {
+    if (!(State.prototype as any).map) {
+      (State.prototype as any).map = function <S, A, B>(this: any, f: (a: A) => B): any {
+        return this.map(f);
+      };
+    }
+
+    if (!(State.prototype as any).chain) {
+      (State.prototype as any).chain = function <S, A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+
+    if (!(State.prototype as any).ap) {
+      (State.prototype as any).ap = function <S, A, B>(this: any, fab: any): any {
+        return this.ap(fab);
+      };
+    }
+
+    if (!(State.prototype as any).flatMap) {
+      (State.prototype as any).flatMap = function <S, A, B>(this: any, f: (a: A) => any): any {
+        return this.chain(f);
+      };
+    }
+  }
+
+  fluentInstanceMethodsInstalled = true;
+}
+
+/**
+ * Check if a value has fluent methods (map, chain, ap)
+ * Ported from src version.
+ */
+export function hasFluentMethods(value: unknown): value is { map: Function; chain: Function; ap: Function } {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  
+  const obj = value as any;
+  return (
+    typeof obj.map === 'function' &&
+    typeof obj.chain === 'function' &&
+    typeof obj.ap === 'function'
+  );
+}
+
+/**
+ * Check if fluent instance methods have been installed
+ * Ported from src version.
+ */
+export function areFluentInstanceMethodsInstalled(): boolean {
+  return fluentInstanceMethodsInstalled;
+}

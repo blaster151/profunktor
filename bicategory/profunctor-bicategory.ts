@@ -10,7 +10,7 @@
  * transformation utilities. Composition of profunctors is provided as a
  * witness-level API; concrete instances can refine it.
  */
-import { Kind2, Apply } from '../fp-hkt.js';
+import { Kind2, Apply } from '../fp-hkt';
 
 // ----------------------------------------------------------------------------
 // 2-cells between parallel profunctors as natural transformations
