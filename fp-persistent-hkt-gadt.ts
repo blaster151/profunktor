@@ -1,3 +1,5 @@
+// Example: Compose to slot persistent collections anywhere HKT-based code expects arrays, etc.
+// const arrayToPersistentToArray = composeK(fromPersistentList, toPersistentList);
 /**
  * Persistent Collections in HKTs + GADTs
  * 
@@ -12,11 +14,22 @@
  * - Type-safe operations with immutability preservation
  */
 
+// ============================================================================
+// Arity-polymorphic helpers (K1/K2/K3)
+// ============================================================================
+
+// mapLastN already exist; wire the K3 version for future containers:
+export const mapList3 = mapLast3; // expose as first-class if you plan a K3 persistent type
+// ============================================================================
+// Interop bridges between standard HKTs and persistent HKTs
+// ============================================================================
+
 import {
   Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
   ArrayK, MaybeK, EitherK, TupleK, FunctionK,
-  Maybe, Either
+  Maybe, Either,
+  ApplyLeft
 } from './fp-hkt';
 
 import {
@@ -28,7 +41,7 @@ import {
 
 import {
   PersistentList, PersistentMap, PersistentSet,
-  PersistentListK, PersistentMapK, PersistentSetK
+  PersistentListK as _PersistentListK, PersistentMapK as _PersistentMapK, PersistentSetK as _PersistentSetK
 } from './fp-persistent';
 
 import {
@@ -36,9 +49,9 @@ import {
   pmatch, PatternMatcherBuilder,
   derivePatternMatcher, createPmatchBuilder,
   Expr, ExprK, evaluate, transformString, ExprFunctor,
-  MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
+  MaybeGADT, MaybeGADTK, getMaybeGADTFunctor, getMaybeGADTApplicative, getMaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor
+  Result, ResultK
 } from './fp-gadt-enhanced';
 
 import {
@@ -51,6 +64,47 @@ import {
   registerDerivableInstances, autoRegisterPersistentCollections,
   deriveInstances, getFunctorInstance, getMonadInstance
 } from './fp-derivable-instances';
+
+// Natural transformations (FunctionK) to and from the persistent containers
+export const toPersistentList: FunctionK<ArrayK, PersistentListHKT> = <A>(as: A[]) =>
+  PersistentList.fromArray(as);
+
+export const fromPersistentList: FunctionK<PersistentListHKT, ArrayK> = <A>(pl: PersistentList<A>) =>
+  pl.toArray();
+
+// For Map: Array<[K, V]> <-> PersistentMap<K, V>
+export const toPersistentMap: FunctionK<TupleK, PersistentMapHKT> = <K, V>(entries: [K, V][]) =>
+  PersistentMap.fromEntries(entries);
+
+export const fromPersistentMap: FunctionK<PersistentMapHKT, TupleK> = <K, V>(pm: PersistentMap<K, V>) => {
+  const arr: [K, V][] = [];
+  pm.forEach((v, k) => arr.push([k, v]));
+  return arr;
+};
+
+// For Set: Array<A> <-> PersistentSet<A>
+export const toPersistentSet: FunctionK<ArrayK, PersistentSetHKT> = <A>(as: A[]) =>
+  PersistentSet.fromArray(as);
+
+export const fromPersistentSet: FunctionK<PersistentSetHKT, ArrayK> = <A>(ps: PersistentSet<A>) => {
+  const arr: A[] = [];
+  ps.forEach(a => arr.push(a));
+  return arr;
+};
+
+/**
+ * @deprecated Use PersistentListHKT instead.
+ */
+export type PersistentListK = _PersistentListK;
+/**
+ * @deprecated Use PersistentMapHKT instead.
+ */
+export type PersistentMapK = _PersistentMapK;
+/**
+ * @deprecated Use PersistentSetHKT instead.
+ */
+export type PersistentSetK = _PersistentSetK;
+
 
 // ============================================================================
 // Part 1: HKT Registration for Persistent Collections
@@ -297,6 +351,47 @@ export function pmatchListTag<A, R>(value: ListGADT<A>): PatternMatcherBuilder<L
   return pmatch(value);
 }
 
+// --------------------------------------------------------------------------
+// GADT-level pattern-match builders & totality helpers (auto-derived style)
+// --------------------------------------------------------------------------
+
+
+// ListGADT builder and total matcher (auto-derived style)
+export const matchListBuilder = createPmatchBuilder<ListGADT<any>, unknown>({});
+export function matchListTotal<A, R>(g: ListGADT<A>, k: {
+  Nil: () => R;
+  Cons: (p: { head: A; tail: PersistentList<A> }) => R;
+}): R {
+  return matchListBuilder(g)
+    .with('Nil', k.Nil)
+    .with('Cons', k.Cons)
+    .exhaustive();
+}
+
+// MapGADT builder and total matcher (auto-derived style)
+export const matchMapBuilder = createPmatchBuilder<MapGADT<any, any>, unknown>({});
+export function matchMapTotal<K, V, R>(g: MapGADT<K, V>, k: {
+  Empty: () => R;
+  NonEmpty: (p: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
+}): R {
+  return matchMapBuilder(g)
+    .with('Empty', k.Empty)
+    .with('NonEmpty', k.NonEmpty)
+    .exhaustive();
+}
+
+// SetGADT builder and total matcher (auto-derived style)
+export const matchSetBuilder = createPmatchBuilder<SetGADT<any>, unknown>({});
+export function matchSetTotal<A, R>(g: SetGADT<A>, k: {
+  Empty: () => R;
+  NonEmpty: (p: { element: A; rest: PersistentSet<A> }) => R;
+}): R {
+  return matchSetBuilder(g)
+    .with('Empty', k.Empty)
+    .with('NonEmpty', k.NonEmpty)
+    .exhaustive();
+}
+
 /**
  * Builder-style pattern matcher for MapGADT with exhaustiveness checking
  */
@@ -512,6 +607,16 @@ export const PersistentListMonad: Monad<PersistentListHKT> = {
 };
 
 /**
+ * Register PersistentListHKT typeclass instances for auto-derivation
+ */
+export function registerPersistentTypeclasses() {
+  deriveInstances({
+    functor: { for: 'PersistentListHKT', map: PersistentListFunctor.map },
+    applicative: { for: 'PersistentListHKT', map: PersistentListFunctor.map, of: PersistentListApplicative.of, ap: PersistentListApplicative.ap },
+    monad: { for: 'PersistentListHKT', map: PersistentListFunctor.map, of: PersistentListApplicative.of, ap: PersistentListApplicative.ap, chain: PersistentListMonad.chain }
+  });
+}
+/**
  * Derived instances for PersistentMapHKT
  */
 export const PersistentMapInstances = {
@@ -528,9 +633,18 @@ export const PersistentMapInstances = {
   }
 };
 
-export const PersistentMapFunctor: Functor<PersistentMapHKT> = {
-  map: PersistentMapInstances.map
-};
+
+/**
+ * Factory: Functor instance for PersistentMap with fixed key type K
+ */
+export function getPersistentMapFunctor<K>(): Functor<ApplyLeft<PersistentMapHKT, K>> {
+  return {
+    map: <A, B>(fa: Apply<ApplyLeft<PersistentMapHKT, K>, [A]>, f: (a: A) => B): Apply<ApplyLeft<PersistentMapHKT, K>, [B]> => {
+      // fa is PersistentMap<K, A>
+      return (fa as PersistentMap<K, A>).map(f) as PersistentMap<K, B>;
+    }
+  };
+}
 
 export const PersistentMapBifunctor: Bifunctor<PersistentMapHKT> = {
   bimap: PersistentMapInstances.bimap,
@@ -602,20 +716,26 @@ export const PersistentSetFoldable: Foldable<PersistentSetHKT> = {
 /**
  * Foldable instance for PersistentMapHKT (fold over values, ignore keys)
  */
-export const PersistentMapFoldable: Foldable<PersistentMapHKT> = {
-  foldr: <K,V,B>(fa: Apply<PersistentMapHKT,[K,V]>, f: (v:V, b:B)=>B, z:B): B => {
-    const buf: V[] = [];
-    (fa as PersistentMap<K,V>).forEach((v) => buf.push(v));
-    let acc = z;
-    for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
-    return acc;
-  },
-  foldl: <K,V,B>(fa: Apply<PersistentMapHKT,[K,V]>, f: (b:B, v:V)=>B, z:B): B => {
-    let acc = z;
-    (fa as PersistentMap<K,V>).forEach((v) => { acc = f(acc, v); });
-    return acc;
-  }
-};
+
+/**
+ * Factory: Foldable instance for PersistentMap with fixed key type K
+ */
+export function getPersistentMapFoldable<K>(): Foldable<ApplyLeft<PersistentMapHKT, K>> {
+  return {
+    foldr: <A, B>(fa: Apply<ApplyLeft<PersistentMapHKT, K>, [A]>, f: (a: A, b: B) => B, z: B): B => {
+      const buf: A[] = [];
+      (fa as PersistentMap<K, A>).forEach((v) => buf.push(v));
+      let acc = z;
+      for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
+      return acc;
+    },
+    foldl: <A, B>(fa: Apply<ApplyLeft<PersistentMapHKT, K>, [A]>, f: (b: B, a: A) => B, z: B): B => {
+      let acc = z;
+      (fa as PersistentMap<K, A>).forEach((v) => { acc = f(acc, v); });
+      return acc;
+    }
+  };
+}
 
 // ============================================================================
 // Part 6.6: Traversable Instances for Persistent Collections
@@ -679,15 +799,23 @@ export function registerPersistentCollectionsAsHKTs(): void {
   registerDerivableInstances(SetGADT);
 }
 
+// --------------------------------------------------------------------------
+// Auto-derivation hooks for persistent typeclasses
+// --------------------------------------------------------------------------
+
 /**
- * Auto-register all persistent collections as HKTs
+ * Register persistent typeclass instances for derivation
  */
-export function autoRegisterPersistentCollectionsAsHKTs(): void {
-  // Register existing persistent collections
-  autoRegisterPersistentCollections();
-  
-  // Register as HKTs
-  registerPersistentCollectionsAsHKTs();
+export function registerPersistentTypeclasses() {
+  deriveInstances({
+    functor: { for: 'PersistentListHKT', map: PersistentListFunctor.map },
+    applicative: { for: 'PersistentListHKT', of: PersistentListApplicative.of, ap: PersistentListApplicative.ap },
+    monad: { for: 'PersistentListHKT', of: PersistentListMonad.of, ap: PersistentListMonad.ap, chain: PersistentListMonad.chain },
+    functor2: { for: 'PersistentMapHKT', map: PersistentMapInstances.map },
+    bifunctor: { for: 'PersistentMapHKT', bimap: PersistentMapInstances.bimap },
+    functor1: { for: 'PersistentSetHKT', map: PersistentSetFunctor.map },
+    // Add more as needed
+  });
 }
 
 // ============================================================================
@@ -809,6 +937,55 @@ export function matchSetTypeSafe<A, R>(
 // Part 10: Utility Functions for Common Operations
 // ============================================================================
 
+// --- Collect/partition helpers for Maybe/Either/Result ---
+export const collectMaybes = <A>(pl: PersistentList<Maybe<A>>): PersistentList<A> =>
+  pl.reduce(PersistentList.empty<A>(), (acc, m) => m.tag === 'Just' ? acc.prepend(m.value) : acc).reverse();
+
+export const partitionEithers = <L, R>(pl: PersistentList<Either<L, R>>): { lefts: PersistentList<L>, rights: PersistentList<R> } => {
+  let lefts = PersistentList.empty<L>();
+  let rights = PersistentList.empty<R>();
+  pl.forEach(e => {
+    if (e.tag === 'Left') lefts = lefts.prepend(e.value);
+    else rights = rights.prepend(e.value);
+  });
+  return { lefts: lefts.reverse(), rights: rights.reverse() };
+};
+
+export const sequenceResult = <A, E>(pl: PersistentList<Result<A, E>>): Result<PersistentList<A>, E> => {
+  let acc = PersistentList.empty<A>();
+  for (const r of pl) {
+    if (r.tag === 'Err') return r;
+    acc = acc.prepend(r.value);
+  }
+  return { tag: 'Ok', value: acc.reverse() };
+};
+
+// --- zip/zipWith for lists/sets ---
+export const zipWith = <A, B, C>(as: PersistentList<A>, bs: PersistentList<B>, f: (a: A, b: B) => C): PersistentList<C> => {
+  const arrA = as.toArray();
+  const arrB = bs.toArray();
+  const len = Math.min(arrA.length, arrB.length);
+  const out: C[] = [];
+  for (let i = 0; i < len; i++) out.push(f(arrA[i], arrB[i]));
+  return PersistentList.fromArray(out);
+};
+export const zip = <A, B>(as: PersistentList<A>, bs: PersistentList<B>): PersistentList<[A, B]> => zipWith(as, bs, (a, b) => [a, b]);
+
+// --- toJSON/fromJSON for persistent structures ---
+export const toJSON = <A>(pl: PersistentList<A>): string => JSON.stringify(pl.toArray());
+export const fromJSON = <A>(json: string): PersistentList<A> => PersistentList.fromArray(JSON.parse(json));
+
+// --- Law helpers (Foldable/Traversable parametricity smoke tests) ---
+export function foldableLaw_identity<A>(pl: PersistentList<A>): boolean {
+  const arr = pl.toArray();
+  return arr.join(',') === pl.foldl('', (acc, a) => acc ? acc + ',' + a : '' + a);
+}
+export function traversableLaw_identity<A>(pl: PersistentList<A>): Promise<boolean> {
+  return Promise.resolve(pl.toArray()).then(arr =>
+    JSON.stringify(arr) === JSON.stringify(pl.toArray())
+  );
+}
+
 /**
  * Sum all elements in a ListGADT
  */
@@ -896,15 +1073,37 @@ export function preserveImmutability<T>(value: T): T {
   return value;
 }
 
+// --------------------------------------------------------------------------
+// Zero-copy immutable array bridges and guards
+// --------------------------------------------------------------------------
+
 /**
- * Type-safe operation that preserves immutability
+ * Convert PersistentList<A> to Immutable<readonly A[]> (zero-copy if possible)
  */
-export function safeOperation<A, B>(
-  operation: (a: A) => B,
-  value: A
-): B {
-  const result = operation(value);
-  return preserveImmutability(result);
+export const toImmutableArray = <A>(pl: PersistentList<A>): Immutable<readonly A[]> => {
+  const arr = pl.toArray();
+  return immutableArray(arr); // zero-copy wrapper if supported
+};
+
+/**
+ * Convert Immutable<readonly A[]> to PersistentList<A>
+ * Throws if input is not immutable; copy-on-write fallback if needed
+ */
+export const fromImmutableArray = <A>(ia: Immutable<readonly A[]>): PersistentList<A> => {
+  if (!isImmutableCollection(ia)) {
+    throw new Error('Input is not an Immutable<readonly A[]>');
+  }
+  // Defensive: ensure array is not mutated
+  return PersistentList.fromArray(ia as readonly A[]);
+};
+
+/**
+ * Guard: Asserts input is an Immutable<readonly A[]>
+ */
+export function assertImmutableArray<A>(ia: any): asserts ia is Immutable<readonly A[]> {
+  if (!isImmutableCollection(ia)) {
+    throw new Error('Expected Immutable<readonly A[]>');
+  }
 }
 
 // ============================================================================

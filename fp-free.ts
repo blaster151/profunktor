@@ -29,7 +29,7 @@ export function foldFree<F extends Kind1, A>(F: Functor<F>, phi: (fa: Apply<F, [
     case 'Pure':
       return fa.value;
     case 'Impure':
-      const mapped: Apply<F, [A]> = F.map(fa.fx, (inner) => foldFree(F, phi, inner));
+  const mapped: Apply<F, [A]> = (F.map as any)(fa.fx, (inner: any) => foldFree(F, phi, inner));
       return phi(mapped);
   }
 }

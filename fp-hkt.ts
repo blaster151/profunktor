@@ -1,3 +1,31 @@
+// Accept both legacy Kind1 and new KindType (kindArity: 1)
+export type Kindish1 = Kind1 | { kindArity: 1 };
+// Export utility types and interfaces for external use
+// ...existing code...
+// Projectwide arity-bridges for Kind2 bifunctors
+
+// Forward declaration for Kind to allow its use in utility types
+// (actual definition is below)
+interface Kind<Args extends readonly Type[]> {
+  readonly type: Type;
+}
+import { __KindBrand, __HKIn, __HKOut } from './kind-branding';
+import type { Functor, Monad } from './fp-typeclasses';
+import { getTypeclassInstance } from './fp-registry-init';
+
+/**
+ * Given a binary kind F and fixed L, return Functor<ApplyLeft<F, L>>
+ */
+export function getFunctorForKind2<F extends Kind2, L>(typeName: string): Functor<ApplyLeft<F, L>> {
+  return getTypeclassInstance(typeName, 'Functor') as Functor<ApplyLeft<F, L>>;
+}
+
+/**
+ * Given a binary kind F and fixed L, return Monad<ApplyLeft<F, L>>
+ */
+export function getMonadForKind2<F extends Kind2, L>(typeName: string): Monad<ApplyLeft<F, L>> {
+  return getTypeclassInstance(typeName, 'Monad') as Monad<ApplyLeft<F, L>>;
+}
 /**
  * Higher-Kinded Types (HKTs) for TypeScript
  * 
@@ -37,29 +65,27 @@ export type KindResult<F extends Kind<any>, Args extends TypeArgs> = Apply<F, Ar
 /**
  * Type-level application: plug Args into F's slots and read `type`
  */
-// BEGIN PATCH: precise Apply for Kind1/2/3 by arity
-export type Apply<
-  F extends Kind<any>,
-  Args extends readonly Type[]
-> =
-  // unary: F<A>
-  Args extends [infer A]
-    ? (F & { arg0: A })['type']
-  // binary: F<A, B>
-  : Args extends [infer A, infer B]
-    ? (F & { arg0: A; arg1: B })['type']
-  // ternary: F<A, B, C>
-  : Args extends [infer A, infer B, infer C]
-    ? (F & { arg0: A; arg1: B; arg2: C })['type']
-  : never;
-// END PATCH
 
-/**
- * Legacy Kind interface for backward compatibility
- */
-export interface Kind<Args extends readonly Type[]> {
-  readonly type: Type;
-}
+// BEGIN PATCH: precise Apply for Kind1/2/3 by arity
+// Apply detects new kind path by kindArity, otherwise falls back to legacy slot encoding
+export type Apply<F, Args extends readonly Type[]> =
+  F extends { kindArity: number }
+    ? ReturnType<typeof import("./src/kind/kindTypeFactory").applyTypeConstructor>
+    : F extends { type: unknown }
+      ? (
+          Args extends [infer A]
+            ? (F & { arg0: A })['type']
+            : Args extends [infer A, infer B]
+              ? (F & { arg0: A; arg1: B })['type']
+              : Args extends [infer A, infer B, infer C]
+                ? (F & { arg0: A; arg1: B; arg2: C })['type']
+                : Args extends [infer A, infer B, infer C, ...infer Rest]
+                  ? (F & { arg0: A; arg1: B; arg2: C } & Record<`arg${number}`, unknown>)['type']
+                  : never
+        )
+      : never;
+// END PATCH
+// END PATCH
 
 // ============================================================================
 // Data Type Definitions
@@ -130,19 +156,32 @@ export interface Kind2Any extends KindAny {
 }
 
 /**
- * HigherKind - represents a function from one kind to another
- * This is the core type for Higher-Order Kinds
+ * HigherKind - nominally brands domain/codomain kinds for safe composition
  */
 export interface HigherKind<In extends KindAny, Out extends KindAny> {
-  readonly __input: In;
-  readonly __output: Out;
+  readonly [__HKIn]: In;
+  readonly [__HKOut]: Out;
+  readonly __input?: In;
+  readonly __output?: Out;
   readonly type: Type;
 }
 
-/**
- * Type-level function application for Higher-Kinds
- * Applies a HigherKind to input arguments and returns the output kind
- */
+export type HKInput<F extends HigherKind<any, any>> = F[typeof __HKIn];
+export type HKOutput<F extends HigherKind<any, any>> = F[typeof __HKOut];
+
+export interface ComposeHOK<
+  F extends HigherKind<any, any>,
+  G extends HigherKind<HKOutput<F>, any>
+> extends HigherKind<HKInput<F>, HKOutput<G>> {
+  readonly __composed: [F, G];
+}
+
+type EnsureComposable<F extends HigherKind<any, any>, G extends HigherKind<any, any>> =
+  HKOutput<F> extends HKInput<G> ? unknown : ["HOK composition mismatch", { left: HKOutput<F> }, { right: HKInput<G> }];
+
+export type Compose<F extends HigherKind<any, any>, G extends HigherKind<any, any>> =
+  EnsureComposable<F, G> & ComposeHOK<F, G>;
+
 export type ApplyHigherKind<F extends HigherKind<any, any>, Args extends readonly Type[]> = 
   F extends HigherKind<infer In, infer Out> 
     ? In extends Kind<Args> 
@@ -150,19 +189,6 @@ export type ApplyHigherKind<F extends HigherKind<any, any>, Args extends readonl
       : never 
     : never;
 
-/**
- * Extract the input kind from a HigherKind
- */
-export type KindInput<F extends HigherKind<any, any>> = F['__input'];
-
-/**
- * Extract the output kind from a HigherKind
- */
-export type KindOutput<F extends HigherKind<any, any>> = F['__output'];
-
-/**
- * Check if two kinds are compatible (same arity)
- */
 export type IsKindCompatible<F extends KindAny, G extends KindAny> = 
   F extends Kind<infer ArgsF> 
     ? G extends Kind<infer ArgsG> 
@@ -172,31 +198,13 @@ export type IsKindCompatible<F extends KindAny, G extends KindAny> =
       : false 
     : false;
 
-/**
- * Check if a HigherKind is compatible with a given input kind
- */
-export type IsHigherKindCompatible<F extends HigherKind<any, any>, In extends KindAny> = 
-  IsKindCompatible<KindInput<F>, In>;
+export type IsHigherKindCompatible<F extends HigherKind<any, any>, In extends KindAny> =
+  IsKindCompatible<HKInput<F>, In>;
 
-/**
- * Compose two HigherKinds
- * F: A -> B, G: B -> C => ComposeHOK<F, G>: A -> C
- */
-export interface ComposeHOK<F extends HigherKind<any, any>, G extends HigherKind<any, any>> 
-  extends HigherKind<KindInput<F>, KindOutput<G>> {
-  readonly __composed: [F, G];
-}
-
-/**
- * Identity HigherKind - maps any kind to itself
- */
 export interface IdentityHOK<In extends KindAny> extends HigherKind<In, In> {
   readonly __identity: true;
 }
 
-/**
- * Constant HigherKind - maps any input kind to a constant output kind
- */
 export interface ConstHOK<In extends KindAny, Out extends KindAny> extends HigherKind<In, Out> {
   readonly __const: Out;
 }
@@ -205,26 +213,17 @@ export interface ConstHOK<In extends KindAny, Out extends KindAny> extends Highe
 // Kind Shorthands for Common Arities
 // ============================================================================
 
-/**
- * Unary type constructor (takes 1 type argument)
- */
 export interface Kind1 extends Kind<[Type]> {
   readonly arg0: Type;
   readonly type: Type;
 }
 
-/**
- * Binary type constructor (takes 2 type arguments)
- */
 export interface Kind2 extends Kind<[Type, Type]> {
   readonly arg0: Type;
   readonly arg1: Type;
   readonly type: Type;
 }
 
-/**
- * Ternary type constructor (takes 3 type arguments)
- */
 export interface Kind3 extends Kind<[Type, Type, Type]> {
   readonly arg0: Type;
   readonly arg1: Type;
@@ -236,7 +235,6 @@ export interface Kind3 extends Kind<[Type, Type, Type]> {
 // Variance Tags and Kind Metadata
 // ============================================================================
 
-/** Variance direction for type parameters */
 export type VarianceTag = 'Out' | 'In' | 'Phantom' | 'Invariant';
 
 export type Out = { readonly _v: 'Out' };
@@ -244,21 +242,15 @@ export type In = { readonly _v: 'In' };
 export type Ph = { readonly _v: 'Phantom' };
 export type Iv = { readonly _v: 'Invariant' };
 
-/** Metadata about a kind: arity and variance for each parameter */
 export interface KindInfo {
   readonly arity: number;
   readonly variance: ReadonlyArray<VarianceTag>;
 }
 
-/**
- * Type-level variance lookup for known kinds. Defaults to Invariant for safety.
- */
 export type VarianceOf<F extends Kind<any>> =
-  // Unary
   F extends ArrayK | MaybeK | PromiseK | SetK | ListK | ObservableLiteK
     ? ['Out']
-    : // Binary known
-    F extends FunctionK
+    : F extends FunctionK
       ? ['In', 'Out']
       : F extends ReaderK
         ? ['In', 'Out']
@@ -270,28 +262,23 @@ export type VarianceOf<F extends Kind<any>> =
               ? ['Out', 'Out']
               : F extends MapK
                 ? ['Invariant', 'Out']
-                : // Fallback: invariant for all parameters
-                F extends Kind<infer Args>
+                : F extends Kind<infer Args>
                   ? { [K in keyof Args]: 'Invariant' } & ReadonlyArray<VarianceTag>
                   : ReadonlyArray<VarianceTag>;
 
-/** Utility: ensure the last parameter of F is covariant (Out) */
 export type RequireCovariantLast<F extends Kind<any>> =
   VarianceOf<F> extends [...infer _Init, infer Last]
     ? Last extends 'Out' ? F : never
     : never;
 
-/** Utility: ensure the first parameter of F is contravariant (In) */
 export type RequireContravariantFirst<F extends Kind<any>> =
   VarianceOf<F> extends [infer First, ...infer _Rest]
     ? First extends 'In' ? F : never
     : never;
 
-/** Extract tail (all but first) of variance array */
 export type ExtractTailVarianceOf<F extends Kind<any>> =
   VarianceOf<F> extends [any, ...infer Tail] ? Tail : [];
 
-/** Extract head (first) of variance array */
 export type ExtractHeadVarianceOf<F extends Kind<any>> =
   VarianceOf<F> extends [infer Head, ...any[]] ? Head : never;
 
@@ -299,30 +286,18 @@ export type ExtractHeadVarianceOf<F extends Kind<any>> =
 // Higher-Order Kind Shorthands
 // ============================================================================
 
-/**
- * Unary to Unary HigherKind (e.g., Functor)
- */
 export interface HOK1<In extends Kind1, Out extends Kind1> extends HigherKind<In, Out> {
   readonly __arity: 1;
 }
 
-/**
- * Binary to Binary HigherKind (e.g., Bifunctor)
- */
 export interface HOK2<In extends Kind2, Out extends Kind2> extends HigherKind<In, Out> {
   readonly __arity: 2;
 }
 
-/**
- * Unary to Binary HigherKind (e.g., Applicative)
- */
 export interface HOK1to2<In extends Kind1, Out extends Kind2> extends HigherKind<In, Out> {
   readonly __arity: '1to2';
 }
 
-/**
- * Binary to Unary HigherKind (e.g., Contravariant)
- */
 export interface HOK2to1<In extends Kind2, Out extends Kind1> extends HigherKind<In, Out> {
   readonly __arity: '2to1';
 }
@@ -331,155 +306,179 @@ export interface HOK2to1<In extends Kind2, Out extends Kind1> extends HigherKind
 // Partial Application Helpers for Higher Arity Kinds
 // ============================================================================
 
-/** Fix the left parameter of a binary kind, yielding a unary kind */
 export interface Fix2Left<F extends Kind2, E> extends Kind1 {
   readonly type: Apply<F, [E, this['arg0']]>;
 }
 
-/** Fix the right parameter of a binary kind, yielding a unary kind */
 export interface Fix2Right<F extends Kind2, A> extends Kind1 {
   readonly type: Apply<F, [this['arg0'], A]>;
 }
 
-/**
- * Curry a binary kind into a unary kind that produces another unary kind.
- * This is a type-level helper for expressing partial application ergonomically.
- */
 export interface CurryKind2<F extends Kind2> extends Kind1 {
   readonly type: {
     <E>(): { new <A>(): Apply<F, [E, A]> };
   };
 }
 
-/** Uncurry two unary applications into a single binary kind application */
 export type UncurryKind2<F extends Kind2, E, A> = Apply<F, [E, A]>;
-
-/** Type-level aliases */
 export type ApplyLeft<F extends Kind2, E> = Fix2Left<F, E>;
 export type ApplyRight<F extends Kind2, A> = Fix2Right<F, A>;
 
-/**
- * Minimal runtime factory to attach metadata for partial applications so registries can inspect variance.
- * Note: Runtime cannot infer types; pass variance explicitly if desired.
- */
-export function makeApplyLeftMeta(baseId: string, varianceTail?: ReadonlyArray<VarianceTag>): {
-  readonly __kind: 'ApplyLeft';
-  readonly base: string;
-  readonly variance?: ReadonlyArray<VarianceTag>;
-} {
-  return { __kind: 'ApplyLeft', base: baseId, variance: varianceTail };
+export interface Flip2<F extends Kind2> extends Kind2 {
+  readonly type: Apply<F, [this['arg1'], this['arg0']]>;
+}
+export type Flip<F extends Kind2> = Flip2<F>;
+
+export interface Fix3Left<F extends Kind3, A> extends Kind2 {
+  readonly type: Apply<F, [A, this['arg0'], this['arg1']]>
+}
+
+export interface Fix3Mid<F extends Kind3, B> extends Kind2 {
+  readonly type: Apply<F, [this['arg0'], B, this['arg1']]>
+}
+
+export interface Fix3Right<F extends Kind3, C> extends Kind2 {
+  readonly type: Apply<F, [this['arg0'], this['arg1'], C]>;
+}
+
+export interface Apply12<F extends Kind3, A, B> extends Kind1 {
+  readonly type: Apply<F, [A, B, this['arg0']]>
+}
+
+export interface Apply23<F extends Kind3, B, C> extends Kind1 {
+  readonly type: Apply<F, [this['arg0'], B, C]>;
+}
+
+export interface Apply13<F extends Kind3, A, C> extends Kind1 {
+  readonly type: Apply<F, [A, this['arg0'], C]>;
 }
 
 // ============================================================================
-// Helper Types for Introspection
+// MapArgs: map argument(s) through a unary kind before applying `F`
 // ============================================================================
 
-// ============================================================================
-// Type Constructor Representations
-// ============================================================================
+export interface MapArg1<F extends Kind1, M extends Kind1> extends Kind1 {
+  readonly type: Apply<F, [Apply<M, [this['arg0']]>]>;
+}
 
-/**
- * Array type constructor as HKT
- */
+export interface MapArg2Left<F extends Kind2, ML extends Kind1> extends Kind2 {
+  readonly type: Apply<F, [Apply<ML, [this['arg0']]> , this['arg1']]>;
+}
+
+export interface MapArg2Right<F extends Kind2, MR extends Kind1> extends Kind2 {
+  readonly type: Apply<F, [this['arg0'], Apply<MR, [this['arg1']]>]>;
+}
+
+export interface MapArgs2<F extends Kind2, ML extends Kind1, MR extends Kind1> extends Kind2 {
+  readonly type: Apply<F, [Apply<ML, [this['arg0']]> , Apply<MR, [this['arg1']]>]>;
+}
+
+type _SameLen<A extends readonly any[], B extends readonly any[]> =
+  A['length'] extends B['length'] ? (B['length'] extends A['length'] ? true : false) : false;
+
+type _VarianceOK<FV extends VarianceTag, GV extends VarianceTag> =
+  GV extends 'Out' ? (FV extends 'Out' | 'Invariant' | 'Phantom' ? true : false)
+  : GV extends 'In' ? (FV extends 'In' | 'Invariant' | 'Phantom' ? true : false)
+  : GV extends 'Invariant' ? (FV extends 'Invariant' ? true : false)
+  : true;
+
+type _ZipVarianceOK<FV extends readonly VarianceTag[], GV extends readonly VarianceTag[]> =
+  FV extends readonly [infer F0, ...infer FRest]
+    ? GV extends readonly [infer G0, ...infer GRest]
+      ? _VarianceOK<Extract<F0, VarianceTag>, Extract<G0, VarianceTag>> extends true
+        ? _ZipVarianceOK<Extract<FRest, readonly VarianceTag[]>, Extract<GRest, readonly VarianceTag[]>>
+        : false
+      : false
+    : true;
+
+export type IsSubkind<F extends KindAny, G extends KindAny> =
+  _SameLen<VarianceOf<F>, VarianceOf<G>> extends true
+    ? _ZipVarianceOK<VarianceOf<F>, VarianceOf<G>>
+    : false;
+
+export type NT<F extends Kind1, G extends Kind1> =
+  <A>(fa: Apply<F, [A]>) => Apply<G, [A]>;
+
+export type NT2<F extends Kind2, G extends Kind2> =
+  <E, A>(fa: Apply<F, [E, A]>) => Apply<G, [E, A]>;
+
+export type NT2Left<F extends Kind2, G extends Kind2, E> =
+  <A>(fa: Apply<F, [E, A]>) => Apply<G, [E, A]>;
+
+export type NT2Right<F extends Kind2, G extends Kind2, A> =
+  <E>(fa: Apply<F, [E, A]>) => Apply<G, [E, A]>;
+
+export interface ComposeK1<F extends Kind1, G extends Kind1> extends Kind1 {
+  readonly type: Apply<G, [Apply<F, [this['arg0']]>]>;
+}
+
+export interface ComposeK2Left<F extends Kind1, G extends Kind2> extends Kind2 {
+  readonly type: Apply<G, [Apply<F, [this['arg0']]> , this['arg1']]>;
+}
+
+export interface ComposeK2Right<F extends Kind1, G extends Kind2> extends Kind2 {
+  readonly type: Apply<G, [this['arg0'], Apply<F, [this['arg1']]>]>;
+}
+
 export interface ArrayK extends Kind1 {
   readonly type: Array<this['arg0']>;
 }
 
-/**
- * Maybe/Option type constructor as HKT
- */
 export interface MaybeK extends Kind1 {
   readonly type: Maybe<this['arg0']>;
 }
 
-/**
- * Either type constructor as HKT
- */
 export interface EitherK extends Kind2 {
   readonly type: Either<this['arg0'], this['arg1']>;
 }
 
-/**
- * Result type constructor as HKT
- */
 export interface ResultK extends Kind2 {
   readonly type: Result<this['arg0'], this['arg1']>;
 }
 
-/**
- * Tuple type constructor as HKT
- */
 export interface TupleK extends Kind2 {
   readonly type: [this['arg0'], this['arg1']];
 }
 
-/**
- * Function type constructor as HKT (contravariant in first arg, covariant in second)
- */
 export interface FunctionK extends Kind2 {
   readonly tag: 'FunctionK';
   readonly type: (arg: this['arg0']) => this['arg1'];
 }
 
-/**
- * Kleisli arrow type constructor as HKT
- */
 export interface KleisliK<M extends Kind1> extends Kind2 {
   readonly tag: 'KleisliK';
   readonly monad: M;
   readonly type: (a: this['arg0']) => Apply<M, [this['arg1']]>;
 }
 
-/**
- * Promise type constructor as HKT
- */
 export interface PromiseK extends Kind1 {
   readonly type: Promise<this['arg0']>;
 }
 
-/**
- * Set type constructor as HKT
- */
 export interface SetK extends Kind1 {
   readonly type: Set<this['arg0']>;
 }
 
-/**
- * Map type constructor as HKT
- */
 export interface MapK extends Kind2 {
   readonly type: Map<this['arg0'], this['arg1']>;
 }
 
-/**
- * List type constructor as HKT
- */
 export interface ListK extends Kind1 {
   readonly type: List<this['arg0']>;
 }
 
-/**
- * Reader type constructor as HKT (environment -> value)
- */
 export interface ReaderK extends Kind2 {
   readonly type: Reader<this['arg0'], this['arg1']>;
 }
 
-/**
- * Writer type constructor as HKT (value, log)
- */
 export interface WriterK extends Kind2 {
   readonly type: Writer<this['arg0'], this['arg1']>;
 }
 
-/**
- * State type constructor as HKT (state -> value, newState)
- */
 export interface StateK extends Kind2 {
   readonly type: State<this['arg0'], this['arg1']>;
 }
 
-// Centralized kind symbols for common FP types
 export interface IOK extends Kind1 {
   readonly type: any;
 }
@@ -488,32 +487,18 @@ export interface TaskK extends Kind1 {
   readonly type: any;
 }
 
-/**
- * ObservableLite type constructor as HKT (reactive streams)
- */
 export interface ObservableLiteK extends Kind1 {
-  readonly type: any; // Will be properly typed when imported
-  readonly __effect: 'Async'; // Mark as async for purity tracking
+  readonly type: any;
+  readonly __effect: 'Async';
 }
 
-/**
- * TaskEither kind - represents the TaskEither type constructor
- */
 export interface TaskEitherK extends Kind2 {
-  readonly type: any; // Will be properly typed when imported
-  readonly __effect: 'Async'; // Mark as async for purity tracking
+  readonly type: any;
+  readonly __effect: 'Async';
 }
 
-// ============================================================================
-// Kind1 wrappers for right-covariant families  
-// ============================================================================
-
-// Re-export specialized Kind1 wrappers from dedicated module
 export type { EitherRightK, ResultOkK } from './fp-hkt-either-result-kinds';
 
-// ----------------------------------------------------------------------------
-// Centralized Kind identifier constants (for registries)
-// ----------------------------------------------------------------------------
 export const ARRAY_K_ID = 'ArrayK' as const;
 export const MAYBE_K_ID = 'MaybeK' as const;
 export const EITHER_K_ID = 'EitherK' as const;
@@ -527,80 +512,30 @@ export const PERSISTENT_SET_K_ID = 'PersistentSetK' as const;
 export const OBSERVABLE_LITE_K_ID = 'ObservableLiteK' as const;
 export const TASK_EITHER_K_ID = 'TaskEitherK' as const;
 
-// ============================================================================
-// Phantom Type Support (Optional Extra Credit)
-// ============================================================================
-
-/**
- * Phantom type parameter - doesn't affect runtime behavior
- */
 export interface Phantom<T> {
   readonly __phantom: T;
 }
 
-/**
- * Kind with phantom type parameter for additional type-level information
- */
 export interface KindWithPhantom<Args extends readonly Type[], PhantomType> extends Kind<Args> {
   readonly __phantom: PhantomType;
 }
 
-// ============================================================================
-// Utility Types
-// ============================================================================
-
-/**
- * Check if a kind is unary
- */
 export type IsKind1<F extends Kind<any>> = F extends Kind1 ? true : false;
-
-/**
- * Check if a kind is binary
- */
 export type IsKind2<F extends Kind<any>> = F extends Kind2 ? true : false;
-
-/**
- * Check if a kind is ternary
- */
 export type IsKind3<F extends Kind<any>> = F extends Kind3 ? true : false;
-
-/**
- * Extract the first type argument from a kind
- */
 export type FirstArg<F extends Kind<any>> = F extends Kind<[infer A, ...any[]]> ? A : never;
-
-/**
- * Extract the second type argument from a kind
- */
 export type SecondArg<F extends Kind<any>> = F extends Kind<[any, infer B, ...any[]]> ? B : never;
-
-/**
- * Extract the third type argument from a kind
- */
 export type ThirdArg<F extends Kind<any>> = F extends Kind<[any, any, infer C, ...any[]]> ? C : never;
 
-// ============================================================================
-// Type Guards and Runtime Utilities
-// ============================================================================
-
-/**
- * Runtime check if a value is a type constructor
- */
 export function isTypeConstructor(value: any): boolean {
   return typeof value === 'function' && value.prototype && value.prototype.constructor === value;
 }
 
-/**
- * Runtime check if a type constructor has the expected arity
- */
 export function hasArity(constructor: any, expectedArity: number): boolean {
   if (!isTypeConstructor(constructor)) return false;
-  
-  // Check if it has type parameters (simplified check)
   const source = constructor.toString();
   const typeParamMatch = source.match(/<[^>]*>/);
   if (!typeParamMatch) return expectedArity === 0;
-  
   const typeParams = typeParamMatch[0].slice(1, -1).split(',').length;
   return typeParams === expectedArity;
 }
@@ -611,23 +546,8 @@ export function hasArity(constructor: any, expectedArity: number): boolean {
 
 /**
  * Example usage:
- * 
- * ```typescript
- * // Define a type constructor
- * interface MyArrayK extends Kind1 {
- *   readonly type: MyArray<this['arg0']>;
- * }
- * 
- * // Use it in a typeclass
- * interface Functor<F extends Kind1> {
- *   map<A, B>(fa: Apply<F, [A]>, f: (a: A) => B): Apply<F, [B]>;
- * }
- * 
- * // Implement for MyArray
- * const MyArrayFunctor: Functor<MyArrayK> = {
- *   map: (fa, f) => fa.map(f)
- * };
- * ```
+ *
+ * // ...existing code...
  */
 
 // ============================================================================
@@ -636,19 +556,19 @@ export function hasArity(constructor: any, expectedArity: number): boolean {
 
 /**
  * HKT Laws:
- * 
+ *
  * 1. Identity: Apply<F, [A]> should be well-formed for any valid F and A
  * 2. Composition: Apply<Compose<F, G>, [A]> = Apply<F, [Apply<G, [A]>]>
  * 3. Naturality: Nat<F, G> should preserve structure
- * 
+ *
  * Kind Laws:
- * 
+ *
  * 1. Kind1: Takes exactly one type argument
  * 2. Kind2: Takes exactly two type arguments
  * 3. Kind3: Takes exactly three type arguments
- * 
+ *
  * Apply Laws:
- * 
+ *
  * 1. Apply<F, Args> should be a concrete type when F is a valid kind and Args match
  * 2. Apply should be distributive over composition
  * 3. Apply should preserve kind arity
@@ -656,25 +576,28 @@ export function hasArity(constructor: any, expectedArity: number): boolean {
 
 /**
  * HKT Laws:
- * 
+ *
  * 1. Identity: Apply<F, [A]> should be well-formed for any valid F and A
  * 2. Composition: Apply<Compose<F, G>, [A]> = Apply<F, [Apply<G, [A]>]>
  * 3. Naturality: Nat<F, G> should preserve structure
- * 
+ *
  * Kind Laws:
- * 
+ *
  * 1. Kind1: Takes exactly one type argument
  * 2. Kind2: Takes exactly two type arguments
  * 3. Kind3: Takes exactly three type arguments
- * 
+ *
  * Apply Laws:
- * 
+ *
  * 1. Apply<F, Args> should be a concrete type when F is a valid kind and Args match
  * 2. Apply should be distributive over composition
  * 3. Apply should preserve kind arity
  */
 
-// HKT identity kind
 export interface IdK extends Kind1 {
-  readonly type: this['arg0']; // Apply<IdK, [A]> === A
+  readonly type: this['arg0'];
 }
+
+export interface Lift1<F extends Kind1> extends HOK1<Kind1, Kind1>  { readonly [__HKOut]: F; }
+export interface Lift2<F extends Kind2> extends HOK2<Kind2, Kind2>  { readonly [__HKOut]: F; }
+// (You can add Lift3 similarly if you need it.)

@@ -34,6 +34,7 @@
 //  */
 // export interface UsageBoundStreamK extends Kind3 {
 //   readonly type: UsageBoundStream<this['arg0'], this['arg1'], this['arg2']>;
+//   // For future arities, extend with: & Record<`arg${number}`, unknown>
 //   readonly usage: (input: this['arg0']) => Multiplicity;
 // }
 

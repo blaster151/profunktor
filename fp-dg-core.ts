@@ -20,7 +20,7 @@ export const scale = <T>(k: number, s: Sum<T>): Sum<T> =>
 export const plus = <T>(a: Sum<T>, b: Sum<T>): Sum<T> => a.concat(b);
 
 // Merge by a user-stable key (caller provides key to identify alpha-equivalent terms)
-export function normalizeByKey<T>(s: Sum<T>, key: (t: T) => string): Sum<T> {
+export function normalizeByKey<T>(s: readonly { coef: number; term: T }[], key: (t: T) => string): { coef: number; term: T }[] {
   const m = new Map<string, { coef: number; term: T }>();
   for (const { coef, term } of s) {
     const k = key(term);

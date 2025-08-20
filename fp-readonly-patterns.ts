@@ -25,9 +25,9 @@ import {
   pmatch, PatternMatcherBuilder,
   derivePatternMatcher, createPmatchBuilder,
   Expr, ExprK, evaluate, transformString, ExprFunctor,
-  MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
+  MaybeGADT, MaybeGADTK, //MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, ResultFunctor
+  Result, ResultK, getResultFunctor
 } from './fp-gadt-enhanced';
 
 import {

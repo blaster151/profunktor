@@ -1,28 +1,35 @@
 // fp-typeclasses.ts
 
 // Use the shared HKT encoding only.
+import type { Kindish1 } from './fp-hkt';
 import {
-  Kind1, Kind2, Apply,
+  Kind1, Kind2, Apply, ApplyLeft,
   ArrayK, TupleK, FunctionK, EitherK,
 } from './fp-hkt';
 
 // Re-export requested HKT symbols for downstream modules
-export type { Kind, Type, Apply } from './fp-hkt';
+export type { Kind1, Type, Apply } from './fp-hkt';
 
 // ============================================================================
 // Core Typeclass Definitions (Kind1/Kind2-based)
 // ============================================================================
 
-export interface Functor<F extends Kind1> {
+
+
+// ...existing code...
+
+
+// Functor interface (Kind1)
+export interface Functor<F extends Kindish1> {
   map<A, B>(fa: Apply<F, [A]>, f: (a: A) => B): Apply<F, [B]>;
 }
 
-export interface Applicative<F extends Kind1> extends Functor<F> {
+export interface Applicative<F extends Kindish1> extends Functor<F> {
   of<A>(a: A): Apply<F, [A]>;
   ap<A, B>(fab: Apply<F, [(a: A) => B]>, fa: Apply<F, [A]>): Apply<F, [B]>;
 }
 
-export interface Monad<F extends Kind1> extends Applicative<F> {
+export interface Monad<F extends Kindish1> extends Applicative<F> {
   chain<A, B>(fa: Apply<F, [A]>, f: (a: A) => Apply<F, [B]>): Apply<F, [B]>;
 }
 
@@ -71,8 +78,9 @@ export const ArrayMonad: Monad<ArrayK> = {
     (fa as unknown as Array<any>).flatMap((a) => f(a) as unknown as Array<any>) as any
 };
 
-// Tuple (Kind2)
-export const TupleBifunctor: Bifunctor<TupleK> = {
+
+// Tuple (Kind2) - Bifunctor instance
+export const TupleBifunctor = <L>() => ({
   bimap: (fab, f, g) => {
     const [a, b] = fab as unknown as [any, any];
     return [f(a), g(b)] as any;
@@ -84,15 +92,61 @@ export const TupleBifunctor: Bifunctor<TupleK> = {
   mapRight: (fab, g) => {
     const [a, b] = fab as unknown as [any, any];
     return [a, g(b)] as any;
-  }
-};
+  },
+  __arity: 1
+});
 
-// Function profunctor (A -> B) is Kind2 with FunctionK
-export const FunctionProfunctor: Profunctor<FunctionK> = {
+// Tuple (Kind2) with left fixed: Functor/Applicative/Monad for ApplyLeft<TupleK, L>
+export const TupleFunctor = <L>() : Functor<ApplyLeft<TupleK, L>> => ({
+  map: (fa, f) => {
+    const [, b] = fa as [L, any];
+    return [((fa as [L, any])[0]), f(b)] as any;
+  }
+});
+
+export const TupleApplicative = <L>() : Applicative<ApplyLeft<TupleK, L>> => ({
+  ...TupleFunctor<L>(),
+  of: (b) => [undefined as any as L, b] as any, // L must be provided externally for lawful instance
+  ap: (fab, fa) => {
+    const [l, f] = fab as [L, (b: any) => any];
+    const [, b] = fa as [L, any];
+    return [l, f(b)] as any;
+  }
+});
+
+export const TupleMonad = <L>() : Monad<ApplyLeft<TupleK, L>> => ({
+  ...TupleApplicative<L>(),
+  chain: (fa, f) => {
+    const [l, b] = fa as [L, any];
+    const [l2, c] = f(b) as [L, any];
+    return [l, c] as any; // ignores l2, classic WriterT
+  }
+});
+
+
+// Function (Kind2) - Profunctor instance
+export const FunctionProfunctor = <L>() => ({
   dimap: (p, f, g) => ((c: any) => g((p as any)(f(c)))) as any,
   lmap: (p, f) => ((c: any) => (p as any)(f(c))) as any,
-  rmap: (p, g) => ((a: any) => g((p as any)(a))) as any
-};
+  rmap: (p, g) => ((a: any) => g((p as any)(a))) as any,
+  __arity: 1
+});
+
+// Function (Kind2) with left fixed: Functor/Applicative/Monad for ApplyLeft<FunctionK, L>
+export const FunctionFunctor = <L>() : Functor<ApplyLeft<FunctionK, L>> => ({
+  map: (fa, f) => ((x: any) => f((fa as (x: any) => any)(x))) as any
+});
+
+export const FunctionApplicative = <L>() : Applicative<ApplyLeft<FunctionK, L>> => ({
+  ...FunctionFunctor<L>(),
+  of: (b) => (_: L) => b,
+  ap: (fab, fa) => (x: any) => (fab as any)(x)((fa as any)(x))
+});
+
+export const FunctionMonad = <L>() : Monad<ApplyLeft<FunctionK, L>> => ({
+  ...FunctionApplicative<L>(),
+  chain: (fa, f) => (x: any) => (f((fa as any)(x)) as any)(x)
+});
 
 // Maybe (tagged ADT – consistent with your other modules)
 export type Maybe<A> = { tag: 'Just'; value: A } | { tag: 'Nothing' };
@@ -125,7 +179,9 @@ export const Left = <L, R = never>(l: L): Either<L, R> => ({ tag: 'Left', left: 
 export const Right = <R, L = never>(r: R): Either<L, R> => ({ tag: 'Right', right: r });
 
 
-export const EitherBifunctor: Bifunctor<EitherK> = {
+
+// Either (Kind2) - Bifunctor instance
+export const EitherBifunctor = <L>() => ({
   bimap: (e, f, g) =>
     (e as Either<any, any>).tag === 'Left'
       ? Left(f((e as any).left))
@@ -137,8 +193,30 @@ export const EitherBifunctor: Bifunctor<EitherK> = {
   mapRight: (e, g) =>
     (e as Either<any, any>).tag === 'Right'
       ? Right(g((e as any).right))
-      : e as any
-};
+      : e as any,
+  __arity: 1
+});
+
+// Either (Kind2) with left fixed: Functor/Applicative/Monad for ApplyLeft<EitherK, L>
+export const EitherFunctor = <L>() : Functor<ApplyLeft<EitherK, L>> => ({
+  map: (fa, f) => (fa as any).tag === 'Right' ? Right(f((fa as any).right)) : fa as any
+});
+
+export const EitherApplicative = <L>() : Applicative<ApplyLeft<EitherK, L>> => ({
+  ...EitherFunctor<L>(),
+  of: Right,
+  ap: (fab, fa) => {
+    if ((fab as any).tag === 'Left') return fab as any;
+    if ((fa as any).tag === 'Left') return fa as any;
+    // Both are Right
+    return Right(((fab as any).right as (a: any) => any)((fa as any).right));
+  }
+});
+
+export const EitherMonad = <L>() : Monad<ApplyLeft<EitherK, L>> => ({
+  ...EitherApplicative<L>(),
+  chain: (fa, f) => (fa as any).tag === 'Right' ? f((fa as any).right) : fa as any
+});
 
 // ============================================================================
 // Generic helpers (renamed to avoid collisions with optics exports)

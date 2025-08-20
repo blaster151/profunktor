@@ -376,11 +376,15 @@ export function toObservableLite<T>(value: FluentOps<T>): ObservableLite<T> {
     });
   }
   
-  // if (isResult(value)) { // Result type guard removed, add if needed
+  if (isResult(value)) {
     return matchResult(value, {
       Ok: (value: T) => ObservableLite.of(value),
       Err: () => new ObservableLite<T>((subscriber) => { subscriber.complete?.(); return () => {}; })
     });
+  }
+
+  // Fallback: throw for truly unhandled types
+  throw new Error('Cannot convert to ObservableLite');
   }
   
   throw new Error('Cannot convert to ObservableLite');

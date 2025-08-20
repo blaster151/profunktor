@@ -12,6 +12,14 @@
  * - pmatchReadonlyK: K-style hook for future HKT integration
  */
 
+// TODO [GitHub Copilot, 2025-08-19]:
+// There is a persistent TypeScript inference issue with pmatchReadonly's handler payload type.
+// For GADT cases like 'Neg', the payload is inferred as 'unknown' in downstream usage (e.g., tests/fp-gadt-readonly.test.ts),
+// even with correct GADT and handler typing. This is likely due to the mapped type or handler signature here.
+// See https://github.com/microsoft/TypeScript/issues/30581 for related TS issues.
+// Until resolved, downstream tests using pmatchReadonly with nested GADTs may require type assertions or be skipped.
+// -- GitHub Copilot
+
 import {
   GADT, GADTTags, GADTPayload,
   pmatch, PatternMatcherBuilder

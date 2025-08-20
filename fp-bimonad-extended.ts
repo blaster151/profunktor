@@ -416,8 +416,22 @@ export const TaskEitherLeft = <L, R>(l: L): TaskEither<L, R> =>
 /**
  * TaskEither constructor for Right
  */
-export const TaskEitherRight = <L, R>(r: R): TaskEither<L, R> => 
+export const TaskEitherRight2 = <L, R>(r: R): TaskEither<L, R> => 
   async () => Right(r);
+
+export interface TaskEitherK extends Kind2 {
+  readonly type: TaskEither<this['arg0'], this['arg1']>;
+}
+
+
+
+export function deriveRightInstances<F extends Kind2, E>(M: BifunctorMonad<F>) {
+  return {
+    Functor:     rightFunctor<F, E>(M),
+    Applicative: rightApplicative<F, E>(M),
+    Monad:       rightMonad<F, E>(M),
+  };
+}
 
 /**
  * TaskEither bifunctor monad instance
@@ -495,6 +509,15 @@ export const TaskEitherBifunctorMonad: BifunctorMonad<any> = {
     };
   }
 };
+
+// Then expose right-biased instances (FixLeft<TaskEitherK, E> ~ Kind1)
+export const TaskEitherRightK = {
+  Functor:     rightFunctor<TaskEitherK, any>(TaskEitherBifunctorMonad),
+  Applicative: rightApplicative<TaskEitherK, any>(TaskEitherBifunctorMonad),
+  Monad:       rightMonad<TaskEitherK, any>(TaskEitherBifunctorMonad),
+} as const;
+
+
 
 // ============================================================================
 // Specialized Combinators for TaskEither
@@ -577,6 +600,118 @@ export function promiseToTaskEither<L, R>(
     }
   };
 }
+
+
+
+
+// Turn a Kind2<F, E, R> into a Kind1 in R by fixing the left parameter E.
+export interface FixLeft<F extends Kind2, E> extends Kind1 {
+  readonly type: Apply<F, [E, this['arg0']]>;
+}
+
+// Turn a Kind2<F, L, A> into a Kind1 in L by fixing the right parameter A.
+export interface FixRight<F extends Kind2, A> extends Kind1 {
+  readonly type: Apply<F, [this['arg0'], A]>;
+}
+
+// ---------- Right-biased instances: FixLeft<F, E> acts like Kind1 in the Right ----------
+export function rightFunctor<F extends Kind2, E>(
+  M: BifunctorMonad<F>
+): Functor<FixLeft<F, E>> {
+  return {
+    map: <A, B>(
+      fa: Apply<FixLeft<F, E>, [A]>,
+      f: (a: A) => B
+    ): Apply<FixLeft<F, E>, [B]> =>
+      M.map(fa as unknown as Apply<F, [E, A]>, f) as unknown as Apply<FixLeft<F, E>, [B]>,
+  };
+}
+
+export function rightApplicative<F extends Kind2, E>(
+  M: BifunctorMonad<F>
+): Applicative<FixLeft<F, E>> {
+  return {
+    ...rightFunctor<F, E>(M),
+    of: <A>(a: A): Apply<FixLeft<F, E>, [A]> =>
+      M.of(a) as unknown as Apply<FixLeft<F, E>, [A]>,
+    ap: <A, B>(
+      fab: Apply<FixLeft<F, E>, [(a: A) => B]>,
+      fa: Apply<FixLeft<F, E>, [A]>
+    ): Apply<FixLeft<F, E>, [B]> =>
+      M.ap(
+        fab as unknown as Apply<F, [E, (a: A) => B]>,
+        fa as unknown as Apply<F, [E, A]>
+      ) as unknown as Apply<FixLeft<F, E>, [B]>,
+  };
+}
+
+export function rightMonad<F extends Kind2, E>(
+  M: BifunctorMonad<F>
+): Monad<FixLeft<F, E>> {
+  return {
+    ...rightApplicative<F, E>(M),
+    chain: <A, B>(
+      fa: Apply<FixLeft<F, E>, [A]>,
+      f: (a: A) => Apply<FixLeft<F, E>, [B]>
+    ): Apply<FixLeft<F, E>, [B]> =>
+      M.chain(
+        fa as unknown as Apply<F, [E, A]>,
+        (a: A) => f(a) as unknown as Apply<F, [E, B]>
+      ) as unknown as Apply<FixLeft<F, E>, [B]>,
+  };
+}
+
+// ---------- Left-biased instances: FixRight<F, A> acts like Kind1 in the Left ----------
+export function leftFunctor<F extends Kind2, A>(
+  M: BifunctorMonad<F>
+): Functor<FixRight<F, A>> {
+  return {
+    map: <L, L2>(
+      fl: Apply<FixRight<F, A>, [L]>,
+      f: (l: L) => L2
+    ): Apply<FixRight<F, A>, [L2]> =>
+      // functor-on-left via bimap/mapLeft; use mapLeft if available, else bimap
+      (M.mapLeft
+        ? M.mapLeft(fl as unknown as Apply<F, [L, A]>, f)
+        : M.bimap(fl as unknown as Apply<F, [L, A]>, f, (x: A) => x)
+      ) as unknown as Apply<FixRight<F, A>, [L2]>,
+  };
+}
+
+// Right-biased instances for Either<L, _>
+export const EitherRight = {
+  Functor:    rightFunctor(EitherBifunctorMonad),
+  Applicative:rightApplicative(EitherBifunctorMonad),
+  Monad:      rightMonad(EitherBifunctorMonad),
+};
+
+// Right-biased instances for TaskEither<L, _>
+export const TaskEitherRight = {
+  Functor:    rightFunctor(TaskEitherBifunctorMonad),
+  Applicative:rightApplicative(TaskEitherBifunctorMonad),
+  Monad:      rightMonad(TaskEitherBifunctorMonad),
+};
+
+// Left Functor for Result<_, E> if you want to map the error channel
+export const ResultLeft = {
+  Functor: leftFunctor(ResultBifunctorMonad),
+};
+
+// If you *also* want Applicative/Monad on the Left side, you need a lawful
+// “of/chain on the left” story. Many F’s don’t have that (e.g., Either is
+// right-biased). You can derive these only if your F has left-heavy laws.
+// If not, just provide Functor on the left and stop there.
+
+// // Lift a Kind2 to Kind3 by introducing an environment R in front (Reader-like)
+// type ReaderLike<F extends Kind2> = {
+//   type: (r: this['arg0']) => Apply<F, [this['arg1'], this['arg2']]>;
+//   arg0: Type; // R
+//   arg1: Type; // E
+//   arg2: Type; // A
+// };
+
+
+
 
 // ============================================================================
 // Purity Integration

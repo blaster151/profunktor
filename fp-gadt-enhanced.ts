@@ -396,13 +396,31 @@ export const resultMatcher = createPmatchBuilder<Result<any, any>, string>({
 /**
  * Manual Functor instance for ResultK
  */
-export const ResultFunctor: Functor<ResultK> = {
-  map: <A, B, E>(fa: Result<A, E>, f: (a: A) => B): Result<B, E> =>
-    pmatch(fa)
-      .with('Ok', ({ value }) => Result.Ok<B, E>(f(value)))
-      .with('Err', ({ error }) => Result.Err<B, E>(error))
-      .exhaustive() as Result<B, E>
-};
+// Factory-based unary instances for ResultK
+import type { Functor1 } from './fp-typeclasses-hok';
+import type { Lift1, ApplyLeft, HKOutput, Apply } from './fp-hkt';
+
+type ResultK1<E> = Lift1<ApplyLeft<ResultK, E>>;
+
+export const getResultFunctor = <E>(): Functor1<ResultK1<E>> => ({
+  __arity: 1,
+  map: <A, B>(fa, f) =>
+    (fa as Result<A, E>).map(f) as Apply<HKOutput<ResultK1<E>>, [B]>,
+});
+
+export const getResultApplicative = <E>(): Applicative<ResultK1<E>> => ({
+  __arity: 1,
+  of: <A>(a: A) => Result.of<E, A>(a) as Apply<HKOutput<ResultK1<E>>, [A]>,
+  ap: <A, B>(fab, fa) => Result.ap<E, A, B>(fab as any, fa as any) as Apply<HKOutput<ResultK1<E>>, [B]>,
+  map: <A, B>(fa, f) => Result.map<E, A, B>(fa as any, f) as Apply<HKOutput<ResultK1<E>>, [B]>,
+});
+
+export const getResultMonad = <E>(): Monad<ResultK1<E>> => ({
+  __arity: 1,
+  of: <A>(a: A) => Result.of<E, A>(a) as Apply<HKOutput<ResultK1<E>>, [A]>,
+  chain: <A, B>(fa, f) => Result.chain<E, A, B>(fa as any, f as any) as Apply<HKOutput<ResultK1<E>>, [B]>,
+  map: <A, B>(fa, f) => Result.map<E, A, B>(fa as any, f) as Apply<HKOutput<ResultK1<E>>, [B]>,
+});
 
 // ============================================================================
 // Typeclass Instances (Derived)
@@ -425,19 +443,20 @@ export const ExprFunctor: Functor<ExprK> = {
 /**
  * Manual Functor instance for MaybeGADTK
  */
-export const MaybeGADTFunctor: Functor<MaybeGADTK> = {
+// Factory for Functor<ApplyLeft<MaybeGADTK, void>> (since Maybe is unary)
+export const getMaybeGADTFunctor = () => ({
   map: <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => MaybeGADT.Just(f(value)))
       .with('Nothing', () => MaybeGADT.Nothing())
       .exhaustive() as MaybeGADT<B>
-};
+});
 
 /**
  * Manual Applicative instance for MaybeGADTK
  */
-export const MaybeGADTApplicative: Applicative<MaybeGADTK> = {
-  ...MaybeGADTFunctor,
+export const getMaybeGADTApplicative = () => ({
+  ...getMaybeGADTFunctor(),
   of: <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a),
   ap: <A, B>(fab: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<B> => 
     pmatch(fab)
@@ -449,19 +468,19 @@ export const MaybeGADTApplicative: Applicative<MaybeGADTK> = {
       )
       .with('Nothing', () => MaybeGADT.Nothing())
       .exhaustive() as MaybeGADT<B>
-};
+});
 
 /**
  * Manual Monad instance for MaybeGADTK
  */
-export const MaybeGADTMonad: Monad<MaybeGADTK> = {
-  ...MaybeGADTApplicative,
+export const getMaybeGADTMonad = () => ({
+  ...getMaybeGADTApplicative(),
   chain: <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => f(value))
       .with('Nothing', () => MaybeGADT.Nothing())
       .exhaustive() as MaybeGADT<B>
-};
+});
 
 /**
  * Manual Bifunctor instance for EitherGADTK
@@ -489,27 +508,12 @@ export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
 /**
  * Manual Applicative instance for ResultK
  */
-export const ResultApplicative: Applicative<ResultK> = {
-  ...ResultFunctor,
-  of: <A, E>(a: A): Result<A, E> => Result.Ok(a),
-  ap: <A, B, E>(ff: Result<(a: A) => B, E>, fa: Result<A, E>): Result<B, E> =>
-    pmatch(ff)
-      .with('Ok', ({ value: f }) => ResultFunctor.map(fa, f))
-      .with('Err', ({ error }) => Result.Err<B, E>(error))
-      .exhaustive() as Result<B, E>
-};
+
 
 /**
  * Manual Monad instance for ResultK
  */
-export const ResultMonad: Monad<ResultK> = {
-  ...ResultApplicative,
-  chain: <A, B, E>(fa: Result<A, E>, f: (a: A) => Result<B, E>): Result<B, E> =>
-    pmatch(fa)
-      .with('Ok', ({ value }) => f(value))
-      .with('Err', ({ error }) => Result.Err<B, E>(error))
-      .exhaustive() as Result<B, E>
-};
+
 
 // ============================================================================
 // Integration Examples
@@ -880,9 +884,9 @@ export function registerGADTInstances(): void {
     registry.register('ExprShow', ExprShow);
     
     // Register MaybeGADT instances
-    registry.register('MaybeGADTFunctor', MaybeGADTFunctor);
-    registry.register('MaybeGADTApplicative', MaybeGADTApplicative);
-    registry.register('MaybeGADTMonad', MaybeGADTMonad);
+  registry.register('MaybeGADTFunctor', getMaybeGADTFunctor());
+  registry.register('MaybeGADTApplicative', getMaybeGADTApplicative());
+  registry.register('MaybeGADTMonad', getMaybeGADTMonad());
     registry.register('MaybeGADTEq', MaybeGADTEq);
     registry.register('MaybeGADTOrd', MaybeGADTOrd);
     registry.register('MaybeGADTShow', MaybeGADTShow);
@@ -894,11 +898,12 @@ export function registerGADTInstances(): void {
     registry.register('EitherGADTShow', EitherGADTShow);
     
     // Register Result instances
-    registry.register('ResultFunctor', ResultFunctor);
-    registry.register('ResultApplicative', ResultApplicative);
-    registry.register('ResultMonad', ResultMonad);
+    // To register Result instances, use the factory functions with a fixed E, e.g.:
+    // registry.register('ResultFunctor', getResultFunctor(someE));
+    // registry.register('ResultApplicative', getResultApplicative(someE));
+    // registry.register('ResultMonad', getResultMonad(someE));
   }
 }
 
-// Auto-register instances
-registerGADTInstances();
+// To use the Monad instance:
+// const derivedMonad = getResultMonad(someE); // Use the factory function with a fixed E

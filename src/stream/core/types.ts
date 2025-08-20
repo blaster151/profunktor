@@ -41,6 +41,7 @@ export interface StateMonoid<S, N> {
  */
 export interface StatefulStreamK extends Kind3 {
   readonly type: StatefulStream<this['arg0'], this['arg1'], this['arg2']>;
+  // For future arities, extend with: & Record<`arg${number}`, unknown>
 }
 
 /**

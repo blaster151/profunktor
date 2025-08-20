@@ -76,8 +76,50 @@ export function PolynomialSemiring<K>(
     return normalize(out);
   };
 
-  // TODO: Implement mul, zero, one as needed for the semiring
-  // Placeholder implementation for demonstration
+  // --- Exported helpers for sparse polynomial semiring ---
+  // Zero: the empty map (no terms)
+  const zero: Map<K, number> = new Map();
+
+  // One: a map with exactly one entry: [Monoid.empty, Semiring.one]
+  const one: Map<K, number> = new Map([[K.empty, R.one]]);
+
+  // Helper: accumulate into a map, summing coefficients and pruning zeroes
+  function accumulate(map: Map<K, number>, k: K, r: number) {
+    const prev = map.get(k) ?? R.zero;
+    const sum = R.add(prev, r);
+    // If Semiring<number> is extended with eqZero, add support here
+    if (sum === R.zero) {
+      map.delete(k);
+    } else {
+      map.set(k, sum);
+    }
+  }
+
+  // Multiplication (Cauchy product / convolution)
+  function mul(a: Map<K, number>, b: Map<K, number>): Map<K, number> {
+    // Optimization: if a or b is zero, return zero
+    if (a.size === 0 || b.size === 0) return zero;
+    // If a is one, return normalize(b); if b is one, return normalize(a)
+    if (a.size === 1 && a.has(K.empty) && a.get(K.empty) === R.one) return normalize(new Map(b));
+    if (b.size === 1 && b.has(K.empty) && b.get(K.empty) === R.one) return normalize(new Map(a));
+    const out = new Map<K, number>();
+    for (const [ka, ra] of a) {
+      for (const [kb, rb] of b) {
+        const k = K.concat(ka, kb);
+        const r = R.mul(ra, rb);
+        accumulate(out, k, r);
+      }
+    }
+    return normalize(out);
+  }
+
+  // Exported for external use
+  return {
+    add,
+    mul,
+    zero,
+    one,
+  };
   return {
     add,
     mul: (a, b) => new Map(),

@@ -15,7 +15,8 @@ import {
 import {
   Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
-  ArrayK, TupleK, FunctionK
+  ArrayK, TupleK, FunctionK,
+  ApplyLeft
 } from './fp-hkt';
 
 import {
@@ -367,20 +368,21 @@ export const ResultShow = deriveShowInstance({
 /**
  * Foldable instance for Result (manual due to complexity)
  */
-export const ResultFoldable: Foldable<ResultK> = {
-  foldr: <T, E, B>(result: Result<T, E>, f: (t: T, b: B) => B, z: B): B => {
-    return matchResult(result, {
-      Ok: (value: T) => f(value, z),
-      Err: () => z
-    });
-  },
-  foldl: <T, E, B>(result: Result<T, E>, f: (b: B, t: T) => B, z: B): B => {
-    return matchResult(result, {
-      Ok: (value: T) => f(z, value),
-      Err: () => z
-    });
-  }
-};
+
+// Factory-based unary Foldable instance for ResultK
+export type ResultK1<E> = ApplyLeft<ResultK, E>;
+export const getResultFoldable = <E>(): Foldable<ResultK1<E>> => ({
+  foldr: <A, B>(fa: Apply<ResultK1<E>, [A]>, f: (a: A, b: B) => B, z: B): B =>
+    matchResult(fa as Result<A, E>, {
+      Ok: (a: A) => f(a, z),
+      Err: (_: E) => z
+    }),
+  foldl: <A, B>(fa: Apply<ResultK1<E>, [A]>, f: (b: B, a: A) => B, z: B): B =>
+    matchResult(fa as Result<A, E>, {
+      Ok: (a: A) => f(z, a),
+      Err: (_: E) => z
+    }),
+});
 
 /**
  * Traversable instance for Result (manual due to complexity)

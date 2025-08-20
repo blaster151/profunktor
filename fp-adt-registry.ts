@@ -98,13 +98,13 @@ export const ADTRegistry = {
     matchers: { match: matchEither },
     effect: 'Pure' as EffectTag,
     typeclassInstances: {
-      // Provide factories because Either is Kind2: we must fix L first  
-      getFunctor: getEitherFunctor, // call as getFunctor<L>()
-      getApplicative: getEitherApplicative, // call as getApplicative<L>()
-      Monad: EitherUnified.HKT ? {} as Monad<EitherK> : undefined,
-      Bifunctor: EitherUnified.HKT ? {} as Bifunctor<EitherK> : undefined,
-      Traversable: EitherUnified.HKT ? {} as Traversable<EitherK> : undefined,
-      Foldable: EitherUnified.HKT ? {} as Foldable<EitherK> : undefined
+  // Provide factories because Either is Kind2: we must fix L first  
+  getFunctor: getEitherFunctor, // call as getFunctor<L>()
+  getApplicative: getEitherApplicative, // call as getApplicative<L>()
+  getMonad: getEitherMonad, // call as getMonad<L>()
+  Bifunctor: EitherUnified.HKT ? {} as Bifunctor<EitherK> : undefined,
+  Traversable: EitherUnified.HKT ? {} as Traversable<EitherK> : undefined,
+  Foldable: EitherUnified.HKT ? {} as Foldable<EitherK> : undefined
     }
   } as ADTRegistryEntry<EitherK, Either<any, any>, typeof EitherUnified.constructors, { match: typeof matchEither }>,
 
@@ -116,13 +116,13 @@ export const ADTRegistry = {
     matchers: { match: matchResult },
     effect: 'Pure' as EffectTag,
     typeclassInstances: {
-      // Provide factories because Result is Kind2: we must fix E first
-      getFunctor: getResultFunctor, // call as getFunctor<E>()
-      getApplicative: getResultApplicative, // call as getApplicative<E>()
-      Monad: ResultUnified.HKT ? {} as Monad<ResultK> : undefined,
-      Bifunctor: ResultUnified.HKT ? {} as Bifunctor<ResultK> : undefined,
-      Traversable: ResultUnified.HKT ? {} as Traversable<ResultK> : undefined,
-      Foldable: ResultUnified.HKT ? {} as Foldable<ResultK> : undefined
+  // Provide factories because Result is Kind2: we must fix E first
+  getFunctor: getResultFunctor, // call as getFunctor<E>()
+  getApplicative: getResultApplicative, // call as getApplicative<E>()
+  getMonad: getResultMonad, // call as getMonad<E>()
+  Bifunctor: ResultUnified.HKT ? {} as Bifunctor<ResultK> : undefined,
+  Traversable: ResultUnified.HKT ? {} as Traversable<ResultK> : undefined,
+  Foldable: ResultUnified.HKT ? {} as Foldable<ResultK> : undefined
     }
   } as ADTRegistryEntry<ResultK, Result<any, any>, typeof ResultUnified.constructors, { match: typeof matchResult }>
 };
@@ -238,35 +238,7 @@ export function registerAllADTsWithDerivableInstances(): void {
 export function generateTypeclassInstances(): void {
   // Generate instances for Maybe
   if (MaybeUnified.HKT) {
-    // Functor instance
-    ADTRegistry.Maybe.typeclassInstances.Functor = {
-      map: <A, B>(fa: any, f: (a: A) => B) => matchMaybe(fa, {
-        Just: (value: A) => Just(f(value)),
-        Nothing: () => Nothing()
-      })
-    } as Functor<MaybeK>;
-
-    // Applicative instance
-    ADTRegistry.Maybe.typeclassInstances.Applicative = {
-      ...ADTRegistry.Maybe.typeclassInstances.Functor,
-      of: Just,
-      ap: <A, B>(fab: any, fa: any) => matchMaybe(fab, {
-        Just: (f: (a: A) => B) => matchMaybe(fa, {
-          Just: (a: A) => Just(f(a)),
-          Nothing: () => Nothing()
-        }),
-        Nothing: () => Nothing()
-      })
-    } as Applicative<MaybeK>;
-
-    // Monad instance
-    ADTRegistry.Maybe.typeclassInstances.Monad = {
-      ...ADTRegistry.Maybe.typeclassInstances.Applicative,
-      chain: <A, B>(fa: any, f: (a: A) => any) => matchMaybe(fa, {
-        Just: (value: A) => f(value),
-        Nothing: () => Nothing()
-      })
-    } as Monad<MaybeK>;
+  // Provide only factories for Kind2s; leave Kind1s as is or use getMaybeFunctor, etc. if available
 
     console.log('✅ Generated typeclass instances for Maybe');
   }
@@ -274,12 +246,8 @@ export function generateTypeclassInstances(): void {
   // Generate instances for Either
   if (EitherUnified.HKT) {
     // Functor instance
-    ADTRegistry.Either.typeclassInstances.Functor = {
-      map: <A, B>(fa: any, f: (a: A) => B) => matchEither(fa as any, {
-        Left: (value: any) => Left(value),
-        Right: (value: A) => Right(f(value))
-      })
-    } as unknown as Functor<EitherK>;
+  // Use factory for unary Functor instance
+  (ADTRegistry.Either.typeclassInstances as any).getFunctor = getEitherFunctor;
 
     // Bifunctor instance
     ADTRegistry.Either.typeclassInstances.Bifunctor = {
@@ -315,42 +283,8 @@ export function generateTypeclassInstances(): void {
 
   // Generate instances for Result
   if (ResultUnified.HKT) {
-    // Functor instance
-    ADTRegistry.Result.typeclassInstances.Functor = {
-      map: <A, B>(fa: any, f: (a: A) => B) => matchResult(fa, {
-        Ok: (value: A) => Ok(f(value)),
-        Err: (error: any) => Err(error)
-      })
-    } as Functor<ResultK>;
-
-    // Bifunctor instance
-    ADTRegistry.Result.typeclassInstances.Bifunctor = {
-      bimap: <A, B, C, D>(fa: any, f: (a: A) => C, g: (b: B) => D) => matchResult(fa, {
-        Ok: (value: A) => Ok(f(value)),
-        Err: (error: B) => Err(g(error))
-      }),
-      mapLeft: <A, B, C>(fa: any, f: (a: A) => C) => matchResult(fa, {
-        Ok: (value: B) => Ok(value),
-        Err: (error: A) => Err(f(error))
-      }),
-      mapRight: <A, B, D>(fa: any, g: (b: B) => D) => matchResult(fa, {
-        Ok: (value: B) => Ok(g(value)),
-        Err: (error: A) => Err(error)
-      })
-    } as Bifunctor<ResultK>;
-
-    // Factory functions
-    (ADTRegistry.Result.typeclassInstances as any).getFunctor = getResultFunctor;
-    (ADTRegistry.Result.typeclassInstances as any).getApplicative = getResultApplicative;
-
-    // Monad instance
-    ADTRegistry.Result.typeclassInstances.Monad = {
-      ...ADTRegistry.Result.typeclassInstances.Applicative,
-      chain: <A, B>(fa: any, f: (a: A) => any) => matchResult(fa, {
-        Ok: (value: A) => f(value),
-        Err: (error: any) => Err(error)
-      })
-    } as Monad<ResultK>;
+  // Provide only factories for Kind2s; leave Kind1s as is or use getResultFunctor, etc. if available
+  // No lawful Monad for ResultK in general; only provide Applicative/Factory.
 
     console.log('✅ Generated typeclass instances for Result');
   }

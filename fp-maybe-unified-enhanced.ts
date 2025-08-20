@@ -50,7 +50,7 @@ import {
 /**
  * Unique symbol brand for immutable types
  */
-export const IMMUTABLE_BRAND = Symbol('immutable'); // as unknown as unique symbol;
+export const IMMUTABLE_BRAND: unique symbol = Symbol('immutable');
 
 // ✅ Use canonical Maybe type from fp-maybe-unified instead of local definition
 // ✅ Keep ergonomic helpers but make them operate on canonical Maybe

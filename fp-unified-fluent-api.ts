@@ -36,7 +36,7 @@ import { getTypeclassInstance, getDerivableInstances, getFPRegistry } from './fp
 import { 
   Kind, Kind1, Kind2, Kind3, 
   Apply, Type, TypeArgs, KindArity, KindResult, ArityOf,
-  HigherKind, KindInput, KindOutput,
+  HigherKind, HKInput, HKOutput,
   Phantom, KindWithPhantom,
   IsKind1, IsKind2, IsKind3,
   FirstArg, SecondArg, ThirdArg,
