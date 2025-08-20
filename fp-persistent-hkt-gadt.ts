@@ -65,28 +65,33 @@ import {
   deriveInstances, getFunctorInstance, getMonadInstance
 } from './fp-derivable-instances';
 
-// Natural transformations (FunctionK) to and from the persistent containers
-export const toPersistentList: FunctionK<ArrayK, PersistentListHKT> = <A>(as: A[]) =>
+// Natural transformations to and from the persistent containers
+export const toPersistentList = <A>(as: A[]) =>
   PersistentList.fromArray(as);
 
-export const fromPersistentList: FunctionK<PersistentListHKT, ArrayK> = <A>(pl: PersistentList<A>) =>
+export const fromPersistentList = <A>(pl: PersistentList<A>) =>
   pl.toArray();
 
-// For Map: Array<[K, V]> <-> PersistentMap<K, V>
-export const toPersistentMap: FunctionK<TupleK, PersistentMapHKT> = <K, V>(entries: [K, V][]) =>
-  PersistentMap.fromEntries(entries);
+// --- Kind2 HKT for Array<[K,V]> ---
+export interface ArrayPairK extends Kind2 {
+  readonly type: Array<[this['arg0'], this['arg1']]>;
+}
 
-export const fromPersistentMap: FunctionK<PersistentMapHKT, TupleK> = <K, V>(pm: PersistentMap<K, V>) => {
-  const arr: [K, V][] = [];
-  pm.forEach((v, k) => arr.push([k, v]));
-  return arr;
+// For Map: Array<[K, V]> <-> PersistentMap<K, V> (Kind2 <-> Kind2)
+export const entriesToPersistentMap = <K, V>(xs: Array<[K, V]>) =>
+  PersistentMap.fromEntries(xs);
+
+export const persistentMapToEntries = <K, V>(pm: PersistentMap<K, V>) => {
+  const out: Array<[K, V]> = [];
+  pm.forEach((v, k) => out.push([k, v]));
+  return out;
 };
 
 // For Set: Array<A> <-> PersistentSet<A>
-export const toPersistentSet: FunctionK<ArrayK, PersistentSetHKT> = <A>(as: A[]) =>
+export const toPersistentSet = <A>(as: A[]) =>
   PersistentSet.fromArray(as);
 
-export const fromPersistentSet: FunctionK<PersistentSetHKT, ArrayK> = <A>(ps: PersistentSet<A>) => {
+export const fromPersistentSet = <A>(ps: PersistentSet<A>) => {
   const arr: A[] = [];
   ps.forEach(a => arr.push(a));
   return arr;
@@ -178,29 +183,6 @@ export type MapGADTTags = 'Empty' | 'NonEmpty';
  */
 export type SetGADTTags = 'Empty' | 'NonEmpty';
 
-/**
- * GADT payload types for ListGADT
- */
-export type ListGADTPayload<T extends ListGADTTags> = 
-  T extends 'Nil' ? {} :
-  T extends 'Cons' ? { head: any; tail: PersistentList<any> } :
-  never;
-
-/**
- * GADT payload types for MapGADT
- */
-export type MapGADTPayload<T extends MapGADTTags> = 
-  T extends 'Empty' ? {} :
-  T extends 'NonEmpty' ? { key: any; value: any; rest: PersistentMap<any, any> } :
-  never;
-
-/**
- * GADT payload types for SetGADT
- */
-export type SetGADTPayload<T extends SetGADTTags> = 
-  T extends 'Empty' ? {} :
-  T extends 'NonEmpty' ? { element: any; rest: PersistentSet<any> } :
-  never;
 
 // ============================================================================
 // Part 3: GADT Constructors for Persistent Collections
@@ -301,8 +283,9 @@ export function matchListPartial<A, R>(
     Cons: (payload: { head: A; tail: PersistentList<A> }) => R;
   }>
 ): R | undefined {
-  const handler = patterns[gadt.tag as keyof typeof patterns];
-  return handler ? handler(gadt as any) : undefined;
+  if (gadt.tag === 'Nil') return patterns.Nil ? patterns.Nil() : undefined;
+  if (gadt.tag === 'Cons') return patterns.Cons ? patterns.Cons(gadt.payload) : undefined;
+  return undefined;
 }
 
 /**
@@ -315,8 +298,9 @@ export function matchMapPartial<K, V, R>(
     NonEmpty: (payload: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
   }>
 ): R | undefined {
-  const handler = patterns[gadt.tag as keyof typeof patterns];
-  return handler ? handler(gadt as any) : undefined;
+  if (gadt.tag === 'Empty') return patterns.Empty ? patterns.Empty() : undefined;
+  if (gadt.tag === 'NonEmpty') return patterns.NonEmpty ? patterns.NonEmpty(gadt.payload) : undefined;
+  return undefined;
 }
 
 /**
@@ -329,8 +313,9 @@ export function matchSetPartial<A, R>(
     NonEmpty: (payload: { element: A; rest: PersistentSet<A> }) => R;
   }>
 ): R | undefined {
-  const handler = patterns[gadt.tag as keyof typeof patterns];
-  return handler ? handler(gadt as any) : undefined;
+  if (gadt.tag === 'Empty') return patterns.Empty ? patterns.Empty() : undefined;
+  if (gadt.tag === 'NonEmpty') return patterns.NonEmpty ? patterns.NonEmpty(gadt.payload) : undefined;
+  return undefined;
 }
 
 // ============================================================================
@@ -345,7 +330,8 @@ export function pmatchList<A, R>(value: ListGADT<A>): PatternMatcherBuilder<List
 }
 
 /**
- * Tag-only pattern matcher for ListGADT (handlers get no payloads)
+ * Alias for pmatch; does not enforce tag-only (no payload) handlers.
+ * Provided for symmetry with tag-only matchers, but allows payloads.
  */
 export function pmatchListTag<A, R>(value: ListGADT<A>): PatternMatcherBuilder<ListGADT<A>, R> {
   return pmatch(value);
@@ -356,37 +342,49 @@ export function pmatchListTag<A, R>(value: ListGADT<A>): PatternMatcherBuilder<L
 // --------------------------------------------------------------------------
 
 
-// ListGADT builder and total matcher (auto-derived style)
-export const matchListBuilder = createPmatchBuilder<ListGADT<any>, unknown>({});
+
+// Strongly-typed builder helper for ListGADT
+export function makeListMatcher<A, R>() {
+  return (g: ListGADT<A>) => pmatch<ListGADT<A>, R>(g);
+}
+
 export function matchListTotal<A, R>(g: ListGADT<A>, k: {
   Nil: () => R;
   Cons: (p: { head: A; tail: PersistentList<A> }) => R;
 }): R {
-  return matchListBuilder(g)
+  return makeListMatcher<A, R>()(g)
     .with('Nil', k.Nil)
     .with('Cons', k.Cons)
     .exhaustive();
 }
 
-// MapGADT builder and total matcher (auto-derived style)
-export const matchMapBuilder = createPmatchBuilder<MapGADT<any, any>, unknown>({});
+
+// Strongly-typed builder helper for MapGADT
+export function makeMapMatcher<K, V, R>() {
+  return (g: MapGADT<K, V>) => pmatch<MapGADT<K, V>, R>(g);
+}
+
 export function matchMapTotal<K, V, R>(g: MapGADT<K, V>, k: {
   Empty: () => R;
   NonEmpty: (p: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
 }): R {
-  return matchMapBuilder(g)
+  return makeMapMatcher<K, V, R>()(g)
     .with('Empty', k.Empty)
     .with('NonEmpty', k.NonEmpty)
     .exhaustive();
 }
 
-// SetGADT builder and total matcher (auto-derived style)
-export const matchSetBuilder = createPmatchBuilder<SetGADT<any>, unknown>({});
+
+// Strongly-typed builder helper for SetGADT
+export function makeSetMatcher<A, R>() {
+  return (g: SetGADT<A>) => pmatch<SetGADT<A>, R>(g);
+}
+
 export function matchSetTotal<A, R>(g: SetGADT<A>, k: {
   Empty: () => R;
   NonEmpty: (p: { element: A; rest: PersistentSet<A> }) => R;
 }): R {
-  return matchSetBuilder(g)
+  return makeSetMatcher<A, R>()(g)
     .with('Empty', k.Empty)
     .with('NonEmpty', k.NonEmpty)
     .exhaustive();
@@ -400,7 +398,8 @@ export function pmatchMap<K, V, R>(value: MapGADT<K, V>): PatternMatcherBuilder<
 }
 
 /**
- * Tag-only pattern matcher for MapGADT (handlers get no payloads)
+ * Alias for pmatch; does not enforce tag-only (no payload) handlers.
+ * Provided for symmetry with tag-only matchers, but allows payloads.
  */
 export function pmatchMapTag<K, V, R>(value: MapGADT<K, V>): PatternMatcherBuilder<MapGADT<K, V>, R> {
   return pmatch(value);
@@ -414,7 +413,8 @@ export function pmatchSet<A, R>(value: SetGADT<A>): PatternMatcherBuilder<SetGAD
 }
 
 /**
- * Tag-only pattern matcher for SetGADT (handlers get no payloads)
+ * Alias for pmatch; does not enforce tag-only (no payload) handlers.
+ * Provided for symmetry with tag-only matchers, but allows payloads.
  */
 export function pmatchSetTag<A, R>(value: SetGADT<A>): PatternMatcherBuilder<SetGADT<A>, R> {
   return pmatch(value);
@@ -606,16 +606,7 @@ export const PersistentListMonad: Monad<PersistentListHKT> = {
   chain: PersistentListInstances.chain
 };
 
-/**
- * Register PersistentListHKT typeclass instances for auto-derivation
- */
-export function registerPersistentTypeclasses() {
-  deriveInstances({
-    functor: { for: 'PersistentListHKT', map: PersistentListFunctor.map },
-    applicative: { for: 'PersistentListHKT', map: PersistentListFunctor.map, of: PersistentListApplicative.of, ap: PersistentListApplicative.ap },
-    monad: { for: 'PersistentListHKT', map: PersistentListFunctor.map, of: PersistentListApplicative.of, ap: PersistentListApplicative.ap, chain: PersistentListMonad.chain }
-  });
-}
+// ...existing code...
 /**
  * Derived instances for PersistentMapHKT
  */
@@ -625,11 +616,11 @@ export const PersistentMapInstances = {
   },
   bimap: <A, B, C, D>(fab: Apply<PersistentMapHKT, [A, B]>, f: (a: A) => C, g: (b: B) => D): Apply<PersistentMapHKT, [C, D]> => {
     const map = fab as PersistentMap<A, B>;
-    const result = PersistentMap.empty<C, D>();
+    let res = PersistentMap.empty<C, D>();
     map.forEach((value, key) => {
-      result.set(f(key), g(value));
+      res = res.set(f(key), g(value));
     });
-    return result as Apply<PersistentMapHKT, [C, D]>;
+    return res as Apply<PersistentMapHKT, [C, D]>;
   }
 };
 
@@ -938,15 +929,24 @@ export function matchSetTypeSafe<A, R>(
 // ============================================================================
 
 // --- Collect/partition helpers for Maybe/Either/Result ---
+
 export const collectMaybes = <A>(pl: PersistentList<Maybe<A>>): PersistentList<A> =>
-  pl.reduce(PersistentList.empty<A>(), (acc, m) => m.tag === 'Just' ? acc.prepend(m.value) : acc).reverse();
+  pl.reduce(
+    (acc, m) => m && typeof m === 'object' && 'tag' in m && m.tag === 'Just' ? acc.prepend((m as any).value as A) : acc,
+    PersistentList.empty<A>()
+  ).reverse();
 
 export const partitionEithers = <L, R>(pl: PersistentList<Either<L, R>>): { lefts: PersistentList<L>, rights: PersistentList<R> } => {
   let lefts = PersistentList.empty<L>();
   let rights = PersistentList.empty<R>();
   pl.forEach(e => {
-    if (e.tag === 'Left') lefts = lefts.prepend(e.value);
-    else rights = rights.prepend(e.value);
+    if (typeof e === 'object' && e !== null && 'tag' in e) {
+      if (e.tag === 'Left' && 'left' in e) {
+        lefts = lefts.prepend((e as any).left as L);
+      } else if (e.tag === 'Right' && 'right' in e) {
+        rights = rights.prepend((e as any).right as R);
+      }
+    }
   });
   return { lefts: lefts.reverse(), rights: rights.reverse() };
 };
@@ -954,10 +954,16 @@ export const partitionEithers = <L, R>(pl: PersistentList<Either<L, R>>): { left
 export const sequenceResult = <A, E>(pl: PersistentList<Result<A, E>>): Result<PersistentList<A>, E> => {
   let acc = PersistentList.empty<A>();
   for (const r of pl) {
-    if (r.tag === 'Err') return r;
-    acc = acc.prepend(r.value);
+    if (typeof r === 'object' && r !== null && 'tag' in r) {
+      if (r.tag === 'Err' && 'error' in r) {
+        return r;
+      } else if (r.tag === 'Ok' && 'value' in r) {
+        acc = acc.prepend((r as any).value as A);
+      }
+    }
   }
-  return { tag: 'Ok', value: acc.reverse() };
+  // If Result is a GADT, return with payload
+  return { tag: 'Ok', payload: { value: acc.reverse() } } as Result<PersistentList<A>, E>;
 };
 
 // --- zip/zipWith for lists/sets ---
@@ -1063,11 +1069,11 @@ export function filterListGADT<A>(gadt: ListGADT<A>, predicate: (a: A) => boolea
  * Ensure immutability branding is preserved
  */
 export function preserveImmutability<T>(value: T): T {
-  if (isPersistentCollection(value)) {
-    // Add branding if not present
-    if (value && typeof value === 'object') {
-      (value as any)[PERSISTENT_BRAND] = true;
-      (value as any)[IMMUTABLE_BRAND] = true;
+  if (isPersistentCollection(value) && value && typeof value === 'object') {
+    for (const sym of [PERSISTENT_BRAND, IMMUTABLE_BRAND]) {
+      if (!(sym in (value as any))) {
+        Object.defineProperty(value as any, sym, { value: true, enumerable: false });
+      }
     }
   }
   return value;
@@ -1081,8 +1087,9 @@ export function preserveImmutability<T>(value: T): T {
  * Convert PersistentList<A> to Immutable<readonly A[]> (zero-copy if possible)
  */
 export const toImmutableArray = <A>(pl: PersistentList<A>): Immutable<readonly A[]> => {
-  const arr = pl.toArray();
-  return immutableArray(arr); // zero-copy wrapper if supported
+  // If immutableArray expects Immutable<A>[], map if needed, else just cast
+  // Here, we assume A is already immutable or primitive
+  return immutableArray(pl.toArray() as any);
 };
 
 /**
