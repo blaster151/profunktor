@@ -15,7 +15,7 @@ import {
     Type,
     TypeParameter,
     Node
-} from "./types.js";
+} from "../types2";
 
 import {
     isKindTypeReference,
@@ -101,7 +101,7 @@ function performKindValidation(
         arity: context.expectedKindArity,
         parameterKinds: context.expectedParameterKinds || [],
         symbol: symbol,
-        retrievedFrom: "context",
+        retrievedFrom: KindSource.None,
         isValid: true
     };
     

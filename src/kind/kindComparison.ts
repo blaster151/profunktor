@@ -5,8 +5,7 @@ import {
     KindType,
     TypeChecker,
     Symbol,
-    DiagnosticMessage,
-} from "./types.js";
+} from "../types2";
 import { KindMetadata } from "./kindMetadata.js";
 import { applyVarianceRules } from "./kindVariance.js";
 import { resolveKindAliases } from "./kindAliasResolution.js";

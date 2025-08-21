@@ -45,7 +45,7 @@ All test suites have been executed successfully with the following results:
 - ✅ **Purity-Aware Derivable Instances** (`fp-derivable-purity.ts`) - Purity-aware auto-generation
 
 ### **5. Advanced Features**
-- ✅ **Persistent HKT+GADT** (`fp-persistent-hkt-gadt.ts`) - Persistent collections with HKTs and GADTs
+- ✅ **Persistent HKT+GADT** (`fp-persistent-hkt.ts`) - Persistent collections with HKTs and GADTs
 - ✅ **Integrated Recursion Schemes** (`fp-gadt-integrated.ts`) - Unified recursion schemes API
 
 ## 📊 **Detailed Test Results**

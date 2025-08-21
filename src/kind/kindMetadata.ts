@@ -8,7 +8,7 @@ import {
     ClassDeclaration,
     SyntaxKind,
     TypeFlags,
-} from "../types";
+} from "../types2";
 import { retrieveBuiltInKindMetadata, isBuiltInKindAlias, isBuiltInFPPattern } from "./kindAliasMetadata";
 import { KindAliasMetadata } from "./kindMetadataCentral";
 import { __KindBrand, __HKIn, __HKOut } from "../../kind-branding";
@@ -115,6 +115,7 @@ class KindInfoCache {
 // Global cache instance
 const kindInfoCache = new KindInfoCache();
 
+function getKindAliasKeys() {
     return Object.keys(KindAliasMetadata);
 }
 
@@ -733,6 +734,7 @@ function checkImplementedInterfaceKind(
  * Get the expanded kind signature for a built-in alias
  * This returns the equivalent Kind<...> form for the alias
  */
+function getBuiltInKindSignature(aliasName: string) {
     switch (aliasName) {
         case "Functor":
             return { arity: 1, parameterKinds: [Type, Type] } as any;

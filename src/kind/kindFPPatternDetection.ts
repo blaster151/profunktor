@@ -11,7 +11,7 @@ import {
     TypeReferenceNode,
     Node,
     DiagnosticWithLocation
-} from "../types";
+} from "../types2";
 
 import {
     retrieveKindMetadata,

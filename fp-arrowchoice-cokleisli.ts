@@ -6,8 +6,8 @@
 //
 // Expose HKTs so it plugs into your registry & law runner.
 
-import { Kind1, Kind2, Apply, Either } from './fp-hkt';
-import { Cochoice, Comonad, Left, Right } from './fp-cochoice';
+import { Kind1, Kind2, Apply } from './fp-hkt';
+import { Cochoice, Comonad, Either, Left, Right } from './fp-cochoice';
 
 // Core Arrow typeclasses (inline to avoid import churn)
 export interface Category<Arr extends Kind2> {

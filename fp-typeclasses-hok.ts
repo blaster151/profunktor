@@ -7,7 +7,7 @@
 
 import {
   Kind, Kind1, Kind2, KindAny, HigherKind, HOK1, HOK2,
-  HKInput, HKOutput, IsKindCompatible, IsHigherKindCompatible,
+  KindInput, KindOutput, IsKindCompatible, IsHigherKindCompatible,
   Apply, TypeArgs, Type
 } from './fp-hkt';
 
@@ -27,14 +27,13 @@ interface Functor<F extends HigherKind<KindAny, KindAny>> {
    * @returns A new functor with the transformed contents
    */
   map: <A, B>(
-  fa: Apply<HKOutput<F>, [A]>, 
+    fa: Apply<KindOutput<F>, [A]>, 
     f: (a: A) => B
-  ) => Apply<HKOutput<F>, [B]>;
+  ) => Apply<KindOutput<F>, [B]>;
 }
 
 /**
  * Unary Functor - maps from Kind1 to Kind1
-// ...existing code...
  */
 interface Functor1<F extends HOK1<Kind1, Kind1>> extends Functor<F> {
   readonly __arity: 1;
@@ -59,27 +58,88 @@ type AnyFunctor = Functor<HigherKind<KindAny, KindAny>>;
 /**
  * Enhanced Applicative typeclass using Higher-Order Kinds
  */
-interface Applicative<F extends HigherKind<KindAny, KindAny>> extends Functor<F> {
-  // Add Applicative methods here as needed
+interface Applicative<F extends HigherKind<Kind1, Kind1>> extends Functor<F> {
+  /**
+   * Lifts a value into the applicative context
+   * @param a - The value to lift
+   * @returns The value wrapped in the applicative context
+   */
+  of: <A>(a: A) => Apply<KindOutput<F>, [A]>;
+  
+  /**
+   * Applies a function in context to a value in context
+   * @param fab - The function in context
+   * @param fa - The value in context
+   * @returns The result of applying the function to the value, in context
+   */
+  ap: <A, B>(
+    fab: Apply<KindOutput<F>, [(a: A) => B]>, 
+    fa: Apply<KindOutput<F>, [A]>
+  ) => Apply<KindOutput<F>, [B]>;
 }
+
+// ============================================================================
+// Enhanced Monad Typeclass with Higher-Order Kinds
+// ============================================================================
+
+/**
+ * Enhanced Monad typeclass using Higher-Order Kinds
+ */
+interface Monad<F extends HigherKind<Kind1, Kind1>> extends Applicative<F> {
+  /**
+   * Chains computations in the monadic context
+   * @param fa - The monadic value to chain from
+   * @param f - The function that produces a new monadic value
+   * @returns The result of chaining the computations
+   */
+  chain: <A, B>(
+    fa: Apply<KindOutput<F>, [A]>, 
+    f: (a: A) => Apply<KindOutput<F>, [B]>
+  ) => Apply<KindOutput<F>, [B]>;
+}
+
+// ============================================================================
+// Enhanced Bifunctor Typeclass with Higher-Order Kinds
+// ============================================================================
 
 /**
  * Enhanced Bifunctor typeclass using Higher-Order Kinds
  */
 interface Bifunctor<F extends HigherKind<Kind2, Kind2>> {
+  /**
+   * Maps functions over both type parameters of a bifunctor
+   * @param fab - The bifunctor to map over
+   * @param f - The function to apply to the first type parameter
+   * @param g - The function to apply to the second type parameter
+   * @returns A new bifunctor with transformed type parameters
+   */
   bimap: <A, B, C, D>(
-    fab: Apply<HKOutput<F>, [A, B]>,
+    fab: Apply<KindOutput<F>, [A, B]>,
     f: (a: A) => C,
     g: (b: B) => D
-  ) => Apply<HKOutput<F>, [C, D]>;
+  ) => Apply<KindOutput<F>, [C, D]>;
+  
+  /**
+   * Maps a function over the first type parameter only
+   * @param fab - The bifunctor to map over
+   * @param f - The function to apply to the first type parameter
+   * @returns A new bifunctor with the first type parameter transformed
+   */
   lmap: <A, B, C>(
-    fab: Apply<HKOutput<F>, [A, B]>,
+    fab: Apply<KindOutput<F>, [A, B]>, 
     f: (a: A) => C
-  ) => Apply<HKOutput<F>, [C, B]>;
+  ) => Apply<KindOutput<F>, [C, B]>;
+  
+  /**
+   * Maps a function over the second type parameter only
+   * @param fab - The bifunctor to map over
+   * @param g - The function to apply to the second type parameter
+   * @returns A new bifunctor with the second type parameter transformed
+   */
   rmap: <A, B, D>(
-    fab: Apply<HKOutput<F>, [A, B]>,
+    fab: Apply<KindOutput<F>, [A, B]>, 
     g: (b: B) => D
-  ) => Apply<HKOutput<F>, [A, D]>;
+  ) => Apply<KindOutput<F>, [A, D]>;
 }
 
 // ============================================================================
@@ -98,10 +158,10 @@ interface Profunctor<F extends HigherKind<Kind2, Kind2>> {
    * @returns A new profunctor with transformed type parameters
    */
   dimap: <A, B, C, D>(
-  p: Apply<HKOutput<F>, [A, B]>,
+    p: Apply<KindOutput<F>, [A, B]>,
     f: (c: C) => A,
     g: (b: B) => D
-  ) => Apply<HKOutput<F>, [C, D]>;
+  ) => Apply<KindOutput<F>, [C, D]>;
   
   /**
    * Maps a contravariant function over the first type parameter only
@@ -110,9 +170,9 @@ interface Profunctor<F extends HigherKind<Kind2, Kind2>> {
    * @returns A new profunctor with the first type parameter transformed
    */
   lmap: <A, B, C>(
-  p: Apply<HKOutput<F>, [A, B]>, 
+    p: Apply<KindOutput<F>, [A, B]>, 
     f: (c: C) => A
-  ) => Apply<HKOutput<F>, [C, B]>;
+  ) => Apply<KindOutput<F>, [C, B]>;
   
   /**
    * Maps a covariant function over the second type parameter only
@@ -121,9 +181,9 @@ interface Profunctor<F extends HigherKind<Kind2, Kind2>> {
    * @returns A new profunctor with the second type parameter transformed
    */
   rmap: <A, B, D>(
-  p: Apply<HKOutput<F>, [A, B]>, 
+    p: Apply<KindOutput<F>, [A, B]>, 
     g: (b: B) => D
-  ) => Apply<HKOutput<F>, [A, D]>;
+  ) => Apply<KindOutput<F>, [A, D]>;
 }
 
 // ============================================================================
@@ -141,9 +201,9 @@ interface Traversable<F extends HigherKind<Kind1, Kind1>, G extends HigherKind<K
    * @returns The result of traversing the structure
    */
   traverse: <A, B>(
-  fa: Apply<HKOutput<F>, [A]>,
-  f: (a: A) => Apply<HKOutput<G>, [B]>
-  ) => Apply<HKOutput<G>, [Apply<HKOutput<F>, [B]>]>;
+    fa: Apply<KindOutput<F>, [A]>,
+    f: (a: A) => Apply<KindOutput<G>, [B]>
+  ) => Apply<KindOutput<G>, [Apply<KindOutput<F>, [B]>]>;
   
   /**
    * Sequences a structure of applicative functors
@@ -151,8 +211,8 @@ interface Traversable<F extends HigherKind<Kind1, Kind1>, G extends HigherKind<K
    * @returns The applicative functor of a structure
    */
   sequence: <A>(
-  fga: Apply<HKOutput<F>, [Apply<HKOutput<G>, [A]>]>
-  ) => Apply<HKOutput<G>, [Apply<HKOutput<F>, [A]>]>;
+    fga: Apply<KindOutput<F>, [Apply<KindOutput<G>, [A]>]>
+  ) => Apply<KindOutput<G>, [Apply<KindOutput<F>, [A]>]>;
 }
 
 // ============================================================================
@@ -171,9 +231,9 @@ interface Foldable<F extends HigherKind<Kind1, Kind1>> {
    * @returns The result of folding the structure
    */
   foldl: <A, B>(
-  fa: Apply<HKOutput<F>, [A]>,
-  reducer: (acc: B, a: A) => B,
-  initial: B
+    fa: Apply<KindOutput<F>, [A]>,
+    reducer: (acc: B, a: A) => B,
+    initial: B
   ) => B;
   
   /**
@@ -184,9 +244,9 @@ interface Foldable<F extends HigherKind<Kind1, Kind1>> {
    * @returns The result of folding the structure
    */
   foldr: <A, B>(
-  fa: Apply<HKOutput<F>, [A]>,
-  reducer: (a: A, acc: B) => B,
-  initial: B
+    fa: Apply<KindOutput<F>, [A]>,
+    reducer: (a: A, acc: B) => B,
+    initial: B
   ) => B;
 }
 
@@ -203,11 +263,6 @@ type IsFunctor<F extends HigherKind<KindAny, KindAny>> =
 /**
  * Check if a type is an Applicative
  */
-// Forward declarations for type predicates (these are only for type-level checks)
-interface Applicative<F> {}
-interface Monad<F> {}
-interface Bifunctor<F> {}
-interface Profunctor<F> {}
 type IsApplicative<F extends HigherKind<Kind1, Kind1>> = 
   F extends Applicative<F> ? true : false;
 
@@ -316,9 +371,9 @@ interface TupleHOK extends HigherKind<Kind2, Kind2> {
  */
 interface PolymorphicFunctor extends Functor<HigherKind<Kind1, Kind1>> {
   map: <F extends HigherKind<Kind1, Kind1>, A, B>(
-  fa: Apply<HKOutput<F>, [A]>,
+    fa: Apply<KindOutput<F>, [A]>,
     f: (a: A) => B
-  ) => Apply<HKOutput<F>, [B]>;
+  ) => Apply<KindOutput<F>, [B]>;
 }
 
 /**
@@ -326,10 +381,10 @@ interface PolymorphicFunctor extends Functor<HigherKind<Kind1, Kind1>> {
  */
 interface PolymorphicBifunctor extends Bifunctor<HigherKind<Kind2, Kind2>> {
   bimap: <F extends HigherKind<Kind2, Kind2>, A, B, C, D>(
-    fab: Apply<HKOutput<F>, [A, B]>,
+    fab: Apply<KindOutput<F>, [A, B]>,
     f: (a: A) => C,
     g: (b: B) => D
-  ) => Apply<HKOutput<F>, [C, D]>;
+  ) => Apply<KindOutput<F>, [C, D]>;
 }
 
 // ============================================================================

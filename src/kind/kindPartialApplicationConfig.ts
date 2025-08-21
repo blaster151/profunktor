@@ -4,7 +4,7 @@ import {
     Type,
     TypeParameterDeclaration,
     SourceFile,
-} from "../types";
+} from "../types2";
 import { PartialApplicationInfo, detectPartialApplication, trackPartialApplication } from "./kindPartialApplication.js";
 
 /**

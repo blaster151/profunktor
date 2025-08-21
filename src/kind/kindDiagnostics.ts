@@ -7,7 +7,7 @@ import {
     Type,
     Symbol,
     SyntaxKind,
-} from "../types";
+} from "../types2";
 import { KindComparisonError, KindComparisonWarning } from "./kindComparison.js";
 
 /**

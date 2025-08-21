@@ -11,7 +11,7 @@ import {
     TypeMapper,
     TypeNode,
     ObjectFlags,
-} from "../types";
+} from "../types2";
 import { __KindBrand, __HKIn, __HKOut } from "../../kind-branding";
 // TODO: Import isTypeConstructorType from the correct location
 // For now, we'll use a simple type check

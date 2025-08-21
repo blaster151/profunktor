@@ -1,18 +1,4 @@
 
-
-/** Narrowing helpers */
-function isObservableLite<A = unknown>(u: unknown): u is ObservableLite<A> {
-  return !!u && typeof (u as any).subscribe === 'function';
-}
-function isStatefulStream<I = unknown, S = unknown, O = unknown>(u: unknown): u is StatefulStream<I, S, O> {
-  return !!u && typeof (u as any).run === 'function' && typeof (u as any).toObservableLite === 'function';
-}
-/** Exhaustiveness helper to make TS understand we handled all cases */
-function assertNever(x: never, msg: string): never {
-  throw new Error(msg);
-}
-
-type FluentValue<A> = ObservableLite<A> | StatefulStream<any, any, A>;
 /**
  * Unified Fluent API Mixin
  * 
@@ -34,6 +20,20 @@ import { Maybe, Just, Nothing, matchMaybe } from './fp-maybe-unified';
 import { Either, Left, Right, matchEither } from './fp-either-unified';
 import { Result, Ok, Err, matchResult } from './fp-result-unified';
 import { isOk, isErr } from './fp-result-unified';
+
+/** Narrowing helpers */
+function isObservableLite<A = unknown>(u: unknown): u is ObservableLite<A> {
+  return !!u && typeof (u as any).subscribe === 'function';
+}
+function isStatefulStream<I = unknown, S = unknown, O = unknown>(u: unknown): u is StatefulStream<I, S, O> {
+  return !!u && typeof (u as any).run === 'function' && typeof (u as any).toObservableLite === 'function';
+}
+/** Exhaustiveness helper to make TS understand we handled all cases */
+function assertNever(x: never, msg: string): never {
+  throw new Error(msg);
+}
+
+type FluentValue<A> = ObservableLite<A> | StatefulStream<any, any, A>;
 
 /**
  * Type guard for Result
@@ -135,6 +135,8 @@ export interface FluentImpl<T> {
   filterMap?: (self: any, f: (a: T) => Maybe<any>) => any;
   ap?: (self: any, fab: any) => any;
   bimap?: (self: any, left: (l: any) => any, right: (r: any) => any) => any;
+  mapLeft?: (self: any, f: (l: any) => any) => any;
+  mapRight?: (self: any, g: (r: any) => any) => any;
   bichain?: (self: any, left: (l: any) => any, right: (r: any) => any) => any;
   scan?: (self: any, reducer: (acc: any, value: T) => any, seed: any) => any;
   take?: (self: any, n: number) => any;

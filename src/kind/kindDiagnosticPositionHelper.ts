@@ -10,7 +10,7 @@ import {
     Node,
     DiagnosticWithLocation,
     LineAndCharacter
-} from "../types";
+} from "../types2";
 
 /**
  * Get line and character position using TypeScript internals

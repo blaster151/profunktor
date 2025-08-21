@@ -6,7 +6,7 @@ This implementation provides seamless integration between persistent collections
 
 ## 🏗️ Core Architecture
 
-### 1. **HKT Registration for Persistent Collections (`fp-persistent-hkt-gadt.ts`)**
+### 1. **HKT Registration for Persistent Collections (`fp-persistent-hkt.ts`)**
 
 The persistent collections HKT GADT integration system provides:
 
@@ -1040,7 +1040,7 @@ The `test-persistent-hkt-gadt.ts` file demonstrates:
 
 ## 📚 Files Created
 
-1. **`fp-persistent-hkt-gadt.ts`** - Core persistent collections HKT GADT integration
+1. **`fp-persistent-hkt.ts`** - Core persistent collections HKT GADT integration
 2. **`test-persistent-hkt-gadt.ts`** - Comprehensive test suite
 3. **`PERSISTENT_COLLECTIONS_HKT_GADT_SUMMARY.md`** - Complete documentation
 

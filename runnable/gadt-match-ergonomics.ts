@@ -5,7 +5,7 @@ import {
   listToGADT, mapToGADT, setToGADT,
   pmatchList, pmatchListTag, pmatchMap, pmatchMapTag, pmatchSet, pmatchSetTag,
   isNil, isCons, isEmptyMap, isNonEmptyMap, isEmptySet, isNonEmptySet 
-} from '../fp-persistent-hkt-gadt';
+} from '../fp-persistent-hkt';
 
 function demoList(): boolean {
   const xs = PersistentList.fromArray([1, 2, 3]);

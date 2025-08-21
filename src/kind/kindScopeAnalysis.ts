@@ -7,7 +7,8 @@ import {
     Type,
     Program,
     TypeReferenceNode,
-} from "../types";
+    TypeFlags,
+} from "../types2";
 import { retrieveKindMetadata } from "./kindMetadata.js";
 
 /**
@@ -73,7 +74,7 @@ export function findTypeConstructorsInScope(
  * Analyzes the scope hierarchy at a given node position
  */
 function getScopeAtLocation(node: Node, checker: TypeChecker): any {
-    const sourceFile = node.getSourceFile();
+    const sourceFile = (node as any).getSourceFile();
     
     // Simplified implementation that focuses on the current file scope
     // In a full implementation, we'd build a complete scope hierarchy
@@ -121,13 +122,13 @@ function isPotentialTypeConstructor(symbol: Symbol, checker: TypeChecker): boole
     if (!declarations || declarations.length === 0) return false;
 
     for (const declaration of declarations) {
-        if (declaration.kind === 'TypeAliasDeclaration' && (declaration as any).typeParameters) {
+        if ((declaration as any).kind === 'TypeAliasDeclaration' && (declaration as any).typeParameters) {
             return true;
         }
-        if (declaration.kind === 'InterfaceDeclaration' && (declaration as any).typeParameters) {
+        if ((declaration as any).kind === 'InterfaceDeclaration' && (declaration as any).typeParameters) {
             return true;
         }
-        if (declaration.kind === 'ClassDeclaration' && (declaration as any).typeParameters) {
+        if ((declaration as any).kind === 'ClassDeclaration' && (declaration as any).typeParameters) {
             return true;
         }
     }
@@ -145,8 +146,8 @@ function calculateDistanceFromNode(symbol: Symbol, node: Node, sourceFile: Sourc
     // Find the closest declaration
     let minDistance = 1000;
     for (const declaration of declarations) {
-        if (declaration.getSourceFile() === sourceFile) {
-            const distance = Math.abs(declaration.pos - node.pos);
+        if ((declaration as any).getSourceFile() === sourceFile) {
+            const distance = Math.abs(((declaration as any).pos as number) - ((node as any).pos as number));
             minDistance = Math.min(minDistance, distance);
         }
     }

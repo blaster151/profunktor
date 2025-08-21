@@ -30,9 +30,9 @@ This report presents the results of a comprehensive audit of the typeclass regis
 2. **MaybeGADT** (`fp-gadt-enhanced.ts`) - Expected: `Pure`
 3. **EitherGADT** (`fp-gadt-enhanced.ts`) - Expected: `Pure`
 4. **Result** (`fp-result.ts`) - Expected: `Pure`
-5. **PersistentListHKT** (`fp-persistent-hkt-gadt.ts`) - Expected: `Pure`
-6. **PersistentMapHKT** (`fp-persistent-hkt-gadt.ts`) - Expected: `Pure`
-7. **PersistentSetHKT** (`fp-persistent-hkt-gadt.ts`) - Expected: `Pure`
+5. **PersistentListHKT** (`fp-persistent-hkt.ts`) - Expected: `Pure`
+6. **PersistentMapHKT** (`fp-persistent-hkt.ts`) - Expected: `Pure`
+7. **PersistentSetHKT** (`fp-persistent-hkt.ts`) - Expected: `Pure`
 8. **Maybe** (`fp-maybe-unified-enhanced.ts`) - Expected: `Pure`
 9. **Function** (`fp-profunctor-optics.ts`) - Expected: `Impure`
 10. **StatefulStream** (`fp-stream-state.ts`) - Expected: `State`
@@ -68,9 +68,9 @@ This report presents the results of a comprehensive audit of the typeclass regis
 2. **MaybeGADT** (`fp-gadt-enhanced.ts`) - Missing: Eq, Ord, Show
 3. **EitherGADT** (`fp-gadt-enhanced.ts`) - Missing: Eq, Ord, Show
 4. **Result** (`fp-result.ts`) - Missing: Eq, Ord, Show
-5. **PersistentListHKT** (`fp-persistent-hkt-gadt.ts`) - Missing: Eq, Ord, Show
-6. **PersistentMapHKT** (`fp-persistent-hkt-gadt.ts`) - Missing: Eq, Ord, Show
-7. **PersistentSetHKT** (`fp-persistent-hkt-gadt.ts`) - Missing: Eq, Ord, Show
+5. **PersistentListHKT** (`fp-persistent-hkt.ts`) - Missing: Eq, Ord, Show
+6. **PersistentMapHKT** (`fp-persistent-hkt.ts`) - Missing: Eq, Ord, Show
+7. **PersistentSetHKT** (`fp-persistent-hkt.ts`) - Missing: Eq, Ord, Show
 8. **Maybe** (`fp-maybe-unified-enhanced.ts`) - Missing: Eq, Ord, Show
 9. **ListGADT** (`fp-gadt.ts`) - Missing: Eq, Ord, Show
 10. **Either** (`fp-either.ts`) - Missing: Eq, Ord, Show
@@ -100,9 +100,9 @@ This report presents the results of a comprehensive audit of the typeclass regis
 | MaybeGADT | fp-gadt-enhanced.ts | ❌ Pure | 🔄 Missing | Needs work |
 | EitherGADT | fp-gadt-enhanced.ts | ❌ Pure | 🔄 Missing | Needs work |
 | Result | fp-result.ts | ❌ Pure | 🔄 Missing | Needs work |
-| PersistentListHKT | fp-persistent-hkt-gadt.ts | ❌ Pure | 🔄 Missing | Needs work |
-| PersistentMapHKT | fp-persistent-hkt-gadt.ts | ❌ Pure | 🔄 Missing | Needs work |
-| PersistentSetHKT | fp-persistent-hkt-gadt.ts | ❌ Pure | 🔄 Missing | Needs work |
+| PersistentListHKT | fp-persistent-hkt.ts | ❌ Pure | 🔄 Missing | Needs work |
+| PersistentMapHKT | fp-persistent-hkt.ts | ❌ Pure | 🔄 Missing | Needs work |
+| PersistentSetHKT | fp-persistent-hkt.ts | ❌ Pure | 🔄 Missing | Needs work |
 | Maybe | fp-maybe-unified-enhanced.ts | ❌ Pure | 🔄 Missing | Needs work |
 | ListGADT | fp-gadt.ts | ❌ Pure | 🔄 Missing | Needs work |
 | PersistentList | fp-persistent.ts | ❌ Pure | ✅ Complete | Needs purity |

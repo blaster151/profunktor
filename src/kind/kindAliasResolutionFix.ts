@@ -12,7 +12,7 @@ import {
     Symbol,
     Node,
     SourceFile
-} from "./types.js";
+} from "../types2";
 
 import {
     KindMetadata,

@@ -1,12 +1,4 @@
 // fp-cooperad-weights-extras.ts
-// --- Node shims and canonical type imports ---
-declare const require: undefined | ((m: string) => any);
-// Optional Node shims (undefined in browsers)
-const _fs: any = (() => { try { return require?.('fs'); } catch { return null; } })();
-const _events: any = (() => { try { return require?.('events'); } catch { return null; } })();
-const once: undefined | ((em: any, ev: string) => Promise<any[]>) = _events?.once;
-
-import type { WeightMonoid, Weight } from './fp-cooperad-weights';
 // Extras for the cooperad weights:
 //  - Polynomial semiring over sparse maps (Map<K, number>), keyed by a Monoid<K>
 //  - BigInt semiring
@@ -73,90 +65,43 @@ export function PolynomialSemiring<K>(
       const sum = R.add(prev, v);
       if (sum === R.zero) out.delete(k); else out.set(k, sum);
     }
-    return normalize(out);
+    return out;
   };
 
-  // --- Exported helpers for sparse polynomial semiring ---
-  // Zero: the empty map (no terms)
-  const zero: Map<K, number> = new Map();
-
-  // One: a map with exactly one entry: [Monoid.empty, Semiring.one]
-  const one: Map<K, number> = new Map([[K.empty, R.one]]);
-
-  // Helper: accumulate into a map, summing coefficients and pruning zeroes
-  function accumulate(map: Map<K, number>, k: K, r: number) {
-    const prev = map.get(k) ?? R.zero;
-    const sum = R.add(prev, r);
-    // If Semiring<number> is extended with eqZero, add support here
-    if (sum === R.zero) {
-      map.delete(k);
-    } else {
-      map.set(k, sum);
-    }
-  }
-
-  // Multiplication (Cauchy product / convolution)
-  function mul(a: Map<K, number>, b: Map<K, number>): Map<K, number> {
-    // Optimization: if a or b is zero, return zero
-    if (a.size === 0 || b.size === 0) return zero;
-    // If a is one, return normalize(b); if b is one, return normalize(a)
-    if (a.size === 1 && a.has(K.empty) && a.get(K.empty) === R.one) return normalize(new Map(b));
-    if (b.size === 1 && b.has(K.empty) && b.get(K.empty) === R.one) return normalize(new Map(a));
+  const mul = (a: Map<K, number>, b: Map<K, number>): Map<K, number> => {
+    if (a.size === 0 || b.size === 0) return new Map();
     const out = new Map<K, number>();
-    for (const [ka, ra] of a) {
-      for (const [kb, rb] of b) {
-        const k = K.concat(ka, kb);
-        const r = R.mul(ra, rb);
-        accumulate(out, k, r);
+    for (const [k1, c1] of a) {
+      for (const [k2, c2] of b) {
+        const k = K.concat(k1, k2);
+        const acc = out.get(k) ?? R.zero;
+        const prod = R.mul(c1, c2);
+        const sum = R.add(acc, prod);
+        if (sum === R.zero) out.delete(k); else out.set(k, sum);
       }
     }
-    return normalize(out);
-  }
-
-  // Exported for external use
-  return {
-    add,
-    mul,
-    zero,
-    one,
+    return out;
   };
+
   return {
-    add,
-    mul: (a, b) => new Map(),
-    zero: new Map(),
-    one: new Map([[K.empty, R.one]])
+    zero: new Map<K, number>(),
+    one : new Map<K, number>([[K.empty, R.one]]),
+    add: (x, y) => normalize(add(x, y)),
+    mul: (x, y) => normalize(mul(x, y)),
   };
 }
-    export async function writeDeltaNDJSON<A>(
-      tr: Tree<A>,
-      filePath: string,
-      opts: NDJSONOpts<A> = {}
-    ): Promise<void> {
-      if (!_fs || !once) {
-        throw new Error("Node streams are unavailable in this build");
-      }
-      const flushEvery = opts.flushEvery ?? 1000;
-      const structural = opts.structural ?? false;
-      const encodeA = opts.encodeA ?? ((a: A) => a);
 
-      const stream = _fs.createWriteStream(filePath);
-      let lineCount = 0;
-
-      try {
-        for (const [forest, trunk] of deltaStream(tr)) {
-          const line = structural
-            ? { forest: forestToJSON(forest, encodeA), trunk: treeToJSON(trunk, encodeA) }
-            : { forest: keyForest(forest), trunk: keyOf(trunk) };
-          stream.write(JSON.stringify(line) + "\n");
-          if (++lineCount % flushEvery === 0) {
-            await once(stream, "drain");
-          }
-        }
-      } finally {
-        stream.end();
-        await once(stream, "finish");
-      }
-    }
+// Pretty for Map<K,number> polynomials
+export function showPoly<K>(
+  m: Map<K, number>,
+  showK: (k: K) => string = (k) => String(k),
+  showC: (c: number) => string = (c) => String(c)
+): string {
+  if (m.size === 0) return "0";
+  return [...m.entries()]
+    .map(([k, c]) => `${showC(c)}·${showK(k) || "1"}`)
+    .join(" + ");
+}
 
 // -------------------------------------------------------------
 // 2) BigInt semiring
@@ -171,7 +116,8 @@ export const BigIntSemiring: Semiring<bigint> = {
 // -------------------------------------------------------------
 // 3) NDJSON streaming writers
 // -------------------------------------------------------------
-
+import * as fs from "fs";
+import { once } from "events";
 
 type ToJSON<A> = (a: A) => any;
 
@@ -198,43 +144,72 @@ function forestToJSON<A>(f: Forest<A>, enc: ToJSON<A>): any {
  * Write raw Δ (forest ⊗ trunk) as NDJSON.
  * Each line: { forest: string|object, trunk: string|object }
  */
-  /**
-   * Write weighted Δ as NDJSON.
-   * Each line: { coef: number, forest: string|object, trunk: string|object }
-   */
-  export async function writeDeltaWNDJSON<A, W = number>(
-    tr: Tree<A>,
-    filePath: string,
-    monoid: WeightMonoid<W>,
-    coefOf: (P: Forest<A>, R: Tree<A>) => Weight<W> = () => monoid.empty,
-    opts: NDJSONOpts<A> = {}
-  ): Promise<void> {
-    if (!_fs || !once) {
-      throw new Error("Node streams are unavailable in this build");
-    }
-    const flushEvery = opts.flushEvery ?? 1000;
-    const structural = opts.structural ?? false;
-    const encodeA = opts.encodeA ?? ((a: A) => a);
+export async function writeDeltaNDJSON<A>(
+  tr: Tree<A>,
+  filePath: string,
+  opts: NDJSONOpts<A> = {}
+): Promise<void> {
+  const flushEvery = opts.flushEvery ?? 1000;
+  const structural = opts.structural ?? false;
+  const encodeA = opts.encodeA ?? ((a: A) => a);
 
-    const stream = _fs.createWriteStream(filePath);
-    let lineCount = 0;
+  const stream = fs.createWriteStream(filePath);
+  let lineCount = 0;
 
-    try {
-      const weighted = deltaW(tr, monoid, coefOf);
-      for (const { coef, forest, trunk } of weighted.values()) {
-        const line = structural
-          ? { coef, forest: forestToJSON(forest, encodeA), trunk: treeToJSON(trunk, encodeA) }
-          : { coef, forest: keyForest(forest), trunk: keyOf(trunk) };
-        stream.write(JSON.stringify(line) + "\n");
-        if (++lineCount % flushEvery === 0) {
-          await once(stream, "drain");
-        }
+  try {
+    for (const [forest, trunk] of deltaStream(tr)) {
+      const line = structural
+        ? { forest: forestToJSON(forest, encodeA), trunk: treeToJSON(trunk, encodeA) }
+        : { forest: keyForest(forest), trunk: keyOf(trunk) };
+      
+      stream.write(JSON.stringify(line) + "\n");
+      
+      if (++lineCount % flushEvery === 0) {
+        await once(stream, "drain");
       }
-    } finally {
-      stream.end();
-      await once(stream, "finish");
     }
+  } finally {
+    stream.end();
+    await once(stream, "finish");
   }
+}
+
+/**
+ * Write weighted Δ as NDJSON.
+ * Each line: { coef: number, forest: string|object, trunk: string|object }
+ */
+export async function writeDeltaWNDJSON<A, W = number>(
+  tr: Tree<A>,
+  filePath: string,
+  monoid: WeightMonoid<W>,
+  coefOf: (P: Forest<A>, R: Tree<A>) => Weight<W> = () => monoid.empty,
+  opts: NDJSONOpts<A> = {}
+): Promise<void> {
+  const flushEvery = opts.flushEvery ?? 1000;
+  const structural = opts.structural ?? false;
+  const encodeA = opts.encodeA ?? ((a: A) => a);
+
+  const stream = fs.createWriteStream(filePath);
+  let lineCount = 0;
+
+  try {
+    const weighted = deltaW(tr, monoid, coefOf);
+    for (const { coef, forest, trunk } of weighted.values()) {
+      const line = structural
+        ? { coef, forest: forestToJSON(forest, encodeA), trunk: treeToJSON(trunk, encodeA) }
+        : { coef, forest: keyForest(forest), trunk: keyOf(trunk) };
+      
+      stream.write(JSON.stringify(line) + "\n");
+      
+      if (++lineCount % flushEvery === 0) {
+        await once(stream, "drain");
+      }
+    }
+  } finally {
+    stream.end();
+    await once(stream, "finish");
+  }
+}
 
 // Browser-compatible execution check
 // Note: Examples can be called directly by creating a demo function

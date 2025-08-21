@@ -17,7 +17,7 @@
 import {
   Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
-  HigherKind, HKInput, HKOutput,
+  HigherKind, KindInput, KindOutput,
   Phantom, KindWithPhantom
 } from './fp-hkt';
 

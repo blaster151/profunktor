@@ -6,7 +6,7 @@ import {
     Node,
     TypeNode,
     SyntaxKind,
-} from "../types";
+} from "../types2";
 import { PartialApplicationInfo, detectPartialApplication } from "./kindPartialApplication.js";
 import { PartialApplicationConfig } from "./kindPartialApplicationConfig.js";
 import { KindMetadata } from "./kindMetadata.js";
@@ -324,7 +324,7 @@ function getKindMetadataForType(type: Type, checker: TypeChecker): KindMetadata 
             arity: (type as any).kindArity || 0,
             parameterKinds: (type as any).parameterKinds || [],
             symbol: type.symbol,
-            retrievedFrom: "explicit",
+            retrievedFrom: KindSource.None,
             isValid: true
         };
     }

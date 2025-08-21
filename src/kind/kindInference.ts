@@ -13,7 +13,7 @@ import {
     TypeReferenceNode,
     KindTypeNode,
     SyntaxKind,
-} from "../types";
+} from "../types2";
 import { __KindBrand, __HKIn, __HKOut } from "../../kind-branding";
 
 /**

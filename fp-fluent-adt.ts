@@ -14,7 +14,7 @@ import type {
   Apply, 
   Type 
 } from './fp-typeclasses';
-import type { Kind1, Kind2, ApplyLeft } from './fp-hkt';
+import type { Kind1, Kind2 } from './fp-hkt';
 import { getTypeclassInstance } from './fp-registry-init';
 
 // ============================================================================
@@ -101,8 +101,7 @@ export function addBifunctorMethods<F extends Kind2, L, R>(
   typeName: string
 ): Apply<F, [L, R]> & FluentBifunctorADT<F, L, R> {
   const bifunctor = getTypeclassInstance(typeName, 'Bifunctor') as Bifunctor<F>;
-  type UF = ApplyLeft<F, L>;
-  const monad = getTypeclassInstance(typeName, 'Monad') as Monad<UF>;
+  const monad = getTypeclassInstance(typeName, 'Monad') as Monad<F>;
 
   if (!bifunctor) {
     throw new Error(`No Bifunctor instance found for ${typeName}`);
@@ -128,13 +127,16 @@ export function addBifunctorMethods<F extends Kind2, L, R>(
   // Add chainLeft method (if Monad instance exists)
   if (monad) {
     fluent.chainLeft = <L2>(f: (l: L) => Apply<F, [L2, R]>): Apply<F, [L2, R]> => {
-      // Fix left slot, chain on right
-      // Not a true bifunctor monad, but allows chaining on right slot
+      // This is a simplified implementation - would need proper bifunctor monad
       return bifunctor.bimap(adt, f, (r: R) => monad.of(r));
     };
+  }
+
+  // Add chainRight method (if Monad instance exists)
+  if (monad) {
     fluent.chainRight = <R2>(g: (r: R) => Apply<F, [L, R2]>): Apply<F, [L, R2]> => {
-      // Fix left slot, chain on right
-      return monad.chain(adt as Apply<UF, [R]>, g) as Apply<F, [L, R2]>;
+      // This is a simplified implementation - would need proper bifunctor monad
+      return bifunctor.bimap(adt, (l: L) => monad.of(l), g);
     };
   }
 

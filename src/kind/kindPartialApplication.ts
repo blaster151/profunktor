@@ -8,8 +8,8 @@ import {
     TypeReferenceNode,
     TypeNode,
     SyntaxKind,
-} from "../types";
-import { KindMetadata } from "./kindMetadata.js";
+} from "../types2";
+import { KindMetadata, KindSource } from "./kindMetadata.js";
 import { compareKinds } from "./kindComparison.js";
 
 /**
@@ -169,7 +169,7 @@ function getKindMetadataForType(type: Type, checker: TypeChecker): KindMetadata 
                 arity: (type as any).kindArity || 0,
                 parameterKinds: (type as any).parameterKinds || [],
                 symbol: type.symbol,
-                retrievedFrom: "explicit",
+                retrievedFrom: KindSource.None,
                 isValid: true
             };
         }

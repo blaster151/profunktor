@@ -9,9 +9,9 @@ import {
     TypeReferenceNode,
     MappedTypeNode,
     SyntaxKind,
-    KindMetadata,
-    KindComparisonResult,
-} from "../types";
+} from "../types2";
+import type { KindMetadata } from "./kindMetadata.js";
+import type { KindComparisonResult } from "./kindComparison.js";
 import { 
     retrieveKindMetadata, 
     isBuiltInKindAliasSymbol, 

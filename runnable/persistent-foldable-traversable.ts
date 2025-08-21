@@ -5,7 +5,7 @@ import {
   PersistentListFoldable, 
   PersistentListTraversable,
   traverseList
-} from '../fp-persistent-hkt-gadt';
+} from '../fp-persistent-hkt';
 
 async function main() {
   console.log('=== Testing PersistentList Foldable/Traversable ===');

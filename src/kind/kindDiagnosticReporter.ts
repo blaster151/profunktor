@@ -6,7 +6,7 @@ import {
     TypeChecker,
     KindMetadata,
     KindComparisonResult
-} from "../types";
+} from "../types2";
 import { validateFPPatternKindConstraint } from "./kindAliasMetadata.js";
 import { retrieveKindMetadata, getBuiltInAliasName } from "./kindMetadata.js";
 import { applyKindDiagnosticAlias } from "./kindDiagnosticAlias.js";

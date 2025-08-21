@@ -4,7 +4,7 @@
 import { Tree, admissibleCuts } from './fp-cooperad-trees.js';
 import { makeDgCooperad } from './fp-dg-cooperad.js';
 import { deformationComplex } from './fp-deformation-dgla-enhanced.js';
-import { DgModule, Sum, sum, zero } from './fp-dg-core.js';
+import { DgModule, Sum, zero } from './fp-dg-core.js';
 
 // ============================================================================
 // Part 1: Ergonomic Design Demonstration
@@ -18,14 +18,7 @@ export function demonstrateErgonomics() {
   
   // 1. Your existing strict cooperad (unchanged)
   const existingCooperad = {
-    delta: (t: Tree<string>) => {
-      const cuts = admissibleCuts(t);
-      // Convert { forest, trunk } to Sum<[Tree, Tree]> format
-      return cuts.map(cut => ({
-        coef: 1,
-        term: [cut.trunk, ...cut.forest] as [Tree<string>, Tree<string>]
-      }));
-    },
+    delta: (t: Tree<string>) => admissibleCuts(t),
     key: (t: Tree<string>) => t.label,
     degree: (t: Tree<string>) => t.kids.length,
     // ... your existing cooperad methods
@@ -201,15 +194,8 @@ export function demonstrateHomotopyWorkflow<A>() {
   
   // 1. Start with existing cooperad
   const existingCooperad = {
-    delta: (t: Tree<A>) => {
-      const cuts = admissibleCuts(t);
-      // Convert { forest, trunk } to Sum<[Tree, Tree]> format
-      return cuts.map(cut => ({
-        coef: 1,
-        term: [cut.trunk, ...cut.forest] as [Tree<A>, Tree<A>]
-      }));
-    },
-    key: (t: Tree<A>) => String(t.label),
+    delta: (t: Tree<A>) => admissibleCuts(t),
+    key: (t: Tree<A>) => t.label,
     degree: (t: Tree<A>) => t.kids.length,
     // ... existing methods
   };
@@ -221,12 +207,6 @@ export function demonstrateHomotopyWorkflow<A>() {
   };
   
   const dgCooperad = makeDgCooperad(existingCooperad, dLocal);
-  
-  // Add the required dC property for deformationComplex
-  const dgCooperadWithDC = {
-    ...dgCooperad,
-    dC: (c: any) => zero() // Add differential on C
-  };
   
   // 3. Build deformation complex
   const algebra = {
@@ -241,7 +221,7 @@ export function demonstrateHomotopyWorkflow<A>() {
     equals: (x: string, y: string) => x === y
   };
   
-  const deformationComplexResult = deformationComplex(dgCooperadWithDC, algebra);
+  const deformationComplexResult = deformationComplex(dgCooperad, algebra);
   
   // 4. Use homotopy-aware law runner
   const lawRunner = homotopyLawRunner<A>();

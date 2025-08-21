@@ -1,4 +1,4 @@
-import { Either } from '../../bicategory/instances/profunctor-choice';
+import type { Either } from '../../../fp-hkt';
 import { ProfunctorChoiceOps, fromProfunctorChoiceWithSumTensor } from '../../bicategory/examples/fromChoiceSumTensor';
 
 // A toy, *finite* relations profunctor for demos: Rel<A,B> := (a: A) => B[]

@@ -27,6 +27,9 @@ import {
   getDerivableInstances 
 } from './fp-registry-init';
 
+// Re-export for compatibility
+export { getFPRegistry };
+
 // ============================================================================
 // Part 1: Type Guard Helpers
 // ============================================================================

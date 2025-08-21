@@ -3,7 +3,7 @@
  * Minimal scaffold to illustrate flow without deep checker integration.
  */
 import { hydrateKindInfoFromSideTable, defaultKindCache, buildKindExportMeta, toCachedKindInfo, normalizeDeclForHashing } from './kindCache.js';
-import type { SourceFile } from './types.js';
+import type { SourceFile } from '../types2';
 
 export function tryHydrateKindInfo(modulePath: string, exportName: string): void {
   const fromSide = hydrateKindInfoFromSideTable(defaultKindCache, modulePath, exportName);
@@ -37,11 +37,9 @@ import {
     SyntaxKind,
     ConditionalTypeNode,
     InferTypeNode,
-} from "./types.js";
+} from "../types2";
 import { 
     isKindSensitiveContext,
-    areKindsCompatible,
-    validateFPPatternConstraints,
     compareKindsWithAliasSupport,
     getKindCompatibilityDiagnostic
 } from "./kindCompatibility.js";
@@ -49,7 +47,7 @@ import {
     retrieveKindMetadata,
     isBuiltInKindAliasSymbol,
     getBuiltInAliasName,
-    getExpandedKindSignature
+    KindSource
 } from "./kindMetadata.js";
 import { compareKinds } from "./kindComparison.js";
 import { createKindDiagnosticReporter } from "./kindDiagnosticReporter.js";
@@ -90,7 +88,7 @@ export function integrateKindValidationInCheckTypeReference(
                         arity: context.expectedKindArity,
                         parameterKinds: context.expectedParameterKinds || [],
                         symbol: symbol,
-                        retrievedFrom: "context",
+                        retrievedFrom: KindSource.None,
                         isValid: true
                     };
                     
@@ -123,41 +121,12 @@ export function integrateKindValidationInCheckTypeReference(
                             });
                         }
                     }
-                    
-                    return { hasKindValidation: true, diagnostics };
                 }
             }
         }
     }
-    
-    // Check for FP pattern constraint violations (Free, Fix)
-    if (node.typeArguments && node.typeArguments.length > 0) {
-        const typeName = (node.typeName as any).escapedText;
-        if (typeName === "Free" || typeName === "Fix") {
-            const typeArguments = node.typeArguments.map(arg => checker.getTypeFromTypeNode(arg));
-            const validation = validateFPPatternConstraints(typeName, typeArguments, checker);
-            
-            if (!validation.isValid) {
-                const diagnosticCode = typeName === "Free" ? 9519 : 9520;
-                const message = validation.errorMessage || `FP pattern '${typeName}' kind constraint violation`;
-                
-                diagnostics.push({
-                    file: sourceFile,
-                    start: node.getStart(sourceFile),
-                    length: node.getWidth(sourceFile),
-                    messageText: message,
-                    category: 1, // Error
-                    code: diagnosticCode,
-                    reportsUnnecessary: false,
-                    reportsDeprecated: false,
-                    source: "ts.plus",
-                    relatedInformation: generateQuickFixSuggestions(typeName, typeArguments[0], node, sourceFile)
-                });
-            }
-        }
-    }
-    
-    return { hasKindValidation: false, diagnostics };
+
+    return { hasKindValidation: diagnostics.length > 0, diagnostics };
 }
 // KINDSCRIPT: END - CHECKER_INTEGRATION
 

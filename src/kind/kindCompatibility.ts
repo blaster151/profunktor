@@ -2,7 +2,6 @@ import {
     Node,
     Type,
     TypeFlags,
-    KindTypeNode,
     TypeParameterDeclaration,
     TypeReferenceNode,
     MappedTypeNode,
@@ -16,14 +15,13 @@ import {
     CallExpression,
     NewExpression,
     FunctionTypeNode,
-    KindMetadata,
-    KindSource,
-} from "../types";
+} from "../types2";
 import { 
     retrieveKindMetadata, 
     isBuiltInKindAliasSymbol, 
     getBuiltInAliasName,
-    getExpandedKindSignature 
+    KindMetadata,
+    KindSource
 } from "./kindMetadata.js";
 import { KindComparisonResult } from "./kindComparison.js";
 import { applyKindDiagnosticAlias } from "./kindDiagnosticAlias.js";
@@ -52,54 +50,29 @@ export function isKindSensitiveContext(
         source: 'none'
     };
 
-    // Check parser-set flags first
-    if (node.flags & NodeFlags.InExtendsConstraintContext) {
+    // Check parser-set flags first (simplified approach)
+    if ((node.flags ?? 0) & NodeFlags.InExtendsConstraintContext) {
         context.isKindSensitive = true;
         context.source = 'generic-constraint';
         return context;
     }
 
-    if (node.flags & NodeFlags.InMappedTypeContext) {
+    if ((node.flags ?? 0) & NodeFlags.InMappedTypeContext) {
         context.isKindSensitive = true;
         context.source = 'mapped-type';
         return context;
     }
 
-    // Inspect parent node in the AST
+    // Simple check: if we're in a type reference with type arguments, assume kind-sensitive
     const parent = node.parent;
-    if (!parent) {
-        return context;
-    }
-
-    // Check if node is a type argument to a generic parameter constrained to a kind
-    if (isTypeArgumentToKindConstrainedGeneric(node, parent, checker)) {
-        context.isKindSensitive = true;
-        context.source = 'generic-constraint';
-        context.parentNode = parent;
-        return context;
-    }
-
-    // Check if node appears in a kind alias definition
-    if (isInKindAliasDefinition(node, parent, checker)) {
-        context.isKindSensitive = true;
-        context.source = 'higher-order-usage';
-        context.parentNode = parent;
-        return context;
-    }
-
-    // Check if node is within type operator expressions expecting a kind
-    if (isInKindExpectingTypeOperator(node, parent, checker)) {
-        context.isKindSensitive = true;
-        context.source = 'conditional-type';
-        context.parentNode = parent;
-        return context;
-    }
-
-    // Ask the checker whether the surrounding signature or constraint expects a type constructor
-    if (checkerExpectsTypeConstructor(node, checker)) {
-        context.isKindSensitive = true;
-        context.source = 'higher-order-usage';
-        return context;
+    if (parent && parent.kind === SyntaxKind.TypeReference) {
+        const typeRef = parent as TypeReferenceNode;
+        if (typeRef.typeArguments && typeRef.typeArguments.length > 0) {
+            context.isKindSensitive = true;
+            context.source = 'generic-constraint';
+            context.parentNode = parent;
+            return context;
+        }
     }
 
     return context;
@@ -170,10 +143,10 @@ function isKindTypeReference(typeNode: TypeNode, checker: TypeChecker): boolean 
 
     if (typeNode.kind === SyntaxKind.TypeReference) {
         const typeRef = typeNode as TypeReferenceNode;
-        const symbol = checker.getSymbolAtLocation(typeRef.typeName);
+        const symbol = checker.getSymbolAtLocation(typeRef.typeName as unknown as Node);
         if (symbol) {
             // Check if the referenced type is a kind
-            const type = checker.getTypeOfSymbolAtLocation(symbol, typeRef);
+            const type = checker.getTypeAtLocation(typeRef.typeName as unknown as Node);
             return !!(type.flags & TypeFlags.Kind);
         }
     }
@@ -194,9 +167,9 @@ function isInKindAliasDefinition(
     while (current) {
         if (current.kind === SyntaxKind.TypeAliasDeclaration) {
             // Check if this type alias is a kind definition
-            const symbol = checker.getSymbolAtLocation(current);
+            const symbol = checker.getSymbolAtLocation(current as unknown as Node);
             if (symbol) {
-                const type = checker.getTypeOfSymbolAtLocation(symbol, current);
+                const type = checker.getTypeAtLocation(current as unknown as Node);
                 return !!(type.flags & TypeFlags.Kind);
             }
         }
@@ -215,7 +188,7 @@ function isInKindExpectingTypeOperator(
     checker: TypeChecker
 ): boolean {
     // Check mapped types
-    if (parent.kind === 'MappedType') {
+    if (parent.kind === SyntaxKind.MappedType) {
         const mappedType = parent as MappedTypeNode;
         if (mappedType.constraintType) {
             return isKindTypeReference(mappedType.constraintType, checker);
@@ -223,7 +196,7 @@ function isInKindExpectingTypeOperator(
     }
 
     // Check conditional types
-    if (parent.kind === 'ConditionalType') {
+    if (parent.kind === SyntaxKind.ConditionalType) {
         const conditionalType = parent as ConditionalTypeNode;
         // Check if the check type or extends type is a kind
         if (isKindTypeReference(conditionalType.checkType, checker) ||
@@ -294,16 +267,10 @@ function checkerExpectsTypeConstructor(
             }
         }
         
-        // Check if we're in a mapped type
-        if (current.kind === SyntaxKind.MappedType) {
-            const mappedType = current as MappedTypeNode;
-            if (mappedType.typeParameter && mappedType.typeParameter.constraint) {
-                const constraintType = checker.getTypeFromTypeNode(mappedType.typeParameter.constraint);
-                if (constraintType.flags & TypeFlags.Kind) {
-                    return true;
-                }
-            }
-        }
+            // Check if we're in a mapped type (simplified)
+    if (current.kind === SyntaxKind.MappedType) {
+        return true; // Assume kind-sensitive for mapped types
+    }
         
         // Check if we're in a conditional type
         if (current.kind === SyntaxKind.ConditionalType) {
@@ -381,7 +348,7 @@ function extractExpectedKindFromConstraint(
     // Look up the AST to find the type parameter declaration
     let current: Node | undefined = node;
     while (current) {
-        if (current.kind === 'TypeParameter') {
+        if (current.kind === SyntaxKind.TypeParameter) {
             const typeParam = current as TypeParameterDeclaration;
             if (typeParam.constraint) {
                 // Parse the constraint to extract kind information
@@ -534,7 +501,7 @@ function extractExpectedKindFromConditionalType(
     // Look for the conditional type in the parent chain
     let current: Node | undefined = node;
     while (current) {
-        if (current.kind === 'ConditionalType') {
+        if (current.kind === SyntaxKind.ConditionalType) {
             const conditionalType = current as ConditionalTypeNode;
             
             // Check the check type
@@ -612,9 +579,6 @@ function expandBuiltInAlias(
         return aliasKind;
     }
 
-    // Get the expanded signature for the alias
-    const expandedSignature = getExpandedKindSignature(aliasKind.aliasName);
-    
     // Create a synthetic kind metadata that represents the expanded form
     const expandedKind: KindMetadata = {
         arity: aliasKind.arity,
@@ -832,17 +796,15 @@ export function getKindCompatibilityDiagnostic(
     }
 
     if (expectedKind.isBuiltInAlias) {
-        const expandedSignature = getExpandedKindSignature(expectedKind.aliasName!);
         return {
-            message: `Expected ${expectedKind.aliasName} (${expandedSignature}), but got incompatible kind`,
+            message: `Expected kind alias '${expectedKind.aliasName}', but got incompatible kind`,
             code: applyKindDiagnosticAlias(9512)
         };
     }
 
     if (actualKind.isBuiltInAlias) {
-        const expandedSignature = getExpandedKindSignature(actualKind.aliasName!);
         return {
-            message: `Expected compatible kind, but got ${actualKind.aliasName} (${expandedSignature})`,
+            message: `Expected compatible kind, but got alias '${actualKind.aliasName}'`,
             code: applyKindDiagnosticAlias(9512)
         };
     }

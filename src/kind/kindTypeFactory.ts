@@ -6,7 +6,7 @@ import {
     TypeChecker,
     TypeConstructorType,
     ObjectFlags,
-} from "../types";
+} from "../types2";
 import { __KindBrand, __HKIn, __HKOut } from "../../kind-branding";
 
 /**

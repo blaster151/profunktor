@@ -71,16 +71,16 @@ These types have been migrated to use `deriveInstances()` but are missing regist
 
 These types still use manual instance definitions and need to be migrated:
 
-1. **PersistentListHKT** (`fp-persistent-hkt-gadt.ts`)
+1. **PersistentListHKT** (`fp-persistent-hkt.ts`)
    - ❌ PersistentListFunctor
    - ❌ PersistentListApplicative
    - ❌ PersistentListMonad
 
-2. **PersistentMapHKT** (`fp-persistent-hkt-gadt.ts`)
+2. **PersistentMapHKT** (`fp-persistent-hkt.ts`)
    - ❌ PersistentMapFunctor
    - ❌ PersistentMapBifunctor
 
-3. **PersistentSetHKT** (`fp-persistent-hkt-gadt.ts`)
+3. **PersistentSetHKT** (`fp-persistent-hkt.ts`)
    - ❌ PersistentSetFunctor
 
 4. **Function** (`fp-profunctor-optics.ts`)
@@ -115,7 +115,7 @@ Most types are missing registration functions that would add their instances to 
    - Add `registerPersistentInstances()` to `fp-persistent.ts`
 
 2. **Migrate remaining manual instances** to use `deriveInstances()`:
-   - Convert PersistentListHKT, PersistentMapHKT, PersistentSetHKT in `fp-persistent-hkt-gadt.ts`
+   - Convert PersistentListHKT, PersistentMapHKT, PersistentSetHKT in `fp-persistent-hkt.ts`
    - Convert Function in `fp-profunctor-optics.ts`
 
 ### Medium Priority

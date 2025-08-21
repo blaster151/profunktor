@@ -9,12 +9,15 @@
  */
 
 import {
-  Kind1, Kind2,
-  KindResult
+  Kind1, Kind2, Kind3,
+  Apply, Type, TypeArgs, KindArity,
+  ArrayK, MaybeK, EitherK, TupleK, FunctionK,
+  Maybe, Either
 } from './fp-hkt';
 
 import {
-  Functor, Applicative, Monad, Bifunctor
+  Functor, Applicative, Monad, Bifunctor,
+  deriveFunctor, deriveApplicative, deriveMonad
 } from './fp-typeclasses-hkt';
 
 import { deriveEqInstance, deriveOrdInstance, deriveShowInstance } from './fp-derivation-helpers';
@@ -151,7 +154,7 @@ export function createPmatchBuilder<T extends GADT<string, any>, R>(
 ) {
   return function(gadt: T): PatternMatcherBuilder<T, R> {
     const state: PatternMatcherState<T, R> = {
-      cases: new Map(Object.keys(cases).map(key => [key, (cases as any)[key]])),
+      cases: new Map(Object.entries(cases)),
       gadt,
       isPartial: false
     };
@@ -228,20 +231,20 @@ export const Expr = {
  */
 export function evaluate(expr: Expr<number>): number {
   return pmatch(expr)
-    .with('Const', ({ value }) => value as number)
+    .with('Const', ({ value }) => value)
     .with('Add', ({ left, right }) => evaluate(left) + evaluate(right))
     .with('If', ({ cond, then, else: else_ }) => {
       // For boolean conditions, we need a separate boolean evaluator
-      const condValue = evaluateBoolean(cond) as boolean;
+      const condValue = evaluateBoolean(cond);
       return condValue ? evaluate(then) : evaluate(else_);
     })
     .with('Var', ({ name }) => { throw new Error(`Unbound variable: ${name}`); })
-    .with('Let', ({ name: _name, value, body }) => {
-      const _val = evaluate(value) as number;
+    .with('Let', ({ name, value, body }) => {
+      const val = evaluate(value);
       // In a real implementation, we'd update the environment
       return evaluate(body);
     })
-    .exhaustive() as number;
+    .exhaustive();
 }
 
 /**
@@ -249,18 +252,18 @@ export function evaluate(expr: Expr<number>): number {
  */
 export function evaluateBoolean(expr: Expr<boolean>): boolean {
   return pmatch(expr)
-    .with('Const', ({ value }) => value as boolean)
-    .with('Add', ({ left: _left, right: _right }) => { throw new Error("Cannot evaluate Add as boolean"); })
+    .with('Const', ({ value }) => value)
+    .with('Add', ({ left, right }) => { throw new Error("Cannot evaluate Add as boolean"); })
     .with('If', ({ cond, then, else: else_ }) => {
-      const condValue = evaluateBoolean(cond) as boolean;
+      const condValue = evaluateBoolean(cond);
       return condValue ? evaluateBoolean(then) : evaluateBoolean(else_);
     })
     .with('Var', ({ name }) => { throw new Error(`Unbound variable: ${name}`); })
-    .with('Let', ({ name: _name, value, body }) => {
-      const _val = evaluateBoolean(value) as boolean;
+    .with('Let', ({ name, value, body }) => {
+      const val = evaluateBoolean(value);
       return evaluateBoolean(body);
     })
-    .exhaustive() as boolean;
+    .exhaustive();
 }
 
 /**
@@ -277,7 +280,7 @@ export function transformString(expr: Expr<string>): Expr<string> {
     })
     .with('Var', ({ name }) => Expr.Var(name))
     .with('Let', ({ name, value, body }) => Expr.Let(name, transformString(value), transformString(body)))
-    .exhaustive() as Expr<string>;
+    .exhaustive();
 }
 
 /**
@@ -290,7 +293,7 @@ export function transformToBoolean(expr: Expr<any>): Expr<boolean> {
     .with('If', ({ cond, then, else: else_ }) => Expr.If(transformToBoolean(cond), transformToBoolean(then), transformToBoolean(else_)))
     .with('Var', ({ name }) => Expr.Const(true)) // Default to true for Var
     .with('Let', ({ name, value, body }) => Expr.Let(name, transformToBoolean(value), transformToBoolean(body)))
-    .exhaustive() as Expr<boolean>;
+    .exhaustive();
 }
 
 // ExprFunctor is already declared below from derived instances
@@ -396,31 +399,13 @@ export const resultMatcher = createPmatchBuilder<Result<any, any>, string>({
 /**
  * Manual Functor instance for ResultK
  */
-// Factory-based unary instances for ResultK
-import type { Functor1 } from './fp-typeclasses-hok';
-import type { Lift1, ApplyLeft, HKOutput, Apply } from './fp-hkt';
-
-type ResultK1<E> = Lift1<ApplyLeft<ResultK, E>>;
-
-export const getResultFunctor = <E>(): Functor1<ResultK1<E>> => ({
-  __arity: 1,
-  map: <A, B>(fa, f) =>
-    (fa as Result<A, E>).map(f) as Apply<HKOutput<ResultK1<E>>, [B]>,
-});
-
-export const getResultApplicative = <E>(): Applicative<ResultK1<E>> => ({
-  __arity: 1,
-  of: <A>(a: A) => Result.of<E, A>(a) as Apply<HKOutput<ResultK1<E>>, [A]>,
-  ap: <A, B>(fab, fa) => Result.ap<E, A, B>(fab as any, fa as any) as Apply<HKOutput<ResultK1<E>>, [B]>,
-  map: <A, B>(fa, f) => Result.map<E, A, B>(fa as any, f) as Apply<HKOutput<ResultK1<E>>, [B]>,
-});
-
-export const getResultMonad = <E>(): Monad<ResultK1<E>> => ({
-  __arity: 1,
-  of: <A>(a: A) => Result.of<E, A>(a) as Apply<HKOutput<ResultK1<E>>, [A]>,
-  chain: <A, B>(fa, f) => Result.chain<E, A, B>(fa as any, f as any) as Apply<HKOutput<ResultK1<E>>, [B]>,
-  map: <A, B>(fa, f) => Result.map<E, A, B>(fa as any, f) as Apply<HKOutput<ResultK1<E>>, [B]>,
-});
+export const ResultFunctor: Functor<ResultK> = {
+  map: <A, B, E>(fa: Result<A, E>, f: (a: A) => B): Result<B, E> =>
+    pmatch(fa)
+      .with('Ok', ({ value }) => Result.Ok<B, E>(f(value)))
+      .with('Err', ({ error }) => Result.Err<B, E>(error))
+      .exhaustive()
+};
 
 // ============================================================================
 // Typeclass Instances (Derived)
@@ -437,26 +422,25 @@ export const ExprFunctor: Functor<ExprK> = {
       .with('If', ({ cond, then, else: else_ }) => Expr.If(cond, ExprFunctor.map(then, f), ExprFunctor.map(else_, f)))
       .with('Var', ({ name }) => Expr.Var(name))
       .with('Let', ({ name, value, body }) => Expr.Let(name, ExprFunctor.map(value, f), ExprFunctor.map(body, f)))
-      .exhaustive() as Expr<B>
+      .exhaustive()
 };
 
 /**
  * Manual Functor instance for MaybeGADTK
  */
-// Factory for Functor<ApplyLeft<MaybeGADTK, void>> (since Maybe is unary)
-export const getMaybeGADTFunctor = () => ({
+export const MaybeGADTFunctor: Functor<MaybeGADTK> = {
   map: <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => MaybeGADT.Just(f(value)))
       .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive() as MaybeGADT<B>
-});
+      .exhaustive()
+};
 
 /**
  * Manual Applicative instance for MaybeGADTK
  */
-export const getMaybeGADTApplicative = () => ({
-  ...getMaybeGADTFunctor(),
+export const MaybeGADTApplicative: Applicative<MaybeGADTK> = {
+  ...MaybeGADTFunctor,
   of: <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a),
   ap: <A, B>(fab: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<B> => 
     pmatch(fab)
@@ -464,23 +448,23 @@ export const getMaybeGADTApplicative = () => ({
         pmatch(fa)
           .with('Just', ({ value: a }) => MaybeGADT.Just(f(a)))
           .with('Nothing', () => MaybeGADT.Nothing())
-          .exhaustive() as MaybeGADT<B>
+          .exhaustive()
       )
       .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive() as MaybeGADT<B>
-});
+      .exhaustive()
+};
 
 /**
  * Manual Monad instance for MaybeGADTK
  */
-export const getMaybeGADTMonad = () => ({
-  ...getMaybeGADTApplicative(),
+export const MaybeGADTMonad: Monad<MaybeGADTK> = {
+  ...MaybeGADTApplicative,
   chain: <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => f(value))
       .with('Nothing', () => MaybeGADT.Nothing())
-      .exhaustive() as MaybeGADT<B>
-});
+      .exhaustive()
+};
 
 /**
  * Manual Bifunctor instance for EitherGADTK
@@ -490,30 +474,45 @@ export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
     pmatch(fab)
       .with('Left', ({ value }) => EitherGADT.Left(f(value)))
       .with('Right', ({ value }) => EitherGADT.Right(g(value)))
-      .exhaustive() as EitherGADT<C, D>,
+      .exhaustive(),
   
   mapLeft: <A, B, C>(fab: EitherGADT<A, B>, f: (a: A) => C): EitherGADT<C, B> => 
     pmatch(fab)
       .with('Left', ({ value }) => EitherGADT.Left(f(value)))
       .with('Right', ({ value }) => EitherGADT.Right(value))
-      .exhaustive() as EitherGADT<C, B>,
+      .exhaustive(),
   
   mapRight: <A, B, D>(fab: EitherGADT<A, B>, g: (b: B) => D): EitherGADT<A, D> => 
     pmatch(fab)
       .with('Left', ({ value }) => EitherGADT.Left(value))
       .with('Right', ({ value }) => EitherGADT.Right(g(value)))
-      .exhaustive() as EitherGADT<A, D>
+      .exhaustive()
 };
 
 /**
  * Manual Applicative instance for ResultK
  */
-
+export const ResultApplicative: Applicative<ResultK> = {
+  ...ResultFunctor,
+  of: <A, E>(a: A): Result<A, E> => Result.Ok(a),
+  ap: <A, B, E>(ff: Result<(a: A) => B, E>, fa: Result<A, E>): Result<B, E> =>
+    pmatch(ff)
+      .with('Ok', ({ value: f }) => ResultFunctor.map(fa, f))
+      .with('Err', ({ error }) => Result.Err<B, E>(error))
+      .exhaustive()
+};
 
 /**
  * Manual Monad instance for ResultK
  */
-
+export const ResultMonad: Monad<ResultK> = {
+  ...ResultApplicative,
+  chain: <A, B, E>(fa: Result<A, E>, f: (a: A) => Result<B, E>): Result<B, E> =>
+    pmatch(fa)
+      .with('Ok', ({ value }) => f(value))
+      .with('Err', ({ error }) => Result.Err<B, E>(error))
+      .exhaustive()
+};
 
 // ============================================================================
 // Integration Examples
@@ -530,19 +529,19 @@ export function exampleMaybePmatch(): void {
   const justResult = pmatch(justValue)
     .with('Just', ({ value }) => `Got value: ${value}`)
     .with('Nothing', () => 'No value')
-    .exhaustive() as string;
+    .exhaustive();
   
   const nothingResult = pmatch(nothingValue)
     .with('Just', ({ value }) => `Got value: ${value}`)
     .with('Nothing', () => 'No value')
-    .exhaustive() as string;
+    .exhaustive();
   
   console.log('MaybeGADT Just (pmatch):', justResult); // "Got value: 42"
   console.log('MaybeGADT Nothing (pmatch):', nothingResult); // "No value"
   
   // Using auto-generated matcher
-  const autoJustResult = maybeMatcher(justValue).exhaustive() as string;
-  const autoNothingResult = maybeMatcher(nothingValue).exhaustive() as string;
+  const autoJustResult = maybeMatcher(justValue).exhaustive();
+  const autoNothingResult = maybeMatcher(nothingValue).exhaustive();
   
   console.log('MaybeGADT auto-generated:', autoJustResult); // "Got 42"
   console.log('MaybeGADT auto-generated:', autoNothingResult); // "No value"
@@ -558,12 +557,12 @@ export function exampleEitherPmatch(): void {
   const leftResult = pmatch(leftValue)
     .with('Left', ({ value }) => `Error: ${value}`)
     .with('Right', ({ value }) => `Success: ${value}`)
-    .exhaustive() as string;
+    .exhaustive();
   
   const rightResult = pmatch(rightValue)
     .with('Left', ({ value }) => `Error: ${value}`)
     .with('Right', ({ value }) => `Success: ${value}`)
-    .exhaustive() as string;
+    .exhaustive();
   
   console.log('EitherGADT Left (pmatch):', leftResult); // "Error: error"
   console.log('EitherGADT Right (pmatch):', rightResult); // "Success: 123"
@@ -601,7 +600,7 @@ export function exampleExprFunctor(): void {
   );
   
   // Map over the expression, doubling all constants
-  const doubled = ExprFunctor.map(expr, (x: number) => x * 2);
+  const doubled = ExprFunctor.map(expr, x => x * 2);
   
   console.log('Original expression:', expr);
   console.log('Doubled expression:', doubled);
@@ -616,8 +615,8 @@ export function exampleResultIntegration(): void {
   const failure = Result.Err('Something went wrong');
   
   // Use auto-generated matcher
-  const successResult = resultMatcher(success).exhaustive() as string;
-  const failureResult = resultMatcher(failure).exhaustive() as string;
+  const successResult = resultMatcher(success).exhaustive();
+  const failureResult = resultMatcher(failure).exhaustive();
   
   console.log('Result success:', successResult); // "Success: 42"
   console.log('Result failure:', failureResult); // "Error: Something went wrong"
@@ -627,10 +626,10 @@ export function exampleResultIntegration(): void {
   
   const chained = derivedMonad.chain(
     success,
-    (x: number) => x > 40 ? Result.Ok(x * 2) : Result.Err('Too small')
+    x => x > 40 ? Result.Ok(x * 2) : Result.Err('Too small')
   );
   
-  const chainedResult = resultMatcher(chained).exhaustive() as string;
+  const chainedResult = resultMatcher(chained).exhaustive();
   console.log('Chained result:', chainedResult); // "Success: 84"
 }
 
@@ -678,7 +677,7 @@ export const ExprEq = deriveEqInstance({
                  .with('If', () => false)
                  .with('Var', () => false)
                  .with('Let', () => false)
-                 .exhaustive() as boolean)
+                 .exhaustive())
       .with('Add', ({ left: al, right: ar }) =>
         pmatch(b).with('Const', () => false)
                  .with('Add', ({ left: bl, right: br }) => 
@@ -686,7 +685,7 @@ export const ExprEq = deriveEqInstance({
                  .with('If', () => false)
                  .with('Var', () => false)
                  .with('Let', () => false)
-                 .exhaustive() as boolean)
+                 .exhaustive())
       .with('If', ({ cond: ac, then: at, else: ae }) =>
         pmatch(b).with('Const', () => false)
                  .with('Add', () => false)
@@ -694,14 +693,14 @@ export const ExprEq = deriveEqInstance({
                    ExprEq.equals(ac, bc) && ExprEq.equals(at, bt) && ExprEq.equals(ae, be))
                  .with('Var', () => false)
                  .with('Let', () => false)
-                 .exhaustive() as boolean)
+                 .exhaustive())
       .with('Var', ({ name: an }) =>
         pmatch(b).with('Const', () => false)
                  .with('Add', () => false)
                  .with('If', () => false)
                  .with('Var', ({ name: bn }) => an === bn)
                  .with('Let', () => false)
-                 .exhaustive() as boolean)
+                 .exhaustive())
       .with('Let', ({ name: an, value: av, body: ab }) =>
         pmatch(b).with('Const', () => false)
                  .with('Add', () => false)
@@ -709,8 +708,8 @@ export const ExprEq = deriveEqInstance({
                  .with('Var', () => false)
                  .with('Let', ({ name: bn, value: bv, body: bb }) =>
                    an === bn && ExprEq.equals(av, bv) && ExprEq.equals(ab, bb))
-                 .exhaustive() as boolean)
-      .exhaustive() as boolean
+                 .exhaustive())
+      .exhaustive()
 });
 
 export const ExprOrd = deriveOrdInstance({
@@ -729,7 +728,7 @@ export const ExprOrd = deriveOrdInstance({
                  .with('If', () => -1)
                  .with('Var', () => -1)
                  .with('Let', () => -1)
-                 .exhaustive() as number)
+                 .exhaustive())
       .with('Add', ({ left: al, right: ar }) =>
         pmatch(b).with('Const', () => 1)
                  .with('Add', ({ left: bl, right: br }) => {
@@ -739,7 +738,7 @@ export const ExprOrd = deriveOrdInstance({
                  .with('If', () => -1)
                  .with('Var', () => -1)
                  .with('Let', () => -1)
-                 .exhaustive() as number)
+                 .exhaustive())
       .with('If', ({ cond: ac, then: at, else: ae }) =>
         pmatch(b).with('Const', () => 1)
                  .with('Add', () => 1)
@@ -751,14 +750,14 @@ export const ExprOrd = deriveOrdInstance({
                  })
                  .with('Var', () => -1)
                  .with('Let', () => -1)
-                 .exhaustive() as number)
+                 .exhaustive())
       .with('Var', ({ name: an }) =>
         pmatch(b).with('Const', () => 1)
                  .with('Add', () => 1)
                  .with('If', () => 1)
                  .with('Var', ({ name: bn }) => an < bn ? -1 : an > bn ? 1 : 0)
                  .with('Let', () => -1)
-                 .exhaustive() as number)
+                 .exhaustive())
       .with('Let', ({ name: an, value: av, body: ab }) =>
         pmatch(b).with('Const', () => 1)
                  .with('Add', () => 1)
@@ -770,8 +769,8 @@ export const ExprOrd = deriveOrdInstance({
                    const valueCmp = ExprOrd.compare(av, bv);
                    return valueCmp !== 0 ? valueCmp : ExprOrd.compare(ab, bb);
                  })
-                 .exhaustive() as number)
-      .exhaustive() as number;
+                 .exhaustive())
+      .exhaustive();
   }
 });
 
@@ -785,7 +784,7 @@ export const ExprShow = deriveShowInstance({
       .with('Var', ({ name }) => `Var("${name}")`)
       .with('Let', ({ name, value, body }) => 
         `Let("${name}", ${ExprShow.show(value)}, ${ExprShow.show(body)})`)
-      .exhaustive() as string
+      .exhaustive()
 });
 
 /**
@@ -797,12 +796,12 @@ export const MaybeGADTEq = deriveEqInstance({
       .with('Just', ({ value: av }) =>
         pmatch(b).with('Just', ({ value: bv }) => av === bv)
                  .with('Nothing', () => false)
-                 .exhaustive() as boolean)
+                 .exhaustive())
       .with('Nothing', () =>
         pmatch(b).with('Just', () => false)
                  .with('Nothing', () => true)
-                 .exhaustive() as boolean)
-      .exhaustive() as boolean
+                 .exhaustive())
+      .exhaustive()
 });
 
 export const MaybeGADTOrd = deriveOrdInstance({
@@ -811,12 +810,12 @@ export const MaybeGADTOrd = deriveOrdInstance({
       .with('Just', ({ value: av }) =>
         pmatch(b).with('Just', ({ value: bv }) => (av < bv ? -1 : av > bv ? 1 : 0) as any)
                  .with('Nothing', () => 1) // Just > Nothing
-                 .exhaustive() as number)
+                 .exhaustive())
       .with('Nothing', () =>
         pmatch(b).with('Just', () => -1) // Nothing < Just
                  .with('Nothing', () => 0)
-                 .exhaustive() as number)
-      .exhaustive() as number
+                 .exhaustive())
+      .exhaustive()
 });
 
 export const MaybeGADTShow = deriveShowInstance({
@@ -824,7 +823,7 @@ export const MaybeGADTShow = deriveShowInstance({
     pmatch(a)
       .with('Just', ({ value }) => `Just(${JSON.stringify(value)})`)
       .with('Nothing', () => 'Nothing')
-      .exhaustive() as string
+      .exhaustive()
 });
 
 /**
@@ -836,12 +835,12 @@ export const EitherGADTEq = deriveEqInstance({
       .with('Left', ({ value: al }) =>
         pmatch(b).with('Left', ({ value: bl }) => al === bl)
                  .with('Right', () => false)
-                 .exhaustive() as boolean)
+                 .exhaustive())
       .with('Right', ({ value: ar }) =>
         pmatch(b).with('Left', () => false)
                  .with('Right', ({ value: br }) => ar === br)
-                 .exhaustive() as boolean)
-      .exhaustive() as boolean
+                 .exhaustive())
+      .exhaustive()
 });
 
 export const EitherGADTOrd = deriveOrdInstance({
@@ -850,12 +849,12 @@ export const EitherGADTOrd = deriveOrdInstance({
       .with('Left', ({ value: al }) =>
         pmatch(b).with('Left', ({ value: bl }) => (al < bl ? -1 : al > bl ? 1 : 0) as any)
                  .with('Right', () => -1) // Left < Right
-                 .exhaustive() as number)
+                 .exhaustive())
       .with('Right', ({ value: ar }) =>
         pmatch(b).with('Left', () => 1)  // Right > Left
                  .with('Right', ({ value: br }) => (ar < br ? -1 : ar > br ? 1 : 0) as any)
-                 .exhaustive() as number)
-      .exhaustive() as number
+                 .exhaustive())
+      .exhaustive()
 });
 
 export const EitherGADTShow = deriveShowInstance({
@@ -863,7 +862,7 @@ export const EitherGADTShow = deriveShowInstance({
     pmatch(a)
       .with('Left', ({ value }) => `Left(${JSON.stringify(value)})`)
       .with('Right', ({ value }) => `Right(${JSON.stringify(value)})`)
-      .exhaustive() as string
+      .exhaustive()
 });
 
 // ============================================================================
@@ -884,9 +883,9 @@ export function registerGADTInstances(): void {
     registry.register('ExprShow', ExprShow);
     
     // Register MaybeGADT instances
-  registry.register('MaybeGADTFunctor', getMaybeGADTFunctor());
-  registry.register('MaybeGADTApplicative', getMaybeGADTApplicative());
-  registry.register('MaybeGADTMonad', getMaybeGADTMonad());
+    registry.register('MaybeGADTFunctor', MaybeGADTFunctor);
+    registry.register('MaybeGADTApplicative', MaybeGADTApplicative);
+    registry.register('MaybeGADTMonad', MaybeGADTMonad);
     registry.register('MaybeGADTEq', MaybeGADTEq);
     registry.register('MaybeGADTOrd', MaybeGADTOrd);
     registry.register('MaybeGADTShow', MaybeGADTShow);
@@ -898,12 +897,11 @@ export function registerGADTInstances(): void {
     registry.register('EitherGADTShow', EitherGADTShow);
     
     // Register Result instances
-    // To register Result instances, use the factory functions with a fixed E, e.g.:
-    // registry.register('ResultFunctor', getResultFunctor(someE));
-    // registry.register('ResultApplicative', getResultApplicative(someE));
-    // registry.register('ResultMonad', getResultMonad(someE));
+    registry.register('ResultFunctor', ResultFunctor);
+    registry.register('ResultApplicative', ResultApplicative);
+    registry.register('ResultMonad', ResultMonad);
   }
 }
 
-// To use the Monad instance:
-// const derivedMonad = getResultMonad(someE); // Use the factory function with a fixed E
+// Auto-register instances
+registerGADTInstances();

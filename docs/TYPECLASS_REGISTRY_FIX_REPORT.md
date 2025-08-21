@@ -147,7 +147,7 @@ The following files were automatically updated:
 4. **`fp-gadt-enhanced.ts`** - Added Eq/Ord/Show derivations and purity tags
 5. **`fp-gadt.ts`** - Added Eq/Ord/Show derivations and purity tags
 6. **`fp-persistent.ts`** - Added Eq/Ord/Show derivations and purity tags
-7. **`fp-persistent-hkt-gadt.ts`** - Added Eq/Ord/Show derivations and purity tags
+7. **`fp-persistent-hkt.ts`** - Added Eq/Ord/Show derivations and purity tags
 
 ## Success Metrics
 

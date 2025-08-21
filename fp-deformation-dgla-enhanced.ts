@@ -34,15 +34,6 @@ export interface DgAlgebraLike<P> {
   equals(x: P, y: P): boolean;
 }
 
-// Module structure for vector spaces (needed for endomorphism algebra)
-export interface Module<V> {
-  add: (x: V, y: V) => V;
-  sub?: (x: V, y: V) => V;          // optional; derive via add+scale(-1,·) if absent
-  scale: (k: number, x: V) => V;
-  zero: () => V;
-  equals?: (a: V, b: V) => boolean; // optional; used by MC tests
-}
-
 // Hom(C,P) object with degree
 export interface Hom<C, P> {
   run(c: C): P;
@@ -357,40 +348,5 @@ export function isChainMap<C, P>(
   return {
     isChainMap: allPassed,
     details
-  };
-}
-
-// ============================================================================
-// Part 6: Enhanced Endomorphism Algebra
-// ============================================================================
-
-/**
- * Create endomorphism algebra parametric in a Module<V>
- * This fixes the issue where endomorphisms need additive structure on the target space
- */
-export function endomorphismAlgebra<V>(M: Module<V>): DgAlgebraLike<(v: V) => V> {
-  const addF = (f: (v: V) => V, g: (v: V) => V) => (v: V) => M.add(f(v), g(v));
-  const subF = (f: (v: V) => V, g: (v: V) => V) => (v: V) => 
-    M.sub ? M.sub(f(v), g(v)) : M.add(f(v), M.scale(-1, g(v)));
-  const scaleF = (k: number, f: (v: V) => V) => (v: V) => M.scale(k, f(v));
-  const zeroF = () => (_: V) => M.zero();
-
-  return {
-    // Multiplicative structure (function composition)
-    mul: (f, g) => (v: V) => f(g(v)),     // composition
-    unit: () => (v: V) => v,              // identity function
-
-    // Additive structure (pointwise operations using Module<V>)
-    add: addF,
-    sub: subF,
-    scale: scaleF,
-    zero: zeroF,
-
-    // Grading and differential
-    degree: () => 0,                      // degree 0 as default
-    dP: () => [],                         // zero differential as default
-    
-    // Equality (function equality is hard, use reference equality as default)
-    equals: (f, g) => f === g             // optionally supply a better equality by testing on a basis
   };
 }

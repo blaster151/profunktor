@@ -2,6 +2,8 @@
 // Only re-export KindSource and Kind3, and import KindMetadata for type-checking if needed.
 export { KindSource } from "./kind/kindMetadata";
 export { Kind3 } from "../fp-hkt";
+
+export enum SyntaxKind {
     GreaterThanEqualsToken,
     EqualsEqualsToken,
     ExclamationEqualsToken,

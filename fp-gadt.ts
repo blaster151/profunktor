@@ -35,9 +35,9 @@ import { attachPurityMarker } from './fp-purity';
 
 
 const maybeMap = <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> =>
-  matchMaybe(fa, {
-    Just: (value) => MaybeGADT.Just(f(value)),
-    Nothing: () => MaybeGADT.Nothing()
+    matchMaybe(fa, {
+      Just: (value) => MaybeGADT.Just(f(value)),
+      Nothing: () => MaybeGADT.Nothing()
   });
 
 const maybeOf = <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a);
@@ -53,9 +53,9 @@ const maybeAp = <A, B>(ff: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<
   });
 
 const maybeChain = <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> =>
-  matchMaybe(fa, {
-    Just: (value) => f(value),
-    Nothing: () => MaybeGADT.Nothing()
+    matchMaybe(fa, {
+      Just: (value) => f(value),
+      Nothing: () => MaybeGADT.Nothing()
   });
 
 // 2) Actual instances (choose one style)
@@ -124,7 +124,7 @@ export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
     fab: EitherGADT<A, B>,
     f: (a: A) => C,
     g: (b: B) => D
-  ): EitherGADT<C, D> =>
+  ): EitherGADT<C, D> => 
     matchEither(fab, {
       Left:  (value) => EitherGADT.Left<C, D>(f(value)),
       Right: (value) => EitherGADT.Right<C, D>(g(value)),
@@ -198,7 +198,7 @@ const mapList = <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> =>
   });
 
 export const ListGADTFunctor: Functor<ListGADTK> = {
-  map: <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> =>
+  map: <A, B>(fa: ListGADT<A>, f: (a: A) => B): ListGADT<B> => 
     matchList(fa, {
       Nil: () => ListGADT.Nil(),
       Cons: (head, tail) => ListGADT.Cons(f(head), ListGADTFunctor.map(tail, f))
@@ -593,7 +593,7 @@ export type HigherOrderGADT<F extends Kind1> =
  * HigherOrderGADT as HKT
  */
 export interface HigherOrderGADTK extends Kind1 {
-  readonly type: this['arg0'] extends Kind1 ? HigherOrderGADT<this['arg0']> : never;
+  readonly type: HigherOrderGADT<this['arg0']>;
 }
 
 /**

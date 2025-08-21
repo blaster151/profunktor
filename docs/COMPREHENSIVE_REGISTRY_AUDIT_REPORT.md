@@ -152,7 +152,7 @@ attachPurityMarker(ResultInstances, 'Pure');
 // fp-stream-state.ts
 attachPurityMarker(StatefulStreamInstances, 'State');
 
-// fp-persistent-hkt-gadt.ts
+// fp-persistent-hkt.ts
 attachPurityMarker(PersistentListHKTInstances, 'Pure');
 attachPurityMarker(PersistentMapHKTInstances, 'Pure');
 attachPurityMarker(PersistentSetHKTInstances, 'Pure');

@@ -5,7 +5,7 @@ import {
   checkListRoundtripBothWays, 
   checkMapRoundtripMapFirst, 
   checkSetRoundtripSetFirst 
-} from '../fp-persistent-hkt-gadt';
+} from '../fp-persistent-hkt';
 
 const xs = PersistentList.fromArray([1, 2, 3]);
 const listLaw = checkListRoundtripBothWays(xs);

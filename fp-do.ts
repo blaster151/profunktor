@@ -51,11 +51,9 @@ export type DoGen2<F extends Kind2, Fixed, A> = Generator<Apply<Fix2Right<F, Fix
 export type DoGen3<F extends Kind3, A, B, C> = Generator<Apply<Fix3To1<F, A, B>, [any]>, C, any>;
 
 /**
- * Helper interface for fixing Kind3 to Kind1 by fixing the first two parameters
+ * Helper type for fixing Kind3 to Kind1
  */
-interface Fix3To1<F extends Kind3, A, B> extends Kind1 {
-  readonly type: Apply<F, [A, B, this['arg0']]>;
-}
+type Fix3To1<F extends Kind3, A, B> = Fix2Right<Fix2Left<F, A>, B>;
 
 /**
  * Monadic value with effect tag
@@ -79,7 +77,7 @@ export type MonadicValue3<F extends Kind3, A, B, C, E extends EffectTag = 'Pure'
  * Effect composition result
  */
 export type ComposedEffect<T extends readonly EffectTag[]> = 
-  T extends readonly [infer First extends EffectTag, ...infer Rest]
+  T extends readonly [infer First, ...infer Rest]
     ? Rest extends readonly EffectTag[]
       ? ComposeEffects<First, ComposedEffect<Rest>>
       : First
@@ -193,17 +191,15 @@ export function markDoMResult<F extends Kind1, A, E extends EffectTag>(
   value: Apply<F, [A]>,
   effect: E
 ): MonadicValue<F, A, E> {
-  const marked = attachPurityMarker(value as object, effect);
-  return marked as MonadicValue<F, A, E>;
+  return attachPurityMarker(value, effect) as MonadicValue<F, A, E>;
 }
 
 /**
  * Infer effect from monadic value
  */
 export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag {
-  const valueObj = value as object;
-  if (hasPurityMarker(valueObj)) {
-    return extractPurityMarker(valueObj).effect;
+  if (hasPurityMarker(value)) {
+    return extractPurityMarker(value);
   }
   
   // Default effect inference based on type
@@ -223,12 +219,9 @@ export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag
 export function composeMonadicEffects<Effects extends readonly EffectTag[]>(
   effects: Effects
 ): ComposedEffect<Effects> {
-  return effects.reduce((acc, effect) => {
-    // Runtime effect composition logic
-    if (acc === 'Pure') return effect;
-    if (effect === 'Pure') return acc;
-    return `${acc}|${effect}` as EffectTag;
-  }, 'Pure' as EffectTag) as ComposedEffect<Effects>;
+  return effects.reduce((acc, effect) => 
+    ComposeEffects<typeof acc, typeof effect>(acc, effect), 'Pure' as EffectTag
+  ) as ComposedEffect<Effects>;
 }
 
 // ============================================================================

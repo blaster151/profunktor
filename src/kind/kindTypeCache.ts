@@ -7,7 +7,7 @@ import {
     NodeFlags,
     KindType,
     TypeChecker,
-} from "../types";
+} from "../types2";
 import { createKindType, createErrorKindType } from "./kindTypeFactory.js";
 import { __KindBrand, __HKIn, __HKOut } from "../../kind-branding";
 

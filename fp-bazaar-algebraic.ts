@@ -1,21 +1,17 @@
 /**
  * Bazaar Algebraic Structures
  * 
- * This module provides algebraic structures for Bazaar optics:
- * - Bazaar as Profunctor (variance-correct for Church encoding)
- * - Bazaar as Strong Profunctor  
+ * This module provides advanced algebraic structures for Bazaar optics:
+ * - Bazaar as Profunctor
+ * - Bazaar as Strong Profunctor
  * - Bazaar as Choice Profunctor
  * - Bazaar as Closed Profunctor
  * - Bazaar as Traversing Profunctor
  * - Advanced algebraic patterns and laws
- * 
- * NOTE: Church-encoded Bazaar has specific variance constraints that affect
- * how these algebraic structures can be implemented. The Profunctor instance
- * uses correct variance: lmap is contravariant in A, rmap is a right-premap.
  */
 
 import { Kind1, Apply } from './fp-hkt';
-import { Applicative } from './fp-typeclasses-hkt';
+import { Applicative, Functor } from './fp-typeclasses-hkt';
 import { Bazaar } from './fp-optics-iso-helpers';
 
 // ============================================================================
@@ -25,16 +21,12 @@ import { Bazaar } from './fp-optics-iso-helpers';
 /**
  * Profunctor interface for Bazaar optics.
  * Provides dimap, lmap, and rmap operations.
- * Note: For Church-encoded Bazaar, lmap is contravariant in A,
- * and rmap is actually a right-premap (B2 -> B), not covariant (B -> B2).
+ * Note: Methods are curried to match implementations.
  */
 export interface Profunctor<A, B, S, T> {
-  /** dimap l rInv = lmap l >>> rmap rInv (right-premap) */
-  dimap<A2, B2>(l: (a: A) => A2, rInv: (b2: B2) => B): (p: Bazaar<A, B, S, T>) => Bazaar<A2, B2, S, T>;
-  /** lmap: pre-process the continuation's expected input */
-  lmap<A2>(l: (a: A) => A2): (p: Bazaar<A, B, S, T>) => Bazaar<A2, B, S, T>;
-  /** rmap: right-premap: pre-process the value expected by the continuation */
-  rmap<B2>(rInv: (b2: B2) => B): (p: Bazaar<A, B, S, T>) => Bazaar<A, B2, S, T>;
+  dimap<A2, B2>(f: (a: A2) => A, g: (b: B) => B2): (pbc: Bazaar<A, B, S, T>) => Bazaar<A2, B2, S, T>;
+  lmap<A2>(f: (a: A2) => A): (pbc: Bazaar<A, B, S, T>) => Bazaar<A2, B, S, T>;
+  rmap<B2>(g: (b: B) => B2): (pbc: Bazaar<A, B, S, T>) => Bazaar<A, B2, S, T>;
 }
 
 /**
@@ -90,24 +82,20 @@ export interface Traversing<A, B, S, T> extends Profunctor<A, B, S, T> {
  */
 export function bazaarProfunctor<A, B, S, T>(): Profunctor<A, B, S, T> {
   return {
-    dimap: <A2, B2>(l: (a: A) => A2, rInv: (b2: B2) => B) =>
+    dimap: <A2, B2>(f: (a: A2) => A, g: (b: B) => B2) =>
       (baz: Bazaar<A, B, S, T>): Bazaar<A2, B2, S, T> =>
-        <F extends Kind1>(F: Applicative<F>, k2: (a2: A2) => Apply<F, [B2]>) =>
-          (s: S) =>
-            // adapt k2 : A2 -> F<B2> to A -> F<B> using rInv : B2 -> B
-            baz(F, (a: A) => F.map(k2(l(a)), rInv))(s),
-
-    lmap: <A2>(l: (a: A) => A2) =>
+        <F extends Kind1>(F: Applicative<F>, k: (a: A2) => Apply<F, [B2]>) =>
+          (s: S) => baz(F, (a: A) => F.map(k(f(a)), g))(s),
+    
+    lmap: <A2>(f: (a: A2) => A) =>
       (baz: Bazaar<A, B, S, T>): Bazaar<A2, B, S, T> =>
-        <F extends Kind1>(F: Applicative<F>, k2: (a2: A2) => Apply<F, [B]>) =>
-          (s: S) =>
-            baz(F, (a: A) => k2(l(a)))(s),
-
-    rmap: <B2>(rInv: (b2: B2) => B) =>
+        <F extends Kind1>(F: Applicative<F>, k: (a: A2) => Apply<F, [B]>) =>
+          (s: S) => baz(F, (a: A) => k(f(a)))(s),
+    
+    rmap: <B2>(g: (b: B) => B2) =>
       (baz: Bazaar<A, B, S, T>): Bazaar<A, B2, S, T> =>
-        <F extends Kind1>(F: Applicative<F>, k2: (a: A) => Apply<F, [B2]>) =>
-          (s: S) =>
-            baz(F, (a: A) => F.map(k2(a), rInv))(s)
+        <F extends Kind1>(F: Applicative<F>, k: (a: A) => Apply<F, [B2]>) =>
+          (s: S) => F.map(baz(F, k)(s), g)
   };
 }
 
@@ -245,10 +233,7 @@ export function bazaarTraversing<A, B, S, T>(): Traversing<A, B, S, T> {
           <F2 extends Kind1>(F2: Applicative<F2>, k: (a: A2) => Apply<F2, [B2]>) =>
             (s: S) => {
               // Compose f with the incoming continuation
-              return baz(F2, (a: A) => {
-                const mapped = F2.map(f(a as any), (b2: B2) => k);
-                return F2.ap(mapped, F2.of(a as any));
-              })(s);
+              return baz(F2, (a: A) => F2.ap(F2.map(f(a as any), (b2: B2) => (k2: (a2: A2) => Apply<F2, [B2]>) => k2(a as any)), k))(s);
             }
         );
       };
@@ -340,12 +325,12 @@ export function testBazaarProfunctorLaws<A, B, S, T>(
   return {
     // dimap id id = id
     dimapIdentity: testData.every(s => {
-      const id = <X>(x: X) => x as any; // Type assertion for dimap compatibility
+      const id = <X>(x: X) => x;
       const dimapped = profunctor.dimap(id, id)(baz);
-      const k = (a: A) => F.of((a as any).toString());
+      const k = (a: A) => F.of(a.toString());
       
       const original = baz(F, k)(s);
-      const transformed = dimapped(F, k as any)(s);
+      const transformed = dimapped(F, k)(s);
       
       return deepEqual(original, transformed);
     }),
@@ -359,11 +344,11 @@ export function testBazaarProfunctorLaws<A, B, S, T>(
       
       const left = profunctor.dimap(
         (x: any) => f(g(x)),
-        (x: any) => h(i(x)) as any
+        (x: any) => h(i(x))
       )(baz);
-      const right = profunctor.dimap(g, h as any)(profunctor.dimap(f, i as any)(baz));
+      const right = profunctor.dimap(g, h)(profunctor.dimap(f, i)(baz));
       
-      const k = (a: A) => F.of((a as any).toString());
+      const k = (a: A) => F.of(a.toString());
       const leftResult = left(F, k)(s);
       const rightResult = right(F, k)(s);
       
@@ -374,7 +359,7 @@ export function testBazaarProfunctorLaws<A, B, S, T>(
     lmapIdentity: testData.every(s => {
       const id = <X>(x: X) => x;
       const lmapId = profunctor.lmap(id)(baz);
-      const k = (a: A) => F.of((a as any).toString());
+      const k = (a: A) => F.of(a.toString());
       
       const original = baz(F, k)(s);
       const transformed = lmapId(F, k)(s);
@@ -384,9 +369,9 @@ export function testBazaarProfunctorLaws<A, B, S, T>(
     
     // rmap id = id
     rmapIdentity: testData.every(s => {
-      const id = <X>(x: X) => x as any; // Type assertion for rmap compatibility
+      const id = <X>(x: X) => x;
       const rmapId = profunctor.rmap(id)(baz);
-      const k = (a: A) => F.of((a as any).toString());
+      const k = (a: A) => F.of(a.toString());
       
       const original = baz(F, k)(s);
       const transformed = rmapId(F, k)(s);
@@ -416,12 +401,12 @@ export function testBazaarStrongLaws<A, B, S, T>(
     // first (arr id) = arr id
     firstIdentity: testData.every(s => {
       const id = <X>(x: X) => x;
-      const arrId = strong.arr(id) as any; // Type assertion for Strong compatibility
+      const arrId = strong.arr(id);
       const firstArrId = strong.first()(arrId);
       
-      const k = (a: A) => F.of((a as any).toString());
-      const original = arrId(F, k as any)(s);
-      const transformed = firstArrId(F, k)([s, 'test'] as any);
+      const k = (a: A) => F.of(a.toString());
+      const original = arrId(F, k)(s);
+      const transformed = firstArrId(F, k)([s, 'test']);
       
       return deepEqual(original, transformed[0]);
     }),
@@ -429,12 +414,12 @@ export function testBazaarStrongLaws<A, B, S, T>(
     // second (arr id) = arr id
     secondIdentity: testData.every(s => {
       const id = <X>(x: X) => x;
-      const arrId = strong.arr(id) as any; // Type assertion for Strong compatibility
+      const arrId = strong.arr(id);
       const secondArrId = strong.second()(arrId);
       
-      const k = (a: A) => F.of((a as any).toString());
-      const original = arrId(F, k as any)(s);
-      const transformed = secondArrId(F, k)(['test', s] as any);
+      const k = (a: A) => F.of(a.toString());
+      const original = arrId(F, k)(s);
+      const transformed = secondArrId(F, k)(['test', s]);
       
       return deepEqual(original, transformed[1]);
     }),
@@ -447,15 +432,15 @@ export function testBazaarStrongLaws<A, B, S, T>(
       const left = strong.first()(strong.compose(
         strong.arr(g),
         strong.arr(f)
-      ) as any);
+      ));
       const right = strong.compose(
-        strong.first()(strong.arr(f)) as any,
-        strong.first()(strong.arr(g)) as any
+        strong.first()(strong.arr(f)),
+        strong.first()(strong.arr(g))
       );
       
-      const k = (a: A) => F.of((a as any).toString());
-      const leftResult = left(F, k)([s, 'test'] as any);
-      const rightResult = right(F, k as any)([s, 'test'] as any);
+      const k = (a: A) => F.of(a.toString());
+      const leftResult = left(F, k)([s, 'test']);
+      const rightResult = right(F, k)([s, 'test']);
       
       return deepEqual(leftResult, rightResult);
     }),
@@ -468,15 +453,15 @@ export function testBazaarStrongLaws<A, B, S, T>(
       const left = strong.second()(strong.compose(
         strong.arr(g),
         strong.arr(f)
-      ) as any);
+      ));
       const right = strong.compose(
-        strong.second()(strong.arr(f)) as any,
-        strong.second()(strong.arr(g)) as any
+        strong.second()(strong.arr(f)),
+        strong.second()(strong.arr(g))
       );
       
-      const k = (a: A) => F.of((a as any).toString());
-      const leftResult = left(F, k)(['test', s] as any);
-      const rightResult = right(F, k as any)(['test', s] as any);
+      const k = (a: A) => F.of(a.toString());
+      const leftResult = left(F, k)(['test', s]);
+      const rightResult = right(F, k)(['test', s]);
       
       return deepEqual(leftResult, rightResult);
     })
@@ -522,8 +507,8 @@ export function simpleBazaar<A, B, S, T>(
   return <F extends Kind1>(F: Applicative<F>, k: (a: A) => Apply<F, [B]>) =>
     (s: S) => {
       const a = extract(s);
-      // We *must* feed the original A into k; transform can be used by construct.
-      return F.map(k(a), (b: B) => construct(transform(a), s));
+      const b = transform(a);
+      return F.map(k(a), () => construct(b, s));
     };
 }
 
@@ -602,9 +587,7 @@ export function strongExample() {
   
   const input: [number[], string] = [[1, 2, 3], "hello"];
   const firstResult = firstBaz(IdApplicative, (n: number) => IdApplicative.of(n.toString()))(input);
-  // Fix the tuple order for second - it expects [unknown, number[]]
-  const secondInput: [unknown, number[]] = ["hello", [1, 2, 3]];
-  const secondResult = secondBaz(IdApplicative, (n: number) => IdApplicative.of(n.toString()))(secondInput);
+  const secondResult = secondBaz(IdApplicative, (n: number) => IdApplicative.of(n.toString()))(input);
   
   console.log('Input pair:', input);
   console.log('First applied:', firstResult);

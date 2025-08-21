@@ -1,6 +1,3 @@
-// Minimal Eq and Semigroup interfaces if not imported
-export interface Eq<A> { equals: (x: A, y: A) => boolean }
-export interface Semigroup<A> { concat: (x: A, y: A) => A }
 /**
  * Persistent Immutable Data Structures
  * 
@@ -20,17 +17,16 @@ import {
   Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
   ArrayK, MaybeK, EitherK, TupleK, FunctionK,
-  Maybe, Either,
-  ApplyLeft,
-  HKOutput,
-  Lift1
+  Maybe, Either
 } from './fp-hkt';
 
-// import {
-//   Functor, Applicative, Monad, Bifunctor,
-//   deriveFunctor, deriveApplicative, deriveMonad,
-//   lift2, composeK, sequence, traverse
-// } from './fp-typeclasses-hkt';
+import {
+  Functor, Applicative, Monad, Bifunctor,
+  deriveFunctor, deriveApplicative, deriveMonad,
+  lift2, composeK, sequence, traverse
+} from './fp-typeclasses-hkt';
+
+
 
 import { 
   deriveEqInstance, 
@@ -43,7 +39,6 @@ import {
 } from './fp-derivation-helpers';
 
 import { applyFluentOps, FluentImpl } from './fp-fluent-api';
-import { Functor1 } from 'fp-typeclasses-hok';
 
 // ============================================================================
 // Part 1: Internal Data Structures
@@ -110,12 +105,6 @@ class Transient<T> {
  * Uses a vector trie for O(log n) random access and updates
  */
 export class PersistentList<T> {
-  /**
-   * Check if the list is empty
-   */
-  isEmpty(): boolean {
-    return this._size === 0;
-  }
   private constructor(
     private readonly root: ListNode<T> | null,
     private readonly _size: number
@@ -125,13 +114,6 @@ export class PersistentList<T> {
    * Get the size of the list
    */
   get size(): number {
-    return this._size;
-  }
-  
-  /**
-   * Get the length of the list (alias for size)
-   */
-  get length(): number {
     return this._size;
   }
   
@@ -364,42 +346,29 @@ export class PersistentList<T> {
   }
   
   /**
-  /**
-   * Reduce from left to right (alias for foldLeft, but with standard reduce signature)
+   * Check if list is empty
    */
-  reduce<U>(fn: (acc: U, value: T, index: number) => U, initial: U): U {
-    return this.foldLeft(initial, fn);
+  isEmpty(): boolean {
+    return this._size === 0;
   }
-
+  
   /**
-   * Reduce from right to left (alias for foldRight, but with standard reduce signature)
+   * Iterator support
    */
-  reduceRight<U>(fn: (acc: U, value: T, index: number) => U, initial: U): U {
-    return this.foldRight(initial, fn);
+  [Symbol.iterator](): Iterator<T> {
+    let index = 0;
+    return {
+      next: (): IteratorResult<T> => {
+        if (index >= this._size) {
+          return { done: true, value: undefined };
+        }
+        const value = this.get(index);
+        index++;
+        return { done: false, value: value! };
+      }
+    };
   }
-
-  /**
-   * Fold left (alias for foldLeft)
-   */
-  foldl<U>(initial: U, fn: (acc: U, value: T, index: number) => U): U {
-    return this.foldLeft(initial, fn);
-  }
-
-  /**
-   * Fold right (alias for foldRight)
-   */
-  foldr<U>(initial: U, fn: (acc: U, value: T, index: number) => U): U {
-    return this.foldRight(initial, fn);
-  }
-
-  /**
-   * Return a new PersistentList with the elements in reverse order
-   */
-  reverse(): PersistentList<T> {
-    const arr = this.toArray();
-    return PersistentList.fromArray([...arr].reverse());
-  }
-
+  
   /**
    * FlatMap operation for PersistentList
    */
@@ -419,6 +388,8 @@ export class PersistentList<T> {
 
   /**
    * Concatenate this list with another list
+   * @param other - The list to concatenate with
+   * @returns A new list containing all elements from both lists
    */
   concat(other: PersistentList<T>): PersistentList<T> {
     if (other.isEmpty()) {
@@ -427,35 +398,25 @@ export class PersistentList<T> {
     if (this.isEmpty()) {
       return other;
     }
+    
+    // Use the optimized internal iterator for better performance
     const result: T[] = [];
+    
+    // Add elements from this list
     if (this.root) {
       PersistentList.traverseNode(this.root, (value) => {
         result.push(value);
       });
     }
+    
+    // Add elements from other list
     if (other.root) {
       PersistentList.traverseNode(other.root, (value) => {
         result.push(value);
       });
     }
+    
     return PersistentList.fromArray(result);
-  }
-
-  /**
-   * Iterator support
-   */
-  [Symbol.iterator](): Iterator<T> {
-    let index = 0;
-    return {
-      next: (): IteratorResult<T> => {
-        if (index >= this._size) {
-          return { done: true, value: undefined };
-        }
-        const value = this.get(index);
-        index++;
-        return { done: false, value: value! };
-      }
-    };
   }
 
   /**
@@ -472,16 +433,6 @@ export class PersistentList<T> {
 
 
   
-  // ...existing code...
-
-  /**
-   * Return a new PersistentList with the elements in reverse order
-   */
-  reverse(): PersistentList<T> {
-    const arr = this.toArray();
-    return PersistentList.fromArray([...arr].reverse());
-  }
-
   // Private helper methods for internal operations
   private static createNode<T>(arr: readonly T[], height: number): ListNode<T> {
     const BRANCH_FACTOR = 32;
@@ -508,24 +459,32 @@ export class PersistentList<T> {
   }
   
   private static getAt<T>(node: ListNode<T>, index: number, height: number): T | undefined {
-    const BF = 32;
+    const BRANCH_FACTOR = 32;
+    
     if (height === 0) {
-      const leafIdx = index & (BF - 1); // lowest 5 bits
-      return node.elements[leafIdx];
+      // Leaf case: index should be modulo BRANCH_FACTOR since leaf can contain multiple leaves' worth of data
+      return node.elements[index % BRANCH_FACTOR];
     }
-    const shift = height * 5;
-    const childIndex = (index >> shift) & (BF - 1);
+    
+    const childIndex = Math.floor(index / Math.pow(BRANCH_FACTOR, height));
+    const childOffset = index % Math.pow(BRANCH_FACTOR, height);
+    
+    if (childIndex >= node.children.length) {
+      return undefined;
+    }
+    
     const child = node.children[childIndex];
-    if (!child) return undefined;
-    return PersistentList.getAt(child, index, height - 1); // pass original index
+    return PersistentList.getAt(child, childOffset, height - 1);
   }
   
   private static appendTo<T>(node: ListNode<T>, value: T, height: number): ListNode<T> {
     const BRANCH_FACTOR = 32;
+    
     if (height === 0) {
       const newElements = [...node.elements, value];
       return new ListNode(newElements, node.children, height);
     }
+    
     const newChildren = [...node.children];
     if (newChildren.length === 0) {
       const child = PersistentList.createNode([value], height - 1);
@@ -535,6 +494,7 @@ export class PersistentList<T> {
       const newLastChild = PersistentList.appendTo(lastChild, value, height - 1);
       newChildren[newChildren.length - 1] = newLastChild;
     }
+    
     return new ListNode(node.elements, newChildren, height);
   }
   
@@ -694,13 +654,6 @@ export class PersistentMap<K, V> {
   }
   
   /**
-   * Create a persistent map from entries (static constructor)
-   */
-  static of<K, V>(entries: Iterable<[K, V]> | Array<[K, V]>): PersistentMap<K, V> {
-    return PersistentMap.fromEntries(Array.from(entries));
-  }
-  
-  /**
    * Get a value by key
    */
   get(key: K): V | undefined {
@@ -805,19 +758,12 @@ export class PersistentMap<K, V> {
   /**
    * Get all entries
    */
-  *entries(): IterableIterator<[K, V]> {
-    if (!this.root) return;
-    function* walk(node: any): Generator<[K, V]> {
-      if (node.entries) {
-        for (const [k, v] of node.entries) yield [k, v];
-      }
-      if (node.children) {
-        for (const child of node.children) {
-          if (child) yield* walk(child);
-        }
-      }
+  entries(): Iterable<[K, V]> {
+    const result: [K, V][] = [];
+    if (this.root) {
+      PersistentMap.collectEntries(this.root, result);
     }
-    yield* walk(this.root);
+    return result;
   }
   
   /**
@@ -871,30 +817,6 @@ export class PersistentMap<K, V> {
     }
   }
 
-  /**
-   * Map over values (expected by fluent layer)
-   */
-  mapValues<V2>(f: (v: V) => V2): PersistentMap<K, V2> {
-    const out = Array.from(this.entries()).map(([k, v]) => [k, f(v)] as [K, V2]);
-    return PersistentMap.fromEntries(out);
-  }
-
-  /**
-   * Map over keys (expected by fluent layer)
-   */
-  mapKeys<K2>(f: (k: K) => K2): PersistentMap<K2, V> {
-    const out = Array.from(this.entries()).map(([k, v]) => [f(k), v] as [K2, V]);
-    return PersistentMap.fromEntries(out);
-  }
-
-  /**
-   * Bimap over both keys and values (expected by fluent layer)
-   */
-  bimap<K2, V2>(fk: (k: K) => K2, fv: (v: V) => V2): PersistentMap<K2, V2> {
-    const out = Array.from(this.entries()).map(([k, v]) => [fk(k), fv(v)] as [K2, V2]);
-    return PersistentMap.fromEntries(out);
-  }
-
 
   
   // Private helper methods
@@ -905,7 +827,7 @@ export class PersistentMap<K, V> {
       for (let i = 0; i < key.length; i++) {
         const char = key.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-  hash = (hash | 0); // Convert to 32-bit integer
+        hash = hash & hash; // Convert to 32-bit integer
       }
       return hash;
     }
@@ -927,7 +849,7 @@ export class PersistentMap<K, V> {
       for (let i = 0; i < key.length; i++) {
         const char = key.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-  hash = (hash | 0); // Convert to 32-bit integer
+        hash = hash & hash; // Convert to 32-bit integer
       }
       return hash;
     }
@@ -1060,14 +982,6 @@ export class PersistentMap<K, V> {
     const h2 = hash2;
     const idx1 = (h1 >> shift) & mask;
     const idx2 = (h2 >> shift) & mask;
-    // If hashes are identical or we've shifted past 32 bits, create a collision bucket
-    if (h1 === h2 || shift >= 30) {
-      // Store both entries in a collision array node
-      // (You may want a dedicated CollisionNode class, but here we use MapNode with a special marker)
-      const entries: [K, V][] = [[key1, value1], [key2, value2]];
-      // Use a bitmap of 0 to indicate a collision node (or use a type tag in a real implementation)
-      return new MapNode(0, entries);
-    }
     if (idx1 !== idx2) {
       const bit1 = 1 << idx1;
       const bit2 = 1 << idx2;
@@ -1120,13 +1034,6 @@ export class PersistentSet<T> {
       set = set.add(item);
     }
     return set;
-  }
-  
-  /**
-   * Create a persistent set from items (static constructor)
-   */
-  static of<A>(items: Iterable<A> | Array<A>): PersistentSet<A> {
-    return PersistentSet.fromArray(Array.from(items));
   }
   
   /**
@@ -1255,13 +1162,6 @@ export class PersistentSet<T> {
     }
   }
 
-  /**
-   * Get values iterator (alias for Symbol.iterator to match usage in fluent layer)
-   */
-  values(): IterableIterator<T> {
-    return this.internalMap.keys();
-  }
-
 
 }
 
@@ -1333,13 +1233,14 @@ export const PersistentListEq = deriveEqInstance({
   }
 });
 
-  customOrd: <A>(a: PersistentList<A>, b: PersistentList<A>, ordA: { compare: (x: A, y: A) => number }): number => {
+export const PersistentListOrd = deriveOrdInstance({
+  customOrd: <A>(a: PersistentList<A>, b: PersistentList<A>): number => {
     const arrA = a.toArray();
     const arrB = b.toArray();
     const minLength = Math.min(arrA.length, arrB.length);
     for (let i = 0; i < minLength; i++) {
-      const cmp = ordA.compare(arrA[i], arrB[i]);
-      if (cmp !== 0) return cmp;
+      if (arrA[i] < arrB[i]) return -1;
+      if (arrA[i] > arrB[i]) return 1;
     }
     return arrA.length - arrB.length;
   }
@@ -1353,11 +1254,10 @@ export const PersistentListShow = deriveShowInstance({
 /**
  * PersistentMap derived instances
  */
-
-/**
- * Factory: Functor instance for PersistentMap with fixed key type K
- */
-// Use the canonical getPersistentMapFunctor below (HKT version)
+export const PersistentMapFunctor = deriveFunctorInstance<PersistentMapK>({
+  customMap: <A, B>(fa: PersistentMap<any, A>, f: (a: A) => B): PersistentMap<any, B> => 
+    fa.map(f)
+});
 
 export const PersistentMapBifunctor = deriveBifunctorInstance<PersistentMapK>({
   customBimap: <A, B, C, D>(
@@ -1387,17 +1287,17 @@ export const PersistentMapEq = deriveEqInstance({
 });
 
 export const PersistentMapOrd = deriveOrdInstance({
-  customOrd: <A, B>(a: PersistentMap<A, B>, b: PersistentMap<A, B>, ordA: { compare: (x: A, y: A) => number }, ordB: { compare: (x: B, y: B) => number }): number => {
+  customOrd: <A, B>(a: PersistentMap<A, B>, b: PersistentMap<A, B>): number => {
     if (a.size !== b.size) return a.size - b.size;
-    const entriesA = Array.from(a.entries()).sort((e1, e2) => ordA.compare(e1[0], e2[0]));
-    const entriesB = Array.from(b.entries()).sort((e1, e2) => ordA.compare(e1[0], e2[0]));
+    const entriesA = Array.from(a.entries()).sort();
+    const entriesB = Array.from(b.entries()).sort();
     for (let i = 0; i < entriesA.length; i++) {
       const [keyA, valueA] = entriesA[i];
       const [keyB, valueB] = entriesB[i];
-      const cmpKey = ordA.compare(keyA, keyB);
-      if (cmpKey !== 0) return cmpKey;
-      const cmpVal = ordB.compare(valueA, valueB);
-      if (cmpVal !== 0) return cmpVal;
+      if (keyA < keyB) return -1;
+      if (keyA > keyB) return 1;
+      if (valueA < valueB) return -1;
+      if (valueA > valueB) return 1;
     }
     return 0;
   }
@@ -1764,11 +1664,10 @@ export const PersistentListMonadAlt = deriveMonadInstance<PersistentListK>({
   }
 });
 
-
-/**
- * Factory: Functor instance for PersistentMap (Alt) with fixed key type K
- */
-// Use the canonical getPersistentMapFunctor below (HKT version)
+export const PersistentMapFunctorAlt = deriveFunctorInstance<PersistentMapK>({
+  customMap: <A, B>(fa: PersistentMap<any, A>, f: (a: A) => B): PersistentMap<any, B> => 
+    fa.map(f)
+});
 
 export const PersistentMapBifunctorAlt = deriveBifunctorInstance<PersistentMapK>({
   customBimap: <A, B, C, D>(
@@ -1964,116 +1863,6 @@ applyFluentOps(PersistentMap.prototype, PersistentMapFluentImpl);
 applyFluentOps(PersistentSet.prototype, PersistentSetFluentImpl);
 
 // ============================================================================
-// Part 11: Type Declaration Merges for Fluent Compatibility
-// ============================================================================
-
-/**
- * Interface merges to ensure compatibility with fluent layer
- */
-export interface PersistentMap<K, V> {
-  mapValues<V2>(f: (v: V) => V2): PersistentMap<K, V2>;
-  mapKeys<K2>(f: (k: K) => K2): PersistentMap<K2, V>;
-  bimap<K2, V2>(fk: (k: K) => K2, fv: (v: V) => V2): PersistentMap<K2, V2>;
-}
-
-export interface PersistentSet<T> {
-  values(): IterableIterator<T>;
-}
-
-export interface PersistentList<T> {
-  length: number;
-}
-
-// Kind2 constructor
-export interface PersistentMapHKT extends Kind2 {
-  // arg0 = K (key), arg1 = A (value)
-  readonly type: PersistentMap<this['arg0'], this['arg1']>;
-}
-
-
-// Canonical unary Functor factory for PersistentMap (fix left K)
-export const getPersistentMapFunctor = <K>(): Functor1<Lift1<ApplyLeft<PersistentMapHKT, K>>> => ({
-  map: <A, B>(fa, f) =>
-    (fa as PersistentMap<K, A>).map(f) as Apply<HKOutput<Lift1<ApplyLeft<PersistentMapHKT, K>>>, [B]>,
-  __arity: 1
-});
-
-
-// Canonical Monad factory for PersistentMap, unary over value by fixing K
-
-// PersistentMap does not admit a lawful Monad instance without a default key or extra structure.
-// Provide only Applicative (Functor+of) factory if needed:
-
-// ==========================
-// Canonical collection instances
-// ==========================
-
-// LIST — full Monad is lawful
-export const getListMonad = () => ({
-  of:  <A>(a: A) => PersistentList.of(a),
-  map: <A,B>(fa: PersistentList<A>, f: (a:A)=>B) => fa.map(f),
-  ap:  <A,B>(ff: PersistentList<(a:A)=>B>, fa: PersistentList<A>) => ff.flatMap(f => fa.map(f)),
-  chain: <A,B>(fa: PersistentList<A>, f: (a:A)=>PersistentList<B>) => fa.flatMap(f),
-});
-
-// Set needs an Eq to deduplicate correctly
-// SET — Apply needs Eq to dedup; do not pass Eq to .map if it doesn’t accept it
-export const getSetApply = <A>(E: Eq<A>) => ({
-  map: <A,B>(fa: PersistentSet<A>, f: (a:A)=>B) => {
-    let out = PersistentSet.empty<B>();
-    fa.forEach?.((a: A) => {
-      const b = f(a);
-      out = (out as any).add ? (out as any).add(b) : out;
-    });
-    return out;
-  },
-  ap: <A,B>(ff: PersistentSet<(a:A)=>B>, fa: PersistentSet<A>) => {
-    let out = PersistentSet.empty<B>();
-    ff.forEach?.((f) => {
-      fa.forEach?.((a) => {
-        const b = f(a);
-        out = (out as any).add ? (out as any).add(b) : out;
-      });
-    });
-    return out;
-  },
-});
-
-// Map needs a Semigroup to combine values pointwise
-// MAP — (a) Pointwise under a Semigroup<S> (combine overlapping keys)
-export const getMapApply = <K, S>(S: Semigroup<S>) => ({
-  map: <A,B>(fa: PersistentMap<K,A>, f: (a:A)=>B) => fa.map(f),
-  ap: <A,B>(ff: PersistentMap<K,(a:A)=>B>, fa: PersistentMap<K,A>) => {
-    let out = PersistentMap.fromEntries<K, B>([]);
-    ff.forEach?.((f, k) => {
-      if (fa.has?.(k)) {
-        const a = (fa as any).get(k);
-        const b = f(a);
-        out = (out as any).set ? (out as any).set(k, b) : out;
-      }
-    });
-    return out;
-  },
-});
-
-// Zippy variant: only applies where both maps share a key
-// MAP — (b) Zippy: only apply where both sides have the key; ignores Semigroup
-export const getMapApplyZippy = <K>() => ({
-  map: <A,B>(fa: PersistentMap<K,A>, f: (a:A)=>B) => fa.map(f),
-  ap: <A,B>(ff: PersistentMap<K,(a:A)=>B>, fa: PersistentMap<K,A>) => {
-    let out = PersistentMap.fromEntries<K, B>([]);
-    ff.forEach?.((f, k) => {
-      if (fa.has?.(k)) {
-        const a = (fa as any).get(k);
-        const b = f(a);
-        out = (out as any).set ? (out as any).set(k, b) : out;
-      }
-    });
-    return out;
-  },
-});
-
-// ============================================================================
 // Part 12: Registration
 // ============================================================================
 
@@ -2102,7 +1891,7 @@ export function registerPersistentInstances(): void {
     registry.register('PersistentListShow', PersistentListShow);
     
     // Register PersistentMap instances
-  // Use getPersistentMapFunctor<K>() for registration as needed
+    registry.register('PersistentMapFunctor', PersistentMapFunctor);
     registry.register('PersistentMapBifunctor', PersistentMapBifunctor);
     registry.register('PersistentMapEq', PersistentMapEq);
     registry.register('PersistentMapOrd', PersistentMapOrd);

@@ -16,11 +16,15 @@
  * ```
  */
 
-
-
-// Inline types to avoid import/export errors
-type ConstructorSpec = Record<string, (...args: any[]) => any>;
-type ProductFields = Record<string, any>;
+import {
+  createSumType,
+  createProductType,
+  ConstructorSpec,
+  ProductFields,
+  SumTypeConfig,
+  ProductTypeConfig,
+  ADTPurityConfig
+} from './fp-adt-builders-enhanced';
 
 import {
   deriveFunctorInstance,
@@ -38,7 +42,10 @@ import {
   FluentImpl
 } from './fp-fluent-api';
 
-import { registerADTMetadata } from './fp-auto-derivation-complete';
+import {
+  getFPRegistry,
+  registerADTMetadata
+} from './fp-auto-derivation-complete';
 
 import {
   Kind1, Kind2, Kind3,
@@ -78,7 +85,7 @@ interface ADTDefinitionConfig {
   
   // Custom derivation functions
   customMap?: <A, B>(fa: any, f: (a: A) => B) => any;
-  customChain?: <A>(fa: any, f: (a: A) => any) => any;
+  customChain?: <A, B>(fa: any, f: (a: A) => any) => any;
   customBimap?: <A, B, C, D>(fab: any, f: (a: A) => C, g: (b: B) => D) => any;
   customEq?: (a: any, b: any) => boolean;
   customOrd?: (a: any, b: any) => number;
@@ -112,7 +119,7 @@ interface ADTMetadata {
 /**
  * Unified ADT instance with all capabilities
  */
-interface UnifiedADTInstance<Spec> {
+interface UnifiedADTInstance<Spec extends Record<string, (...args: any[]) => any>> {
   // Core ADT functionality
   readonly tag: keyof Spec;
   readonly payload: any;
@@ -150,7 +157,10 @@ interface UnifiedADTInstance<Spec> {
 /**
  * Unified ADT builder with all capabilities
  */
-type UnifiedADTBuilder<Spec> = {
+interface UnifiedADTBuilder<Spec extends Record<string, (...args: any[]) => any>> {
+  // Constructor functions - using simpler approach
+  constructors: Record<keyof Spec, any>;
+  
   // Static methods
   of<A>(value: A): UnifiedADTInstance<Spec>;
   from<A>(value: A): UnifiedADTInstance<Spec>;
@@ -172,7 +182,7 @@ type UnifiedADTBuilder<Spec> = {
   create<K extends keyof Spec>(tag: K, payload?: any): UnifiedADTInstance<Spec>;
   match<Result>(instance: UnifiedADTInstance<Spec>, handlers: any): Result;
   matchTag<Result>(instance: UnifiedADTInstance<Spec>, handlers: any): Result;
-} & { [K in keyof Spec]: any };
+}
 
 // ============================================================================
 // Part 2: Unified ADT Definition Function
@@ -181,7 +191,7 @@ type UnifiedADTBuilder<Spec> = {
 /**
  * Define a unified ADT with automatic capabilities
  */
-function defineADT<Spec extends ConstructorSpec>(
+function defineADT<Spec extends Record<string, (...args: any[]) => any>>(
   name: string,
   spec: Spec,
   config: ADTDefinitionConfig = {}
@@ -189,7 +199,7 @@ function defineADT<Spec extends ConstructorSpec>(
   console.log(`🔧 Defining unified ADT: ${name}`);
   
   // Default configuration
-  const defaultConfig: ADTDefinitionConfig = {
+  const defaultConfig: Required<ADTDefinitionConfig> = {
     functor: true,
     applicative: true,
     monad: true,
@@ -202,13 +212,25 @@ function defineADT<Spec extends ConstructorSpec>(
     customFluentMethods: {},
     optics: true,
     register: true,
-    namespace: 'default'
-    // no custom* defaults here — leave them undefined unless provided
+    namespace: 'default',
+    customMap: (fa: any, f: any) => fa,
+    customChain: (fa: any, f: any) => fa,
+    customBimap: (fab: any, f: any, g: any) => fab,
+    customEq: (a: any, b: any) => a === b,
+    customOrd: (a: any, b: any) => 0,
+    customShow: (a: any) => String(a)
   };
   
   const finalConfig = { ...defaultConfig, ...config };
   
-
+  // Create base ADT builder
+  const baseBuilder = createSumType(spec, {
+    name,
+    effect: ((finalConfig.purity !== undefined ? finalConfig.purity : 'Pure') as any),
+    enableHKT: true,
+    enableDerivableInstances: false,
+    enableRuntimeMarkers: false
+  });
   
   // Derive typeclass instances
   const derivationConfig: DerivationConfig = {
@@ -230,7 +252,7 @@ function defineADT<Spec extends ConstructorSpec>(
   const instances = deriveAllInstances(name, derivationConfig);
   
   // Create fluent implementation
-  const fluentImpl = createFluentImpl(name, instances, finalConfig.customFluentMethods ?? {});
+  const fluentImpl = createFluentImpl(name, instances, finalConfig.customFluentMethods);
   
   // Create unified ADT class
   class UnifiedADT implements UnifiedADTInstance<Spec> {
@@ -275,24 +297,24 @@ function defineADT<Spec extends ConstructorSpec>(
     map<B>(f: (a: any) => B): any {
       return fluentImpl.map ? fluentImpl.map(this, f) : this;
     }
-
-    chain(f: (a: any) => any): any {
+    
+    chain<B>(f: (a: any) => any): any {
       return fluentImpl.chain ? fluentImpl.chain(this, f) : this;
     }
-
-    flatMap(f: (a: any) => any): any {
+    
+    flatMap<B>(f: (a: any) => any): any {
       return this.chain(f);
     }
-
-    ap(fab: any): any {
+    
+    ap<B>(fab: any): any {
       return fluentImpl.ap ? fluentImpl.ap(this, fab) : this;
     }
-
-    filter(predicate: (a: any) => boolean): any {
+    
+        filter(predicate: (a: any) => boolean): any {
       return fluentImpl.filter ? fluentImpl.filter(this, predicate) : this;
     }
 
-    filterMap(f: (a: any) => any): any {
+    filterMap<B>(f: (a: any) => any): any {
       return fluentImpl.filterMap ? fluentImpl.filterMap(this, f) : this;
     }
 
@@ -301,26 +323,26 @@ function defineADT<Spec extends ConstructorSpec>(
     }
 
     mapLeft<C>(f: (a: any) => C): any {
-      return fluentImpl.bimap ? fluentImpl.bimap(this, f, (x: any) => x) : this;
+      return fluentImpl.mapLeft ? fluentImpl.mapLeft(this, f) : this;
     }
 
     mapRight<D>(g: (b: any) => D): any {
-      return fluentImpl.bimap ? fluentImpl.bimap(this, (x: any) => x, g) : this;
+      return fluentImpl.mapRight ? fluentImpl.mapRight(this, g) : this;
     }
-
+    
     // Optics methods (placeholder)
-    lens<K extends string>(_key: K): any {
+    lens<K extends string>(key: K): any {
       // TODO: Implement optics
       return null;
     }
-
-    prism<K extends string>(_key: K): any {
+    
+    prism<K extends string>(key: K): any {
       // TODO: Implement optics
       return null;
     }
-
+    
     // Utility methods
-    equals(other: any): boolean {
+        equals(other: any): boolean {
       return instances.eq ? instances.eq.equals(this, other) : this === other;
     }
 
@@ -331,14 +353,14 @@ function defineADT<Spec extends ConstructorSpec>(
     show(): string {
       return instances.show ? instances.show.show(this) : this.toString();
     }
-
+    
     toJSON(): any {
       return {
         tag: this.tag,
         payload: this.payload
       };
     }
-
+    
     toString(): string {
       return `${name}(${String(this.tag)}, ${JSON.stringify(this.payload)})`;
     }
@@ -376,10 +398,10 @@ function defineADT<Spec extends ConstructorSpec>(
       }
       return out;
     })(),
-    purity: finalConfig.purity ?? 'Pure',
+    purity: finalConfig.purity,
     typeclasses: Object.keys(instances).filter(key => instances[key as keyof typeof instances]),
     fluentMethods: Object.keys(fluentImpl),
-    optics: finalConfig.optics ?? true,
+    optics: finalConfig.optics,
     customEq: finalConfig.customEq,
     customOrd: finalConfig.customOrd,
     customShow: finalConfig.customShow
@@ -535,7 +557,8 @@ function createFluentImpl(name: string, instances: any, customMethods: Record<st
   
   if (instances.bifunctor) {
     fluentImpl.bimap = (instance, f, g) => instances.bifunctor.bimap(instance, f, g);
-    // mapLeft/mapRight are not required on FluentImpl; handled in class via bimap+identity
+    fluentImpl.mapLeft = (instance, f) => instances.bifunctor.mapLeft(instance, f);
+    fluentImpl.mapRight = (instance, g) => instances.bifunctor.mapRight(instance, g);
   }
   
   // Add custom methods
@@ -548,7 +571,20 @@ function createFluentImpl(name: string, instances: any, customMethods: Record<st
  * Register ADT in the global registry
  */
 function registerADTInRegistry(name: string, metadata: ADTMetadata, instances: any) {
-  // Only keep metadata in auto-derivation side
+  const registry = getFPRegistry();
+  if (!registry) return;
+
+  // One flat keyspace is simplest and avoids API-mismatch errors
+  registry.register(`${name}.metadata`, metadata);
+  if (instances.functor)     registry.register(`${name}.Functor`, instances.functor);
+  if (instances.applicative) registry.register(`${name}.Applicative`, instances.applicative);
+  if (instances.monad)       registry.register(`${name}.Monad`, instances.monad);
+  if (instances.bifunctor)   registry.register(`${name}.Bifunctor`, instances.bifunctor);
+  if (instances.eq)          registry.register(`${name}.Eq`, instances.eq);
+  if (instances.ord)         registry.register(`${name}.Ord`, instances.ord);
+  if (instances.show)        registry.register(`${name}.Show`, instances.show);
+
+  // keep metadata in auto-derivation side too
   registerADTMetadata(name, metadata);
 }
 
@@ -563,7 +599,7 @@ function defineProductADT<Fields extends ProductFields>(
   name: string,
   fields: Fields,
   config: ADTDefinitionConfig = {}
-): UnifiedADTBuilder<any> {
+): UnifiedADTBuilder<{ Product: (...args: any[]) => Fields }> {
   console.log(`🔧 Defining unified product ADT: ${name}`);
   
   // Create product type spec

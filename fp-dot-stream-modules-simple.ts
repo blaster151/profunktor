@@ -77,7 +77,7 @@ interface ComposedStream<F extends StreamModule<any, any, any, any>, G extends S
   > {
   run(input: F extends StreamModule<infer FIn, any, any, any> ? FIn : never): StateFn<
     { fState: F extends StreamModule<any, any, infer FState, any> ? FState : never; gState: G extends StreamModule<any, any, infer GState, any> ? GState : never },
-    G extends StreamModule<any, infer GOut, any, any> ? GOut : never
+    G extends StreamModule<any, any, any, infer GOut> ? GOut : never
   >;
 }
 
@@ -206,8 +206,8 @@ class StreamBuilder<In, Out, S, M extends Nat> {
 function demonstrateMultiplicityTracking() {
   console.log("=== Multiplicity Tracking Examples ===");
   
-  // MapStream: always consumes once  
-  const mapStream = new MapStreamImpl<number, number>((x: number) => x * 2);
+  // MapStream: always consumes once
+  const mapStream = new MapStreamImpl<number, string>((x: number) => `value: ${x}`);
   console.log("MapStream multiplicity:", mapStream.multiplicity);
   
   // FilterStream: consumes once
@@ -239,13 +239,7 @@ function demonstrateMultiplicityTracking() {
   
   // Demonstrate runtime behavior
   const testInput = 10;
-  const initialState = { 
-    fState: { 
-      fState: undefined, // mapStream state (void)
-      gState: undefined  // filterStream state (void)
-    }, 
-    gState: 0 as Nat // scanStream state
-  };
+  const initialState = { fState: undefined, gState: undefined, hState: 0 };
   
   try {
     const [finalState, output] = composed.run(testInput)(initialState);
@@ -260,7 +254,7 @@ function demonstrateMultiplicityComposition() {
   console.log("\n=== Multiplicity Composition Examples ===");
   
   // Create streams with different multiplicities
-  const mapStream = new MapStreamImpl<number, number>((x: number) => x * 2);
+  const mapStream = new MapStreamImpl<number, string>((x: number) => `processed: ${x}`);
   const takeStream = new TakeStreamImpl<number, 2>(2);
   const repeatStream = new RepeatStreamImpl<number, 3>(3);
   
@@ -283,11 +277,9 @@ function demonstrateMultiplicityComposition() {
   
   for (const input of testInputs) {
     const initialState = {
-      fState: {
-        fState: undefined, // mapStream state (void)
-        gState: { count: 0 as Nat } // takeStream state
-      },
-      gState: { remaining: 3 as Nat } // repeatStream state
+      fState: undefined,
+      gState: { count: 0 },
+      hState: { remaining: 3 }
     };
     
     try {

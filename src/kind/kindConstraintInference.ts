@@ -8,7 +8,7 @@ import {
     TypeReferenceNode,
     Identifier,
     SyntaxKind,
-} from "../types";
+} from "../types2";
 import { KindMetadata } from "./kindMetadata.js";
 import { compareKinds } from "./kindComparison.js";
 import { globalKindConstraintMap, KindConstraint } from "./kindConstraintPropagation.js";

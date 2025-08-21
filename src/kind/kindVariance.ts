@@ -3,7 +3,8 @@ import {
     TypeChecker,
     TypeParameterDeclaration,
     Symbol,
-} from "../types";
+    SyntaxKind,
+} from "../types2";
 import { KindMetadata } from "./kindMetadata.js";
 import { __KindBrand, __HKIn, __HKOut } from "../../kind-branding";
 
@@ -42,9 +43,9 @@ export function extractVarianceAnnotations(
 
     // Find the first relevant declaration
     const declaration = declarations.find(d => 
-        d.kind === 'TypeAliasDeclaration' ||
-        d.kind === 'InterfaceDeclaration' ||
-        d.kind === 'ClassDeclaration'
+        d.kind === SyntaxKind.TypeAliasDeclaration ||
+        d.kind === SyntaxKind.InterfaceDeclaration ||
+        d.kind === SyntaxKind.ClassDeclaration
     );
 
     if (!declaration) {
@@ -53,11 +54,11 @@ export function extractVarianceAnnotations(
 
     // Extract type parameters
     let typeParameters: readonly TypeParameterDeclaration[] = [];
-    if (declaration.kind === 'TypeAliasDeclaration') {
+    if (declaration.kind === SyntaxKind.TypeAliasDeclaration) {
         typeParameters = (declaration as any).typeParameters || [];
-    } else if (declaration.kind === 'InterfaceDeclaration') {
+    } else if (declaration.kind === SyntaxKind.InterfaceDeclaration) {
         typeParameters = (declaration as any).typeParameters || [];
-    } else if (declaration.kind === 'ClassDeclaration') {
+    } else if (declaration.kind === SyntaxKind.ClassDeclaration) {
         typeParameters = (declaration as any).typeParameters || [];
     }
 
@@ -84,7 +85,7 @@ function extractVarianceFromTypeParameter(
     typeParam: TypeParameterDeclaration,
     checker: TypeChecker
 ): VarianceAnnotation | null {
-    const paramName = typeParam.name.escapedText;
+    const paramName = String(typeParam.name.escapedText);
     
     // Check for explicit variance markers in the name
     if (paramName.startsWith('+')) {
@@ -97,7 +98,7 @@ function extractVarianceFromTypeParameter(
     // Check for variance annotations in JSDoc comments
     if (typeParam.jsDoc) {
         for (const tag of typeParam.jsDoc) {
-            if (tag.tagName.escapedText === 'variance') {
+            if (String((tag as any).tagName?.escapedText) === 'variance') {
                 const varianceText = tag.comment?.toString().toLowerCase();
                 if (varianceText?.includes('covariant') || varianceText?.includes('+')) {
                     return VarianceAnnotation.Covariant;

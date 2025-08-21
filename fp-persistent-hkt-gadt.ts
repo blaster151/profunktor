@@ -1,5 +1,3 @@
-// Example: Compose to slot persistent collections anywhere HKT-based code expects arrays, etc.
-// const arrayToPersistentToArray = composeK(fromPersistentList, toPersistentList);
 /**
  * Persistent Collections in HKTs + GADTs
  * 
@@ -14,34 +12,23 @@
  * - Type-safe operations with immutability preservation
  */
 
-// ============================================================================
-// Arity-polymorphic helpers (K1/K2/K3)
-// ============================================================================
-
-// mapLastN already exist; wire the K3 version for future containers:
-export const mapList3 = mapLast3; // expose as first-class if you plan a K3 persistent type
-// ============================================================================
-// Interop bridges between standard HKTs and persistent HKTs
-// ============================================================================
-
 import {
   Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
   ArrayK, MaybeK, EitherK, TupleK, FunctionK,
-  Maybe, Either,
-  ApplyLeft
+  Maybe, Either
 } from './fp-hkt';
 
 import {
   Functor, Applicative, Monad, Bifunctor, Traversable, Foldable,
   deriveFunctor, deriveApplicative, deriveMonad,
   lift2, composeK, sequence, traverse,
-  mapLast1, mapLast2, mapLast3
+  map, chain, ap, of
 } from './fp-typeclasses-hkt';
 
 import {
   PersistentList, PersistentMap, PersistentSet,
-  PersistentListK as _PersistentListK, PersistentMapK as _PersistentMapK, PersistentSetK as _PersistentSetK
+  PersistentListK, PersistentMapK, PersistentSetK
 } from './fp-persistent';
 
 import {
@@ -49,13 +36,13 @@ import {
   pmatch, PatternMatcherBuilder,
   derivePatternMatcher, createPmatchBuilder,
   Expr, ExprK, evaluate, transformString, ExprFunctor,
-  MaybeGADT, MaybeGADTK, getMaybeGADTFunctor, getMaybeGADTApplicative, getMaybeGADTMonad,
+  MaybeGADT, MaybeGADTK, MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK
+  Result, ResultK, ResultFunctor, deriveResultMonad
 } from './fp-gadt-enhanced';
 
 import {
-  Immutable, immutableArray
+  DeepImmutable, ImmutableArray
 } from './fp-immutable';
 
 import {
@@ -64,52 +51,6 @@ import {
   registerDerivableInstances, autoRegisterPersistentCollections,
   deriveInstances, getFunctorInstance, getMonadInstance
 } from './fp-derivable-instances';
-
-// Natural transformations to and from the persistent containers
-export const toPersistentList = <A>(as: A[]) =>
-  PersistentList.fromArray(as);
-
-export const fromPersistentList = <A>(pl: PersistentList<A>) =>
-  pl.toArray();
-
-// --- Kind2 HKT for Array<[K,V]> ---
-export interface ArrayPairK extends Kind2 {
-  readonly type: Array<[this['arg0'], this['arg1']]>;
-}
-
-// For Map: Array<[K, V]> <-> PersistentMap<K, V> (Kind2 <-> Kind2)
-export const entriesToPersistentMap = <K, V>(xs: Array<[K, V]>) =>
-  PersistentMap.fromEntries(xs);
-
-export const persistentMapToEntries = <K, V>(pm: PersistentMap<K, V>) => {
-  const out: Array<[K, V]> = [];
-  pm.forEach((v, k) => out.push([k, v]));
-  return out;
-};
-
-// For Set: Array<A> <-> PersistentSet<A>
-export const toPersistentSet = <A>(as: A[]) =>
-  PersistentSet.fromArray(as);
-
-export const fromPersistentSet = <A>(ps: PersistentSet<A>) => {
-  const arr: A[] = [];
-  ps.forEach(a => arr.push(a));
-  return arr;
-};
-
-/**
- * @deprecated Use PersistentListHKT instead.
- */
-export type PersistentListK = _PersistentListK;
-/**
- * @deprecated Use PersistentMapHKT instead.
- */
-export type PersistentMapK = _PersistentMapK;
-/**
- * @deprecated Use PersistentSetHKT instead.
- */
-export type PersistentSetK = _PersistentSetK;
-
 
 // ============================================================================
 // Part 1: HKT Registration for Persistent Collections
@@ -183,6 +124,29 @@ export type MapGADTTags = 'Empty' | 'NonEmpty';
  */
 export type SetGADTTags = 'Empty' | 'NonEmpty';
 
+/**
+ * GADT payload types for ListGADT
+ */
+export type ListGADTPayload<T extends ListGADTTags> = 
+  T extends 'Nil' ? {} :
+  T extends 'Cons' ? { head: any; tail: PersistentList<any> } :
+  never;
+
+/**
+ * GADT payload types for MapGADT
+ */
+export type MapGADTPayload<T extends MapGADTTags> = 
+  T extends 'Empty' ? {} :
+  T extends 'NonEmpty' ? { key: any; value: any; rest: PersistentMap<any, any> } :
+  never;
+
+/**
+ * GADT payload types for SetGADT
+ */
+export type SetGADTPayload<T extends SetGADTTags> = 
+  T extends 'Empty' ? {} :
+  T extends 'NonEmpty' ? { element: any; rest: PersistentSet<any> } :
+  never;
 
 // ============================================================================
 // Part 3: GADT Constructors for Persistent Collections
@@ -226,7 +190,7 @@ export const SetGADT = {
 // ============================================================================
 
 /**
- * Pattern matcher for ListGADT (rebuilt on top of pmatch builder)
+ * Pattern matcher for ListGADT
  */
 export function matchList<A, R>(
   gadt: ListGADT<A>,
@@ -235,14 +199,14 @@ export function matchList<A, R>(
     Cons: (payload: { head: A; tail: PersistentList<A> }) => R;
   }
 ): R {
-  return pmatchList<A, R>(gadt)
-    .with('Nil', patterns.Nil)
-    .with('Cons', patterns.Cons)
-    .exhaustive();
+  return pmatch(gadt)
+    .with('Nil', () => patterns.Nil())
+    .with('Cons', p => patterns.Cons(p))
+    .exhaustive() as R;
 }
 
 /**
- * Pattern matcher for MapGADT (rebuilt on top of pmatch builder)
+ * Pattern matcher for MapGADT
  */
 export function matchMap<K, V, R>(
   gadt: MapGADT<K, V>,
@@ -251,14 +215,14 @@ export function matchMap<K, V, R>(
     NonEmpty: (payload: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
   }
 ): R {
-  return pmatchMap<K, V, R>(gadt)
-    .with('Empty', patterns.Empty)
-    .with('NonEmpty', patterns.NonEmpty)
-    .exhaustive();
+  return pmatch(gadt)
+    .with('Empty', () => patterns.Empty())
+    .with('NonEmpty', p => patterns.NonEmpty(p))
+    .exhaustive() as R;
 }
 
 /**
- * Pattern matcher for SetGADT (rebuilt on top of pmatch builder)
+ * Pattern matcher for SetGADT
  */
 export function matchSet<A, R>(
   gadt: SetGADT<A>,
@@ -267,10 +231,10 @@ export function matchSet<A, R>(
     NonEmpty: (payload: { element: A; rest: PersistentSet<A> }) => R;
   }
 ): R {
-  return pmatchSet<A, R>(gadt)
-    .with('Empty', patterns.Empty)
-    .with('NonEmpty', patterns.NonEmpty)
-    .exhaustive();
+  return pmatch(gadt)
+    .with('Empty', () => patterns.Empty())
+    .with('NonEmpty', p => patterns.NonEmpty(p))
+    .exhaustive() as R;
 }
 
 /**
@@ -283,9 +247,8 @@ export function matchListPartial<A, R>(
     Cons: (payload: { head: A; tail: PersistentList<A> }) => R;
   }>
 ): R | undefined {
-  if (gadt.tag === 'Nil') return patterns.Nil ? patterns.Nil() : undefined;
-  if (gadt.tag === 'Cons') return patterns.Cons ? patterns.Cons(gadt.payload) : undefined;
-  return undefined;
+  const handler = patterns[gadt.tag as keyof typeof patterns];
+  return handler ? handler(gadt as any) : undefined;
 }
 
 /**
@@ -298,9 +261,8 @@ export function matchMapPartial<K, V, R>(
     NonEmpty: (payload: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
   }>
 ): R | undefined {
-  if (gadt.tag === 'Empty') return patterns.Empty ? patterns.Empty() : undefined;
-  if (gadt.tag === 'NonEmpty') return patterns.NonEmpty ? patterns.NonEmpty(gadt.payload) : undefined;
-  return undefined;
+  const handler = patterns[gadt.tag as keyof typeof patterns];
+  return handler ? handler(gadt as any) : undefined;
 }
 
 /**
@@ -313,165 +275,8 @@ export function matchSetPartial<A, R>(
     NonEmpty: (payload: { element: A; rest: PersistentSet<A> }) => R;
   }>
 ): R | undefined {
-  if (gadt.tag === 'Empty') return patterns.Empty ? patterns.Empty() : undefined;
-  if (gadt.tag === 'NonEmpty') return patterns.NonEmpty ? patterns.NonEmpty(gadt.payload) : undefined;
-  return undefined;
-}
-
-// ============================================================================
-// Part 4.5: Builder-Style Pattern Matching for Ergonomic Use
-// ============================================================================
-
-/**
- * Builder-style pattern matcher for ListGADT with exhaustiveness checking
- */
-export function pmatchList<A, R>(value: ListGADT<A>): PatternMatcherBuilder<ListGADT<A>, R> {
-  return pmatch(value);
-}
-
-/**
- * Alias for pmatch; does not enforce tag-only (no payload) handlers.
- * Provided for symmetry with tag-only matchers, but allows payloads.
- */
-export function pmatchListTag<A, R>(value: ListGADT<A>): PatternMatcherBuilder<ListGADT<A>, R> {
-  return pmatch(value);
-}
-
-// --------------------------------------------------------------------------
-// GADT-level pattern-match builders & totality helpers (auto-derived style)
-// --------------------------------------------------------------------------
-
-
-
-// Strongly-typed builder helper for ListGADT
-export function makeListMatcher<A, R>() {
-  return (g: ListGADT<A>) => pmatch<ListGADT<A>, R>(g);
-}
-
-export function matchListTotal<A, R>(g: ListGADT<A>, k: {
-  Nil: () => R;
-  Cons: (p: { head: A; tail: PersistentList<A> }) => R;
-}): R {
-  return makeListMatcher<A, R>()(g)
-    .with('Nil', k.Nil)
-    .with('Cons', k.Cons)
-    .exhaustive();
-}
-
-
-// Strongly-typed builder helper for MapGADT
-export function makeMapMatcher<K, V, R>() {
-  return (g: MapGADT<K, V>) => pmatch<MapGADT<K, V>, R>(g);
-}
-
-export function matchMapTotal<K, V, R>(g: MapGADT<K, V>, k: {
-  Empty: () => R;
-  NonEmpty: (p: { key: K; value: V; rest: PersistentMap<K, V> }) => R;
-}): R {
-  return makeMapMatcher<K, V, R>()(g)
-    .with('Empty', k.Empty)
-    .with('NonEmpty', k.NonEmpty)
-    .exhaustive();
-}
-
-
-// Strongly-typed builder helper for SetGADT
-export function makeSetMatcher<A, R>() {
-  return (g: SetGADT<A>) => pmatch<SetGADT<A>, R>(g);
-}
-
-export function matchSetTotal<A, R>(g: SetGADT<A>, k: {
-  Empty: () => R;
-  NonEmpty: (p: { element: A; rest: PersistentSet<A> }) => R;
-}): R {
-  return makeSetMatcher<A, R>()(g)
-    .with('Empty', k.Empty)
-    .with('NonEmpty', k.NonEmpty)
-    .exhaustive();
-}
-
-/**
- * Builder-style pattern matcher for MapGADT with exhaustiveness checking
- */
-export function pmatchMap<K, V, R>(value: MapGADT<K, V>): PatternMatcherBuilder<MapGADT<K, V>, R> {
-  return pmatch(value);
-}
-
-/**
- * Alias for pmatch; does not enforce tag-only (no payload) handlers.
- * Provided for symmetry with tag-only matchers, but allows payloads.
- */
-export function pmatchMapTag<K, V, R>(value: MapGADT<K, V>): PatternMatcherBuilder<MapGADT<K, V>, R> {
-  return pmatch(value);
-}
-
-/**
- * Builder-style pattern matcher for SetGADT with exhaustiveness checking
- */
-export function pmatchSet<A, R>(value: SetGADT<A>): PatternMatcherBuilder<SetGADT<A>, R> {
-  return pmatch(value);
-}
-
-/**
- * Alias for pmatch; does not enforce tag-only (no payload) handlers.
- * Provided for symmetry with tag-only matchers, but allows payloads.
- */
-export function pmatchSetTag<A, R>(value: SetGADT<A>): PatternMatcherBuilder<SetGADT<A>, R> {
-  return pmatch(value);
-}
-
-// ============================================================================
-// Part 4.6: Type Guards and Narrowing Functions
-// ============================================================================
-
-/**
- * Type guard for Nil case of ListGADT
- */
-export function isNil<A>(g: ListGADT<A>): g is { tag: 'Nil'; payload: {} } {
-  return g.tag === 'Nil';
-}
-
-/**
- * Type guard for Cons case of ListGADT
- */
-export function isCons<A>(g: ListGADT<A>): g is { tag: 'Cons'; payload: { head: A; tail: PersistentList<A> } } {
-  return g.tag === 'Cons';
-}
-
-/**
- * Type guard for Empty case of MapGADT
- */
-export function isEmptyMap<K,V>(g: MapGADT<K,V>): g is { tag: 'Empty'; payload: {} } {
-  return g.tag === 'Empty';
-}
-
-/**
- * Type guard for NonEmpty case of MapGADT
- */
-export function isNonEmptyMap<K,V>(g: MapGADT<K,V>): g is { tag: 'NonEmpty'; payload: { key: K; value: V; rest: PersistentMap<K,V> } } {
-  return g.tag === 'NonEmpty';
-}
-
-/**
- * Type guard for Empty case of SetGADT
- */
-export function isEmptySet<A>(g: SetGADT<A>): g is { tag: 'Empty'; payload: {} } {
-  return g.tag === 'Empty';
-}
-
-/**
- * Type guard for NonEmpty case of SetGADT
- */
-export function isNonEmptySet<A>(g: SetGADT<A>): g is { tag: 'NonEmpty'; payload: { element: A; rest: PersistentSet<A> } } {
-  return g.tag === 'NonEmpty';
-}
-
-/**
- * Guard/when helper for conditional pattern matching
- * Usage: pmatchList(g).with('Cons', ({ head }) => when((h:number)=>h>0, () => head)(head)).exhaustive()
- */
-export function when<T>(pred: (t: T) => boolean, handler: (t: T) => any) {
-  return (t: T) => (pred(t) ? handler(t) : undefined);
+  const handler = patterns[gadt.tag as keyof typeof patterns];
+  return handler ? handler(gadt as any) : undefined;
 }
 
 // ============================================================================
@@ -511,10 +316,7 @@ export function mapToGADT<K, V>(map: PersistentMap<K, V>): MapGADT<K, V> {
   if (map.isEmpty()) {
     return MapGADT.Empty();
   } else {
-    const entries: [K, V][] = [];
-    map.forEach((value, key) => {
-      entries.push([key, value]);
-    });
+    const entries = Array.from(map.entries());
     const [key, value] = entries[0];
     const rest = PersistentMap.fromEntries(entries.slice(1));
     return MapGADT.NonEmpty(key, value, rest);
@@ -538,10 +340,7 @@ export function setToGADT<A>(set: PersistentSet<A>): SetGADT<A> {
   if (set.isEmpty()) {
     return SetGADT.Empty();
   } else {
-    const values: A[] = [];
-    set.forEach(value => {
-      values.push(value);
-    });
+    const values = Array.from(set);
     const element = values[0];
     const rest = PersistentSet.fromArray(values.slice(1));
     return SetGADT.NonEmpty(element, rest);
@@ -565,7 +364,7 @@ export function gadtToSet<A>(gadt: SetGADT<A>): PersistentSet<A> {
 /**
  * Derived instances for PersistentListHKT
  */
-export const PersistentListInstances = {
+export const PersistentListInstances = deriveInstances<PersistentListHKT>({
   map: <A, B>(fa: Apply<PersistentListHKT, [A]>, f: (a: A) => B): Apply<PersistentListHKT, [B]> => {
     return (fa as PersistentList<A>).map(f) as Apply<PersistentListHKT, [B]>;
   },
@@ -575,197 +374,42 @@ export const PersistentListInstances = {
   ap: <A, B>(fab: Apply<PersistentListHKT, [(a: A) => B]>, fa: Apply<PersistentListHKT, [A]>): Apply<PersistentListHKT, [B]> => {
     const functions = fab as PersistentList<(a: A) => B>;
     const values = fa as PersistentList<A>;
-    // Since PersistentList doesn't have ap, we need to implement it manually
-    const result: B[] = [];
-    functions.forEach(fn => {
-      values.forEach(val => {
-        result.push(fn(val));
-      });
-    });
-    return PersistentList.fromArray(result) as Apply<PersistentListHKT, [B]>;
+    return functions.ap(values) as Apply<PersistentListHKT, [B]>;
   },
   chain: <A, B>(fa: Apply<PersistentListHKT, [A]>, f: (a: A) => Apply<PersistentListHKT, [B]>): Apply<PersistentListHKT, [B]> => {
-    return (fa as PersistentList<A>).flatMap(a => f(a) as PersistentList<B>) as Apply<PersistentListHKT, [B]>;
+    return (fa as PersistentList<A>).chain(f as any) as Apply<PersistentListHKT, [B]>;
   }
-};
+});
 
-export const PersistentListFunctor: Functor<PersistentListHKT> = {
-  map: PersistentListInstances.map
-};
+export const PersistentListFunctor = PersistentListInstances.functor;
+export const PersistentListApplicative = PersistentListInstances.applicative;
+export const PersistentListMonad = PersistentListInstances.monad;
 
-export const PersistentListApplicative: Applicative<PersistentListHKT> = {
-  map: PersistentListInstances.map,
-  of: PersistentListInstances.of,
-  ap: PersistentListInstances.ap
-};
-
-export const PersistentListMonad: Monad<PersistentListHKT> = {
-  map: PersistentListInstances.map,
-  of: PersistentListInstances.of,
-  ap: PersistentListInstances.ap,
-  chain: PersistentListInstances.chain
-};
-
-// ...existing code...
 /**
  * Derived instances for PersistentMapHKT
  */
-export const PersistentMapInstances = {
+export const PersistentMapInstances = deriveInstances<PersistentMapHKT>({
   map: <A, B>(fa: Apply<PersistentMapHKT, [any, A]>, f: (a: A) => B): Apply<PersistentMapHKT, [any, B]> => {
     return (fa as PersistentMap<any, A>).map(f) as Apply<PersistentMapHKT, [any, B]>;
   },
   bimap: <A, B, C, D>(fab: Apply<PersistentMapHKT, [A, B]>, f: (a: A) => C, g: (b: B) => D): Apply<PersistentMapHKT, [C, D]> => {
-    const map = fab as PersistentMap<A, B>;
-    let res = PersistentMap.empty<C, D>();
-    map.forEach((value, key) => {
-      res = res.set(f(key), g(value));
-    });
-    return res as Apply<PersistentMapHKT, [C, D]>;
+    return (fab as PersistentMap<A, B>).bimap(f, g) as Apply<PersistentMapHKT, [C, D]>;
   }
-};
+});
 
-
-/**
- * Factory: Functor instance for PersistentMap with fixed key type K
- */
-export function getPersistentMapFunctor<K>(): Functor<ApplyLeft<PersistentMapHKT, K>> {
-  return {
-    map: <A, B>(fa: Apply<ApplyLeft<PersistentMapHKT, K>, [A]>, f: (a: A) => B): Apply<ApplyLeft<PersistentMapHKT, K>, [B]> => {
-      // fa is PersistentMap<K, A>
-      return (fa as PersistentMap<K, A>).map(f) as PersistentMap<K, B>;
-    }
-  };
-}
-
-export const PersistentMapBifunctor: Bifunctor<PersistentMapHKT> = {
-  bimap: PersistentMapInstances.bimap,
-  mapLeft: <A, B, C>(fab: Apply<PersistentMapHKT, [A, B]>, f: (a: A) => C): Apply<PersistentMapHKT, [C, B]> => {
-    return PersistentMapInstances.bimap(fab, f, (b: B) => b);
-  },
-  mapRight: <A, B, D>(fab: Apply<PersistentMapHKT, [A, B]>, g: (b: B) => D): Apply<PersistentMapHKT, [A, D]> => {
-    return PersistentMapInstances.bimap(fab, (a: A) => a, g);
-  }
-};
+export const PersistentMapFunctor = PersistentMapInstances.functor;
+export const PersistentMapBifunctor = PersistentMapInstances.bifunctor;
 
 /**
  * Derived instances for PersistentSetHKT
  */
-export const PersistentSetInstances = {
+export const PersistentSetInstances = deriveInstances<PersistentSetHKT>({
   map: <A, B>(fa: Apply<PersistentSetHKT, [A]>, f: (a: A) => B): Apply<PersistentSetHKT, [B]> => {
     return (fa as PersistentSet<A>).map(f) as Apply<PersistentSetHKT, [B]>;
   }
-};
+});
 
-export const PersistentSetFunctor: Functor<PersistentSetHKT> = {
-  map: PersistentSetInstances.map
-};
-
-// ============================================================================
-// Part 6.5: Foldable Instances for Persistent Collections
-// ============================================================================
-
-/**
- * Foldable instance for PersistentListHKT
- */
-export const PersistentListFoldable: Foldable<PersistentListHKT> = {
-  foldr: <A,B>(fa: Apply<PersistentListHKT,[A]>, f: (a:A, b:B)=>B, z: B): B => {
-    let acc = z;
-    // Right-fold: we need to walk from the right. If list supports reverse or tail recursion, use it.
-    // Safe iterative approach: collect then loop backwards.
-    const buf: A[] = [];
-    (fa as PersistentList<A>).forEach(a => buf.push(a));
-    for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
-    return acc;
-  },
-  foldl: <A,B>(fa: Apply<PersistentListHKT,[A]>, f: (b:B, a:A)=>B, z: B): B => {
-    let acc = z;
-    (fa as PersistentList<A>).forEach(a => { acc = f(acc, a); });
-    return acc;
-  }
-};
-
-/**
- * Foldable instance for PersistentSetHKT
- */
-export const PersistentSetFoldable: Foldable<PersistentSetHKT> = {
-  foldr: <A,B>(fa: Apply<PersistentSetHKT,[A]>, f: (a:A, b:B)=>B, z:B): B => {
-    // No intrinsic order; pick insertion/iteration order.
-    // Collect then right-fold to satisfy foldr signature.
-    const buf: A[] = [];
-    (fa as PersistentSet<A>).forEach(a => buf.push(a));
-    let acc = z;
-    for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
-    return acc;
-  },
-  foldl: <A,B>(fa: Apply<PersistentSetHKT,[A]>, f: (b:B, a:A)=>B, z:B): B => {
-    let acc = z;
-    (fa as PersistentSet<A>).forEach(a => { acc = f(acc, a); });
-    return acc;
-  }
-};
-
-/**
- * Foldable instance for PersistentMapHKT (fold over values, ignore keys)
- */
-
-/**
- * Factory: Foldable instance for PersistentMap with fixed key type K
- */
-export function getPersistentMapFoldable<K>(): Foldable<ApplyLeft<PersistentMapHKT, K>> {
-  return {
-    foldr: <A, B>(fa: Apply<ApplyLeft<PersistentMapHKT, K>, [A]>, f: (a: A, b: B) => B, z: B): B => {
-      const buf: A[] = [];
-      (fa as PersistentMap<K, A>).forEach((v) => buf.push(v));
-      let acc = z;
-      for (let i = buf.length - 1; i >= 0; i--) acc = f(buf[i], acc);
-      return acc;
-    },
-    foldl: <A, B>(fa: Apply<ApplyLeft<PersistentMapHKT, K>, [A]>, f: (b: B, a: A) => B, z: B): B => {
-      let acc = z;
-      (fa as PersistentMap<K, A>).forEach((v) => { acc = f(acc, v); });
-      return acc;
-    }
-  };
-}
-
-// ============================================================================
-// Part 6.6: Traversable Instances for Persistent Collections
-// ============================================================================
-
-/**
- * Traversable instance for PersistentListHKT (Promise-based fallback for legacy interface)
- */
-export const PersistentListTraversable: Traversable<PersistentListHKT> = {
-  ...PersistentListFunctor,
-  traverse: <G extends Kind1, A, B>(
-    fa: Apply<PersistentListHKT,[A]>,
-    f: (a: A) => Apply<G,[B]>
-  ): Apply<G,[Apply<PersistentListHKT,[B]>]> => {
-    // Promise-based fallback: treat G as PromiseK at runtime
-    const ps: Promise<B>[] = [];
-    (fa as PersistentList<A>).forEach(a => {
-      ps.push((f(a) as unknown as Promise<B>));
-    });
-    return Promise.all(ps)
-      .then(bs => PersistentList.fromArray(bs)) as unknown as Apply<G,[Apply<PersistentListHKT,[B]>]>;
-  },
-};
-
-/**
- * Helper functions for sequence and traverse (legacy form)
- */
-export function sequenceList<A>(
-  xs: Apply<PersistentListHKT,[Promise<A>]>
-): Promise<Apply<PersistentListHKT,[A]>> {
-  return PersistentListTraversable.traverse(xs, (pa) => pa as any) as any;
-}
-
-export function traverseList<A, B>(
-  xs: Apply<PersistentListHKT,[A]>,
-  f: (a: A) => Promise<B>
-): Promise<Apply<PersistentListHKT,[B]>> {
-  return PersistentListTraversable.traverse(xs, f as any) as any;
-}
+export const PersistentSetFunctor = PersistentSetInstances.functor;
 
 // ============================================================================
 // Part 7: Integration with Derivable Instances
@@ -790,23 +434,15 @@ export function registerPersistentCollectionsAsHKTs(): void {
   registerDerivableInstances(SetGADT);
 }
 
-// --------------------------------------------------------------------------
-// Auto-derivation hooks for persistent typeclasses
-// --------------------------------------------------------------------------
-
 /**
- * Register persistent typeclass instances for derivation
+ * Auto-register all persistent collections as HKTs
  */
-export function registerPersistentTypeclasses() {
-  deriveInstances({
-    functor: { for: 'PersistentListHKT', map: PersistentListFunctor.map },
-    applicative: { for: 'PersistentListHKT', of: PersistentListApplicative.of, ap: PersistentListApplicative.ap },
-    monad: { for: 'PersistentListHKT', of: PersistentListMonad.of, ap: PersistentListMonad.ap, chain: PersistentListMonad.chain },
-    functor2: { for: 'PersistentMapHKT', map: PersistentMapInstances.map },
-    bifunctor: { for: 'PersistentMapHKT', bimap: PersistentMapInstances.bimap },
-    functor1: { for: 'PersistentSetHKT', map: PersistentSetFunctor.map },
-    // Add more as needed
-  });
+export function autoRegisterPersistentCollectionsAsHKTs(): void {
+  // Register existing persistent collections
+  autoRegisterPersistentCollections();
+  
+  // Register as HKTs
+  registerPersistentCollectionsAsHKTs();
 }
 
 // ============================================================================
@@ -820,7 +456,7 @@ export function mapList<A, B>(
   fa: Apply<PersistentListHKT, [A]>,
   f: (a: A) => B
 ): Apply<PersistentListHKT, [B]> {
-  return mapLast1(PersistentListFunctor)(fa, f);
+  return map(PersistentListFunctor, fa, f);
 }
 
 /**
@@ -830,7 +466,7 @@ export function chainList<A, B>(
   fa: Apply<PersistentListHKT, [A]>,
   f: (a: A) => Apply<PersistentListHKT, [B]>
 ): Apply<PersistentListHKT, [B]> {
-  return PersistentListMonad.chain(fa, f);
+  return chain(PersistentListMonad, fa, f);
 }
 
 /**
@@ -840,14 +476,14 @@ export function apList<A, B>(
   fab: Apply<PersistentListHKT, [(a: A) => B]>,
   fa: Apply<PersistentListHKT, [A]>
 ): Apply<PersistentListHKT, [B]> {
-  return PersistentListApplicative.ap(fab, fa);
+  return ap(PersistentListApplicative, fab, fa);
 }
 
 /**
  * Type-safe of operation for PersistentListHKT
  */
 export function ofList<A>(a: A): Apply<PersistentListHKT, [A]> {
-  return PersistentListApplicative.of(a);
+  return of(PersistentListApplicative, a);
 }
 
 /**
@@ -857,7 +493,7 @@ export function mapMap<K, A, B>(
   fa: Apply<PersistentMapHKT, [K, A]>,
   f: (a: A) => B
 ): Apply<PersistentMapHKT, [K, B]> {
-  return mapLast2(PersistentMapBifunctor)(fa, f);
+  return map(PersistentMapFunctor, fa, f);
 }
 
 /**
@@ -878,7 +514,7 @@ export function mapSet<A, B>(
   fa: Apply<PersistentSetHKT, [A]>,
   f: (a: A) => B
 ): Apply<PersistentSetHKT, [B]> {
-  return mapLast1(PersistentSetFunctor)(fa, f);
+  return map(PersistentSetFunctor, fa, f);
 }
 
 // ============================================================================
@@ -927,70 +563,6 @@ export function matchSetTypeSafe<A, R>(
 // ============================================================================
 // Part 10: Utility Functions for Common Operations
 // ============================================================================
-
-// --- Collect/partition helpers for Maybe/Either/Result ---
-
-export const collectMaybes = <A>(pl: PersistentList<Maybe<A>>): PersistentList<A> =>
-  pl.reduce(
-    (acc, m) => m && typeof m === 'object' && 'tag' in m && m.tag === 'Just' ? acc.prepend((m as any).value as A) : acc,
-    PersistentList.empty<A>()
-  ).reverse();
-
-export const partitionEithers = <L, R>(pl: PersistentList<Either<L, R>>): { lefts: PersistentList<L>, rights: PersistentList<R> } => {
-  let lefts = PersistentList.empty<L>();
-  let rights = PersistentList.empty<R>();
-  pl.forEach(e => {
-    if (typeof e === 'object' && e !== null && 'tag' in e) {
-      if (e.tag === 'Left' && 'left' in e) {
-        lefts = lefts.prepend((e as any).left as L);
-      } else if (e.tag === 'Right' && 'right' in e) {
-        rights = rights.prepend((e as any).right as R);
-      }
-    }
-  });
-  return { lefts: lefts.reverse(), rights: rights.reverse() };
-};
-
-export const sequenceResult = <A, E>(pl: PersistentList<Result<A, E>>): Result<PersistentList<A>, E> => {
-  let acc = PersistentList.empty<A>();
-  for (const r of pl) {
-    if (typeof r === 'object' && r !== null && 'tag' in r) {
-      if (r.tag === 'Err' && 'error' in r) {
-        return r;
-      } else if (r.tag === 'Ok' && 'value' in r) {
-        acc = acc.prepend((r as any).value as A);
-      }
-    }
-  }
-  // If Result is a GADT, return with payload
-  return { tag: 'Ok', payload: { value: acc.reverse() } } as Result<PersistentList<A>, E>;
-};
-
-// --- zip/zipWith for lists/sets ---
-export const zipWith = <A, B, C>(as: PersistentList<A>, bs: PersistentList<B>, f: (a: A, b: B) => C): PersistentList<C> => {
-  const arrA = as.toArray();
-  const arrB = bs.toArray();
-  const len = Math.min(arrA.length, arrB.length);
-  const out: C[] = [];
-  for (let i = 0; i < len; i++) out.push(f(arrA[i], arrB[i]));
-  return PersistentList.fromArray(out);
-};
-export const zip = <A, B>(as: PersistentList<A>, bs: PersistentList<B>): PersistentList<[A, B]> => zipWith(as, bs, (a, b) => [a, b]);
-
-// --- toJSON/fromJSON for persistent structures ---
-export const toJSON = <A>(pl: PersistentList<A>): string => JSON.stringify(pl.toArray());
-export const fromJSON = <A>(json: string): PersistentList<A> => PersistentList.fromArray(JSON.parse(json));
-
-// --- Law helpers (Foldable/Traversable parametricity smoke tests) ---
-export function foldableLaw_identity<A>(pl: PersistentList<A>): boolean {
-  const arr = pl.toArray();
-  return arr.join(',') === pl.foldl('', (acc, a) => acc ? acc + ',' + a : '' + a);
-}
-export function traversableLaw_identity<A>(pl: PersistentList<A>): Promise<boolean> {
-  return Promise.resolve(pl.toArray()).then(arr =>
-    JSON.stringify(arr) === JSON.stringify(pl.toArray())
-  );
-}
 
 /**
  * Sum all elements in a ListGADT
@@ -1069,178 +641,50 @@ export function filterListGADT<A>(gadt: ListGADT<A>, predicate: (a: A) => boolea
  * Ensure immutability branding is preserved
  */
 export function preserveImmutability<T>(value: T): T {
-  if (isPersistentCollection(value) && value && typeof value === 'object') {
-    for (const sym of [PERSISTENT_BRAND, IMMUTABLE_BRAND]) {
-      if (!(sym in (value as any))) {
-        Object.defineProperty(value as any, sym, { value: true, enumerable: false });
-      }
+  if (isPersistentCollection(value)) {
+    // Add branding if not present
+    if (value && typeof value === 'object') {
+      (value as any)[PERSISTENT_BRAND] = true;
+      (value as any)[IMMUTABLE_BRAND] = true;
     }
   }
   return value;
 }
 
-// --------------------------------------------------------------------------
-// Zero-copy immutable array bridges and guards
-// --------------------------------------------------------------------------
-
-/**
- * Convert PersistentList<A> to Immutable<readonly A[]> (zero-copy if possible)
- */
-export const toImmutableArray = <A>(pl: PersistentList<A>): Immutable<readonly A[]> => {
-  // If immutableArray expects Immutable<A>[], map if needed, else just cast
-  // Here, we assume A is already immutable or primitive
-  return immutableArray(pl.toArray() as any);
-};
-
-/**
- * Convert Immutable<readonly A[]> to PersistentList<A>
- * Throws if input is not immutable; copy-on-write fallback if needed
- */
-export const fromImmutableArray = <A>(ia: Immutable<readonly A[]>): PersistentList<A> => {
-  if (!isImmutableCollection(ia)) {
-    throw new Error('Input is not an Immutable<readonly A[]>');
-  }
-  // Defensive: ensure array is not mutated
-  return PersistentList.fromArray(ia as readonly A[]);
-};
-
-/**
- * Guard: Asserts input is an Immutable<readonly A[]>
- */
-export function assertImmutableArray<A>(ia: any): asserts ia is Immutable<readonly A[]> {
-  if (!isImmutableCollection(ia)) {
-    throw new Error('Expected Immutable<readonly A[]>');
-  }
-}
-
 // ============================================================================
-// Part 11.5: Deterministic Equality Helpers
+// Part 11: Derived Instances for Persistent Collections
 // ============================================================================
 
 /**
- * Deterministic equality for PersistentList
+ * Derived instances for PersistentListHKT
  */
-export function equalsList<A>(
-  x: PersistentList<A>, 
-  y: PersistentList<A>, 
-  eqA: (a: A, b: A) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)
-): boolean {
-  const ax: A[] = []; 
-  x.forEach(a => ax.push(a));
-  const ay: A[] = []; 
-  y.forEach(a => ay.push(a));
-  if (ax.length !== ay.length) return false;
-  for (let i = 0; i < ax.length; i++) {
-    if (!eqA(ax[i], ay[i])) return false;
-  }
-  return true;
-}
+export const PersistentListHKTEq = deriveEqInstance({ kind: PersistentListHKT });
+export const PersistentListHKTOrd = deriveOrdInstance({ kind: PersistentListHKT });
+export const PersistentListHKTShow = deriveShowInstance({ kind: PersistentListHKT });
 
 /**
- * Deterministic equality for PersistentSet (compare sorted arrays)
+ * Derived instances for PersistentMapHKT
  */
-export function equalsSet<A>(
-  x: PersistentSet<A>, 
-  y: PersistentSet<A>, 
-  eqA: (a: A, b: A) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)
-): boolean {
-  const ax: A[] = []; 
-  x.forEach(a => ax.push(a));
-  const ay: A[] = []; 
-  y.forEach(a => ay.push(a));
-  const sx = ax.map(a => JSON.stringify(a)).sort();
-  const sy = ay.map(a => JSON.stringify(a)).sort();
-  if (sx.length !== sy.length) return false;
-  for (let i = 0; i < sx.length; i++) {
-    if (sx[i] !== sy[i]) return false;
-  }
-  return true;
-}
+export const PersistentMapHKTEq = deriveEqInstance({ kind: PersistentMapHKT });
+export const PersistentMapHKTOrd = deriveOrdInstance({ kind: PersistentMapHKT });
+export const PersistentMapHKTShow = deriveShowInstance({ kind: PersistentMapHKT });
 
 /**
- * Deterministic equality for PersistentMap (sort entries by stable string key)
+ * Derived instances for PersistentSetHKT
  */
-export function equalsMap<K, V>(
-  x: PersistentMap<K, V>,
-  y: PersistentMap<K, V>,
-  eqK: (k1: K, k2: K) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b),
-  eqV: (v1: V, v2: V) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)
-): boolean {
-  const ex: Array<[K, V]> = []; 
-  x.forEach((v, k) => ex.push([k, v]));
-  const ey: Array<[K, V]> = []; 
-  y.forEach((v, k) => ey.push([k, v]));
-  if (ex.length !== ey.length) return false;
-  // naive O(n^2) match – fine for demos
-  const used = new Set<number>();
-  for (const [kx, vx] of ex) {
-    let found = false;
-    for (let i = 0; i < ey.length; i++) {
-      if (used.has(i)) continue;
-      const [ky, vy] = ey[i];
-      if (eqK(kx, ky) && eqV(vx, vy)) { 
-        used.add(i); 
-        found = true; 
-        break; 
-      }
-    }
-    if (!found) return false;
-  }
-  return true;
-}
-
-// ============================================================================
-// Part 11.6: Round-Trip Laws and Checks
-// ============================================================================
+export const PersistentSetHKTEq = deriveEqInstance({ kind: PersistentSetHKT });
+export const PersistentSetHKTOrd = deriveOrdInstance({ kind: PersistentSetHKT });
+export const PersistentSetHKTShow = deriveShowInstance({ kind: PersistentSetHKT });
 
 /**
- * Check round-trip laws for List ↔ GADT conversion (both directions safe)
+ * Type-safe operation that preserves immutability
  */
-export function checkListRoundtripBothWays<A>(
-  xs: PersistentList<A>, 
-  eqA?: (a: A, b: A) => boolean
-) {
-  const g = listToGADT(xs);
-  const back = gadtToList(g);
-  const toGADT_toList = equalsList(xs, back, eqA);
-
-  // For gadt -> list -> gadt, compare tag + (head,tail) structure
-  const g2 = listToGADT(gadtToList(g));
-  const same =
-    g.tag === g2.tag &&
-    (g.tag === 'Nil' ||
-      (JSON.stringify(g.payload.head) === JSON.stringify((g2 as any).payload.head) &&
-       equalsList(g.payload.tail, (g2 as any).payload.tail, eqA)));
-  const toList_toGADT = same;
-
-  return { toGADT_toList, toList_toGADT };
-}
-
-/**
- * Check round-trip law for Map → GADT → Map (safe direction)
- * Skip GADT → Map → GADT because "first entry" choice is iteration-order dependent
- */
-export function checkMapRoundtripMapFirst<K, V>(
-  m: PersistentMap<K, V>, 
-  eqK?: (k1: K, k2: K) => boolean, 
-  eqV?: (v1: V, v2: V) => boolean
-): boolean {
-  const g = mapToGADT(m);
-  const back = gadtToMap(g);
-  return equalsMap(m, back, eqK, eqV);
-}
-
-/**
- * Check round-trip law for Set → GADT → Set (safe direction)
- * Skip GADT → Set → GADT because "first element" choice is iteration-order dependent
- */
-export function checkSetRoundtripSetFirst<A>(
-  s: PersistentSet<A>, 
-  eqA?: (a: A, b: A) => boolean
-): boolean {
-  const g = setToGADT(s);
-  const back = gadtToSet(g);
-  return equalsSet(s, back, eqA);
+export function safeOperation<A, B>(
+  operation: (a: A) => B,
+  value: A
+): B {
+  const result = operation(value);
+  return preserveImmutability(result);
 }
 
 // ============================================================================
@@ -1269,4 +713,31 @@ export function checkSetRoundtripSetFirst<A>(
  * 2. GADT Law: ListGADT<A> provides correct type narrowing
  * 3. Safety Law: All operations maintain type safety
  * 4. Branding Law: Immutability branding is preserved
- */
+ */ 
+export function registerPersistentListHKTDerivations(): void {
+  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
+    const registry = (globalThis as any).__FP_REGISTRY;
+    registry.register('PersistentListHKTEq', PersistentListHKTEq);
+    registry.register('PersistentListHKTOrd', PersistentListHKTOrd);
+    registry.register('PersistentListHKTShow', PersistentListHKTShow);
+  }
+}
+registerPersistentListHKTDerivations();
+export function registerPersistentMapHKTDerivations(): void {
+  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
+    const registry = (globalThis as any).__FP_REGISTRY;
+    registry.register('PersistentMapHKTEq', PersistentMapHKTEq);
+    registry.register('PersistentMapHKTOrd', PersistentMapHKTOrd);
+    registry.register('PersistentMapHKTShow', PersistentMapHKTShow);
+  }
+}
+registerPersistentMapHKTDerivations();
+export function registerPersistentSetHKTDerivations(): void {
+  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
+    const registry = (globalThis as any).__FP_REGISTRY;
+    registry.register('PersistentSetHKTEq', PersistentSetHKTEq);
+    registry.register('PersistentSetHKTOrd', PersistentSetHKTOrd);
+    registry.register('PersistentSetHKTShow', PersistentSetHKTShow);
+  }
+}
+registerPersistentSetHKTDerivations();
