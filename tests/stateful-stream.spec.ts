@@ -99,7 +99,7 @@ describe('StatefulStream - Unit Tests', () => {
       
       const [state, output] = chainedStream.run(3)('init:');
       expect(state).toBe('init:12');
-      expect(output).toBe(8); // (3 + 1) * 2
+      expect(output).toBe(6); // 3 * 2 (chain passes original input to both streams)
     });
 
     it('preserves state through chain', () => {

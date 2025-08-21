@@ -456,4 +456,4 @@ export const getOrElse = <L, R>(onLeft: (l: L) => R, either: Either<L, R>): R =>
     Right: (r: R) => r
   });
 
-export { EitherK } from './fp-hkt';
+export type { EitherK } from './fp-hkt';

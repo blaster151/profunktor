@@ -14,8 +14,7 @@ import {
   RequireCovariantLast
 } from './fp-hkt';
 
-// Local no-op purity marker to satisfy references in examples
-declare function attachPurityMarker<T>(obj: T, marker: string): void;
+import { attachPurityMarker } from './fp-purity';
 
 // ============================================================================
 // Core Typeclass Definitions

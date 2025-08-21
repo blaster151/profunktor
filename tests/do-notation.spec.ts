@@ -95,7 +95,9 @@ describe('Do Notation Integration Tests', () => {
       const marked = markDoMResult(pureResult, 'Pure');
       expect(marked).toBeDefined();
       
-      const effect = inferEffect(pureResult as any);
+      // inferEffect expects a monadic value, not a plain number
+      // For a plain number, it should return 'Pure' by default
+      const effect = inferEffect(MaybeGADT.Just(pureResult) as any);
       expect(effect).toBe('Pure');
     });
   });

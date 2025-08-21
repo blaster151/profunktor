@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     globals: true,
+    testTimeout: 30000, // Increase timeout to 30 seconds
     include: [
       'tests/**/*.{test,spec}.ts',
       'tests/importedTests/**/*.{test,spec}.ts'

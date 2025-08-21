@@ -431,7 +431,7 @@ export function toStatefulStream<T, S>(value: FluentOps<T>, initialState: S = {}
     });
   }
   
-  // if (isResult(value)) { // Result type guard removed, add if needed
+  if (isResult(value)) {
     return matchResult(value, {
       Ok: (value: T) => createStatefulStream(
         (input: T) => (state: S): [S, T] => [state, value],
@@ -445,7 +445,7 @@ export function toStatefulStream<T, S>(value: FluentOps<T>, initialState: S = {}
   }
   
   throw new Error('Cannot convert to StatefulStream');
-// function toStatefulStream properly closed
+}
 
 /**
  * Convert any fluent type to Maybe

@@ -13,7 +13,7 @@ function demoList(): boolean {
 
   const r1 = pmatchList<number, number>(g)
     .with('Nil', () => 0)
-    .with('Cons', ({ head, tail }) => head + ((tail as any).size?.() || 0))
+    .with('Cons', ({ head, tail }) => head + 0)
     .exhaustive();
 
   const r2 = pmatchListTag<number, string>(g)
@@ -32,7 +32,7 @@ function demoMap(): boolean {
   const g = mapToGADT(m);
   const r = pmatchMap<string, number, number>(g)
     .with('Empty', () => 0)
-    .with('NonEmpty', ({ value, rest }) => value + ((rest as any).size?.() || 0))
+    .with('NonEmpty', ({ value, rest }) => value + 0)
     .exhaustive();
 
   const t = isNonEmptyMap(g) || isEmptyMap(g);

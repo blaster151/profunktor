@@ -21,8 +21,8 @@ import {
   Phantom, KindWithPhantom
 } from './fp-hkt';
 
+import type { EffectTag } from './fp-purity';
 import {
-  EffectTag, EffectOf, Pure, IO, Async,
   createPurityInfo, attachPurityMarker, extractPurityMarker
 } from './fp-purity';
 

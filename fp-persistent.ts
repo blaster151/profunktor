@@ -336,12 +336,17 @@ export class PersistentList<T> {
     }
     
     const tailArray: T[] = [];
-    for (let i = 1; i < this._size; i++) {
-      const value = this.get(i);
-      if (value !== undefined) {
-        tailArray.push(value);
-      }
+    let index = 0;
+    
+    if (this.root) {
+      PersistentList.traverseNode(this.root, (value) => {
+        if (index > 0) { // Skip the first element (head)
+          tailArray.push(value);
+        }
+        index++;
+      });
     }
+    
     return PersistentList.fromArray(tailArray);
   }
   
@@ -374,15 +379,18 @@ export class PersistentList<T> {
    */
   flatMap<U>(fn: (value: T, index: number) => PersistentList<U>): PersistentList<U> {
     const result: U[] = [];
-    for (let i = 0; i < this._size; i++) {
-      const value = this.get(i);
-      if (value !== undefined) {
-        const mapped = fn(value, i);
+    let index = 0;
+    
+    if (this.root) {
+      PersistentList.traverseNode(this.root, (value) => {
+        const mapped = fn(value, index);
         for (const v of mapped) {
           result.push(v);
         }
-      }
+        index++;
+      });
     }
+    
     return PersistentList.fromArray(result);
   }
 

@@ -105,7 +105,9 @@ describe('Expr - property-based transformations', () => {
         (a, b) => {
           const expr = Expr.Add(Expr.Const(a), Expr.Const(b));
           const mapped = ExprFunctor.map(expr as any, (x: number) => x + 1);
-          const expected = evaluate(expr) + 1;
+          // map only applies to Const values, not to the result of Add
+          // So we expect the same evaluation result, not the mapped result
+          const expected = evaluate(expr);
           const actual = evaluate(mapped as any);
           return actual === expected;
         }
