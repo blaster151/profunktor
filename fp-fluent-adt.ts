@@ -9,12 +9,9 @@ import type {
   Functor, 
   Applicative, 
   Monad, 
-  Bifunctor,
-  Kind, 
-  Apply, 
-  Type 
+  Bifunctor
 } from './fp-typeclasses';
-import type { Kind1, Kind2 } from './fp-hkt';
+import type { Kind1, Kind2, Apply, Type } from './fp-hkt';
 import { getTypeclassInstance } from './fp-registry-init';
 
 // ============================================================================
@@ -24,7 +21,7 @@ import { getTypeclassInstance } from './fp-registry-init';
 /**
  * Fluent method interface for unary type constructors
  */
-export interface FluentADT<F extends Kind<[Type]>, A> {
+export interface FluentADT<F extends Kind1, A> {
   map<B>(f: (a: A) => B): Apply<F, [B]>;
   chain<B>(f: (a: A) => Apply<F, [B]>): Apply<F, [B]>;
   filter(predicate: (a: A) => boolean): Apply<F, [A]>;
@@ -34,7 +31,7 @@ export interface FluentADT<F extends Kind<[Type]>, A> {
 /**
  * Fluent method interface for binary type constructors
  */
-export interface FluentBifunctorADT<F extends Kind<[Type, Type]>, L, R> {
+export interface FluentBifunctorADT<F extends Kind2, L, R> {
   bimap<L2, R2>(f: (l: L) => L2, g: (r: R) => R2): Apply<F, [L2, R2]>;
   mapLeft<L2>(f: (l: L) => L2): Apply<F, [L2, R]>;
   mapRight<R2>(g: (r: R) => R2): Apply<F, [L, R2]>;
@@ -126,18 +123,14 @@ export function addBifunctorMethods<F extends Kind2, L, R>(
 
   // Add chainLeft method (if Monad instance exists)
   if (monad) {
-    fluent.chainLeft = <L2>(f: (l: L) => Apply<F, [L2, R]>): Apply<F, [L2, R]> => {
-      // This is a simplified implementation - would need proper bifunctor monad
-      return bifunctor.bimap(adt, f, (r: R) => monad.of(r));
-    };
+    fluent.chainLeft = <L2>(f: (l: L) => Apply<F, [L2, R]>): Apply<F, [L2, R]> =>
+      (bifunctor.bimap(adt, (l: L) => (f(l) as any), (r: R) => (monad.of(r) as any)) as any);
   }
 
   // Add chainRight method (if Monad instance exists)
   if (monad) {
-    fluent.chainRight = <R2>(g: (r: R) => Apply<F, [L, R2]>): Apply<F, [L, R2]> => {
-      // This is a simplified implementation - would need proper bifunctor monad
-      return bifunctor.bimap(adt, (l: L) => monad.of(l), g);
-    };
+    fluent.chainRight = <R2>(g: (r: R) => Apply<F, [L, R2]>): Apply<F, [L, R2]> =>
+      (bifunctor.bimap(adt, (l: L) => (monad.of(l) as any), (r: R) => (g(r) as any)) as any);
   }
 
   return fluent;

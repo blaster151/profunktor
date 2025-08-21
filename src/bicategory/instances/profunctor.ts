@@ -1,7 +1,7 @@
 // Concrete P instance: minimal profunctor-like with id/compose supplied by caller
 // This serves as a ready-made hook to plug your existing profunctor dictionary.
 
-import { Kind2, Apply } from '../../../fp-hkt';
+import { Kind2, Apply } from 'fp-hkt';
 import { makeProfunctorBicategory, withMonoidal, NatP } from '../profunctor-bicategory';
 
 export function fromProfunctor<P extends Kind2>(ops: {
@@ -29,7 +29,9 @@ export function fromProfunctor<P extends Kind2>(ops: {
         (p: Apply<P, [[A1,A2],[B1,B2]]>) => {
           // Compose alpha/beta componentwise on product endpoints
           // Apply alpha to first component and beta to second component
-          return beta(alpha(p as any)) as any;
+          const first  = (alpha as any)(p as any) as Apply<P, [[A1,A2],[B1,B2]]>;
+          const second = (beta  as any)(first as any) as Apply<P, [[A1,A2],[B1,B2]]>;
+          return second as any;
         }
     });
   }

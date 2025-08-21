@@ -125,7 +125,8 @@ export class StatefulStream<I, S, O> {
 			let state = initialState as S;
 			try {
 				for (const input of Array.from(inputs as any)) {
-					const [s2, out] = this.run(input)(state as any);
+					const runInput: (i: I) => StateFn<S, O> = this.run;
+					const [s2, out] = runInput(input as I)(state as S);
 					state = s2;
 					observer.next(out);
 				}
@@ -143,9 +144,10 @@ export class StatefulStream<I, S, O> {
 			let state = initialState as S;
 			(async () => {
 				try {
-					for await (const input of inputs) {
+					for await (const input of inputs as any) {
 						if (cancelled) break;
-						const [s2, out] = this.run(input)(state as any);
+						const runInput: (i: I) => StateFn<S, O> = this.run;
+						const [s2, out] = runInput(input as I)(state as S);
 						state = s2;
 						observer.next(out);
 					}
@@ -167,8 +169,9 @@ export class StatefulStream<I, S, O> {
   map<B>(f: (a: O) => B): StatefulStream<I, S, B> {
     const purity: EffectTag = this.__purity === 'Pure' ? 'Pure' : 'State';
     return new StatefulStream<I, S, B>((input) => (state) => {
-      const [s2, a] = this.run(input)(state);
-      return [s2, f(a)];
+      const runInput: (i: I) => StateFn<S, O> = this.run;
+      const [s2, o] = runInput(input as I)(state);
+      return [s2, f(o)];
     }, purity);
   }
 
@@ -176,8 +179,10 @@ export class StatefulStream<I, S, O> {
   ap<A, B>(this: StatefulStream<I, S, (a: A) => B>, other: StatefulStream<I, S, A>): StatefulStream<I, S, B> {
     const purity: EffectTag = (this.__purity === 'Pure' && other.__purity === 'Pure') ? 'Pure' : 'State';
     return new StatefulStream<I, S, B>((input) => (state) => {
-      const [s1, f] = this.run(input)(state);
-      const [s2, a] = other.run(input)(s1);
+      const runLeft: (i: I) => StateFn<S, (a: A) => B> = this.run as any;
+      const runRight: (i: I) => StateFn<S, A> = other.run as any;
+      const [s1, f] = runLeft(input)(state);
+      const [s2, a] = runRight(input)(s1);
       return [s2, f(a)];
     }, purity);
   }
@@ -185,8 +190,10 @@ export class StatefulStream<I, S, O> {
   // Monad
   chain<B>(f: (a: O) => StatefulStream<I, S, B>): StatefulStream<I, S, B> {
     return new StatefulStream<I, S, B>((input) => (state) => {
-      const [s2, a] = this.run(input)(state);
-      return f(a).run(input)(s2);
+      const runInput: (i: I) => StateFn<S, O> = this.run;
+      const [s2, a] = runInput(input as I)(state);
+      const runNext: (i: I) => StateFn<S, B> = f(a).run as any;
+      return runNext(input)(s2);
     }, 'State');
   }
 
@@ -280,7 +287,8 @@ export function compose<S, A, B, C>(
 ): StatefulStream<A, S, C> {
   return createStatefulStream(
     (input) => (state) => {
-      const [s1, b] = f.run(input)(state);
+      const runF: (i: A) => StateFn<S, B> = f.run as any;
+      const [s1, b] = runF(input)(state);
       return g.run(b)(s1);
     },
     f.__purity === 'Pure' && g.__purity === 'Pure' ? 'Pure' : 'State'
@@ -314,8 +322,10 @@ export function fanOut<S, A, B, C>(
 ): StatefulStream<A, S, [B, C]> {
   return createStatefulStream(
     (input) => (state) => {
-      const [s1, b] = f.run(input)(state);
-      const [s2, c] = g.run(input)(s1);
+      const runF: (i: A) => StateFn<S, B> = f.run as any;
+      const runG: (i: A) => StateFn<S, C> = g.run as any;
+      const [s1, b] = runF(input)(state);
+      const [s2, c] = runG(input)(s1);
       return [s2, [b, c]];
     },
     f.__purity === 'Pure' && g.__purity === 'Pure' ? 'Pure' : 'State'
@@ -351,7 +361,8 @@ export const StatefulStreamFunctor = {
   ): StatefulStream<I, S, B> => {
     return createStatefulStream(
       (input) => (state) => {
-        const [s2, a] = fa.run(input)(state);
+        const runFA: (i: I) => StateFn<S, A> = fa.run as any;
+        const [s2, a] = runFA(input)(state);
         return [s2, f(a)];
       },
       fa.__purity === 'Pure' ? 'Pure' : 'State'
@@ -372,8 +383,10 @@ export const StatefulStreamApplicative = {
   ): StatefulStream<I, S, B> => {
     return createStatefulStream(
       (input) => (state) => {
-        const [s1, f] = ff.run(input)(state);
-        const [s2, a] = fa.run(input)(s1);
+        const runFF: (i: I) => StateFn<S, (a: A) => B> = ff.run as any;
+        const runFA: (i: I) => StateFn<S, A> = fa.run as any;
+        const [s1, f] = runFF(input)(state);
+        const [s2, a] = runFA(input)(s1);
         return [s2, f(a)];
       },
       ff.__purity === 'Pure' && fa.__purity === 'Pure' ? 'Pure' : 'State'
@@ -389,8 +402,10 @@ export const StatefulStreamMonad = {
   ): StatefulStream<I, S, B> => {
     return createStatefulStream(
       (input) => (state) => {
-        const [s2, a] = fa.run(input)(state);
-        return f(a).run(input)(s2);
+        const runFA: (i: I) => StateFn<S, A> = fa.run as any;
+        const [s2, a] = runFA(input)(state);
+        const runFB: (i: I) => StateFn<S, B> = f(a).run as any;
+        return runFB(input)(s2);
       },
       'State'
     );
@@ -405,7 +420,8 @@ export const StatefulStreamProfunctor = {
   ): StatefulStream<I2, S, O2> => {
     return createStatefulStream(
       (input2) => (state) => {
-        const [s2, o] = p.run(f(input2))(state);
+        const runP: (i: I) => StateFn<S, O> = p.run as any;
+        const [s2, o] = runP(f(input2))(state);
         return [s2, g(o)];
       },
       p.__purity
@@ -448,7 +464,8 @@ export function focusState<S, N, F>(
 			const focusedState = (optic as any).get ? (optic as any).get(state) : (state as unknown as F);
       
       // Run stream on focused state
-      const [focusedState2, output] = sf.run(input)(focusedState as any);
+      const runSF = sf.run as (i: any) => StateFn<any, any>;
+      const [focusedState2, output] = runSF(input)(focusedState as any);
       
 			// Update original state with focused state
 			const newState = (optic as any).set ? (optic as any).set(focusedState2, state) : state;
@@ -467,7 +484,8 @@ export function focusOutput<O, F>(
 ): <I, S>(sf: StatefulStream<I, S, O>) => StatefulStream<I, S, F> {
   return (sf) => createStatefulStream(
     (input) => (state) => {
-      const [s2, output] = sf.run(input)(state);
+      const runSF = sf.run as (i: any) => StateFn<any, any>;
+      const [s2, output] = runSF(input)(state);
       
 			// Extract focused output (lens/optional only in lite build)
 			const focusedOutput = (optic as any).get ? (optic as any).get(output) : (output as unknown as F);
@@ -504,7 +522,8 @@ export function runStatefulStream<I, S, O>(
   input: I,
   initialState: S
 ): [S, O] {
-  return stream.run(input)(initialState);
+  const runInput: (i: I) => StateFn<S, O> = stream.run;
+  return runInput(input)(initialState);
 }
 
 /**
@@ -518,8 +537,9 @@ export function runStatefulStreamList<I, S, O>(
   let state = initialState;
   const outputs: O[] = [];
   
-  for (const input of Array.from(inputs as any)) {
-    const [newState, output] = stream.run(input)(state);
+  for (const input of inputs) {
+    const runInput: (i: I) => StateFn<S, O> = stream.run;
+    const [newState, output] = runInput(input as I)(state);
     state = newState;
     outputs.push(output);
   }

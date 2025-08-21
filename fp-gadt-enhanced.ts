@@ -58,10 +58,10 @@ export type PatternCase<T, Tag extends string, R> = (payload: GADTPayload<T, Tag
  * Pattern matching builder interface
  */
 export interface PatternMatcherBuilder<T, R> {
-  with<Tag extends GADTTags<T>>(
+  with<Tag extends GADTTags<T>, R2>(
     tag: Tag,
-    handler: PatternCase<T, Tag, R>
-  ): PatternMatcherBuilder<T, R>;
+    handler: PatternCase<T, Tag, R2>
+  ): PatternMatcherBuilder<T, R | R2>;
   
   partial(): R | undefined;
   exhaustive(): R;
@@ -80,44 +80,44 @@ interface PatternMatcherState<T, R> {
  * Fluent pattern matching DSL
  * Provides type-safe, ergonomic pattern matching with exhaustiveness checks
  */
-export function pmatch<T extends GADT<string, any>, R>(
+export function pmatch<T extends GADT<string, any>>(
   gadt: T
-): PatternMatcherBuilder<T, R> {
-  const state: PatternMatcherState<T, R> = {
+): PatternMatcherBuilder<T, never> {
+  const state: PatternMatcherState<T, unknown> = {
     cases: new Map(),
     gadt,
     isPartial: false
   };
 
-  const builder: PatternMatcherBuilder<T, R> = {
-    with<Tag extends GADTTags<T>>(
+  const builder: PatternMatcherBuilder<T, any> = {
+    with<Tag extends GADTTags<T>, R2>(
       tag: Tag,
-      handler: PatternCase<T, Tag, R>
-    ): PatternMatcherBuilder<T, R> {
-      state.cases.set(tag, handler as (payload: unknown) => R);
-      return builder;
+      handler: PatternCase<T, Tag, R2>
+    ): PatternMatcherBuilder<T, any> {
+      state.cases.set(tag, handler as (payload: unknown) => any);
+      return builder as PatternMatcherBuilder<T, any>;
     },
 
-    partial(): R | undefined {
+    partial(): any {
       state.isPartial = true;
-      const handler = state.cases.get(state.gadt.tag);
+      const handler = state.cases.get((state.gadt as any).tag);
       if (!handler) {
         return undefined;
       }
-      return handler(state.gadt.payload);
+      return (handler as (payload: unknown) => any)((state.gadt as any).payload);
     },
 
-    exhaustive(): R {
-      const handler = state.cases.get(state.gadt.tag);
+    exhaustive(): any {
+      const handler = state.cases.get((state.gadt as any).tag);
       if (!handler) {
         // This should never happen if all cases are handled
-        throw new Error(`Unhandled case: ${state.gadt.tag}`);
+        throw new Error(`Unhandled case: ${(state.gadt as any).tag}`);
       }
-      return handler(state.gadt.payload as any) as R;
+      return (handler as (payload: unknown) => any)((state.gadt as any).payload);
     }
   };
 
-  return builder;
+  return builder as PatternMatcherBuilder<T, never>;
 }
 
 // ============================================================================
@@ -153,40 +153,40 @@ export function createPmatchBuilder<T extends GADT<string, any>, R>(
   cases: Partial<DerivablePatternMatch<T, R>>
 ) {
   return function(gadt: T): PatternMatcherBuilder<T, R> {
-    const state: PatternMatcherState<T, R> = {
-      cases: new Map(Object.entries(cases)),
+    const state: PatternMatcherState<T, any> = {
+      cases: new Map(Object.entries(cases as Record<string, (p: unknown) => R>)),
       gadt,
       isPartial: false
     };
 
-    const builder: PatternMatcherBuilder<T, R> = {
-      with<Tag extends GADTTags<T>>(
+    const builder: PatternMatcherBuilder<T, any> = {
+      with<Tag extends GADTTags<T>, R2>(
         tag: Tag,
-        handler: PatternCase<T, Tag, R>
-      ): PatternMatcherBuilder<T, R> {
-        state.cases.set(tag, handler as (payload: unknown) => R);
-        return builder;
+        handler: PatternCase<T, Tag, R2>
+      ): PatternMatcherBuilder<T, any> {
+        state.cases.set(tag, handler as (payload: unknown) => any);
+        return builder as PatternMatcherBuilder<T, any>;
       },
 
-      partial(): R | undefined {
+      partial(): any {
         state.isPartial = true;
-        const handler = state.cases.get(state.gadt.tag);
+        const handler = state.cases.get((state.gadt as any).tag);
         if (!handler) {
           return undefined;
         }
-        return handler(state.gadt.payload);
+        return (handler as (payload: unknown) => any)((state.gadt as any).payload);
       },
 
-      exhaustive(): R {
-        const handler = state.cases.get(state.gadt.tag);
+      exhaustive(): any {
+        const handler = state.cases.get((state.gadt as any).tag);
         if (!handler) {
-          throw new Error(`Unhandled case: ${state.gadt.tag}`);
+          throw new Error(`Unhandled case: ${(state.gadt as any).tag}`);
         }
-        return handler(state.gadt.payload as any) as R;
+        return (handler as (payload: unknown) => any)((state.gadt as any).payload);
       }
     };
 
-    return builder;
+    return builder as PatternMatcherBuilder<T, R>;
   };
 }
 
@@ -417,11 +417,11 @@ export const ResultFunctor: Functor<ResultK> = {
 export const ExprFunctor: Functor<ExprK> = {
   map: <A, B>(fa: Expr<A>, f: (a: A) => B): Expr<B> => 
     pmatch(fa)
-      .with('Const', ({ value }) => Expr.Const(f(value)))
-      .with('Add', ({ left, right }) => Expr.Add(left, right))
-      .with('If', ({ cond, then, else: else_ }) => Expr.If(cond, ExprFunctor.map(then, f), ExprFunctor.map(else_, f)))
-      .with('Var', ({ name }) => Expr.Var(name))
-      .with('Let', ({ name, value, body }) => Expr.Let(name, ExprFunctor.map(value, f), ExprFunctor.map(body, f)))
+      .with('Const', ({ value }) => Expr.Const<B>(f(value)))
+      .with('Add', ({ left, right }) => Expr.Add(left, right) as unknown as Expr<B>)
+      .with('If', ({ cond, then, else: else_ }) => Expr.If<B>(cond, ExprFunctor.map(then, f), ExprFunctor.map(else_, f)))
+      .with('Var', ({ name }) => Expr.Var(name) as unknown as Expr<B>)
+      .with('Let', ({ name, value, body }) => Expr.Let<B>(name, ExprFunctor.map(value, f), ExprFunctor.map(body, f)))
       .exhaustive()
 };
 
@@ -431,8 +431,8 @@ export const ExprFunctor: Functor<ExprK> = {
 export const MaybeGADTFunctor: Functor<MaybeGADTK> = {
   map: <A, B>(fa: MaybeGADT<A>, f: (a: A) => B): MaybeGADT<B> => 
     pmatch(fa)
-      .with('Just', ({ value }) => MaybeGADT.Just(f(value)))
-      .with('Nothing', () => MaybeGADT.Nothing())
+      .with('Just', ({ value }) => MaybeGADT.Just<B>(f(value)))
+      .with('Nothing', () => MaybeGADT.Nothing<B>())
       .exhaustive()
 };
 
@@ -441,16 +441,16 @@ export const MaybeGADTFunctor: Functor<MaybeGADTK> = {
  */
 export const MaybeGADTApplicative: Applicative<MaybeGADTK> = {
   ...MaybeGADTFunctor,
-  of: <A>(a: A): MaybeGADT<A> => MaybeGADT.Just(a),
+  of: <A>(a: A): MaybeGADT<A> => MaybeGADT.Just<A>(a),
   ap: <A, B>(fab: MaybeGADT<(a: A) => B>, fa: MaybeGADT<A>): MaybeGADT<B> => 
     pmatch(fab)
       .with('Just', ({ value: f }) => 
         pmatch(fa)
-          .with('Just', ({ value: a }) => MaybeGADT.Just(f(a)))
-          .with('Nothing', () => MaybeGADT.Nothing())
+          .with('Just', ({ value: a }) => MaybeGADT.Just<B>(f(a)))
+          .with('Nothing', () => MaybeGADT.Nothing<B>())
           .exhaustive()
       )
-      .with('Nothing', () => MaybeGADT.Nothing())
+      .with('Nothing', () => MaybeGADT.Nothing<B>())
       .exhaustive()
 };
 
@@ -462,7 +462,7 @@ export const MaybeGADTMonad: Monad<MaybeGADTK> = {
   chain: <A, B>(fa: MaybeGADT<A>, f: (a: A) => MaybeGADT<B>): MaybeGADT<B> => 
     pmatch(fa)
       .with('Just', ({ value }) => f(value))
-      .with('Nothing', () => MaybeGADT.Nothing())
+      .with('Nothing', () => MaybeGADT.Nothing<B>())
       .exhaustive()
 };
 
@@ -472,20 +472,20 @@ export const MaybeGADTMonad: Monad<MaybeGADTK> = {
 export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
   bimap: <A, B, C, D>(fab: EitherGADT<A, B>, f: (a: A) => C, g: (b: B) => D): EitherGADT<C, D> => 
     pmatch(fab)
-      .with('Left', ({ value }) => EitherGADT.Left(f(value)))
-      .with('Right', ({ value }) => EitherGADT.Right(g(value)))
+      .with('Left', ({ value }) => EitherGADT.Left<C, D>(f(value)))
+      .with('Right', ({ value }) => EitherGADT.Right<C, D>(g(value)))
       .exhaustive(),
   
   mapLeft: <A, B, C>(fab: EitherGADT<A, B>, f: (a: A) => C): EitherGADT<C, B> => 
     pmatch(fab)
-      .with('Left', ({ value }) => EitherGADT.Left(f(value)))
-      .with('Right', ({ value }) => EitherGADT.Right(value))
+      .with('Left', ({ value }) => EitherGADT.Left<C, B>(f(value)))
+      .with('Right', ({ value }) => EitherGADT.Right<C, B>(value))
       .exhaustive(),
   
   mapRight: <A, B, D>(fab: EitherGADT<A, B>, g: (b: B) => D): EitherGADT<A, D> => 
     pmatch(fab)
-      .with('Left', ({ value }) => EitherGADT.Left(value))
-      .with('Right', ({ value }) => EitherGADT.Right(g(value)))
+      .with('Left', ({ value }) => EitherGADT.Left<A, D>(value))
+      .with('Right', ({ value }) => EitherGADT.Right<A, D>(g(value)))
       .exhaustive()
 };
 
@@ -494,12 +494,11 @@ export const EitherGADTBifunctor: Bifunctor<EitherGADTK> = {
  */
 export const ResultApplicative: Applicative<ResultK> = {
   ...ResultFunctor,
-  of: <A, E>(a: A): Result<A, E> => Result.Ok(a),
+  of: <A, E>(a: A): Result<A, E> => Result.Ok<A, E>(a),
   ap: <A, B, E>(ff: Result<(a: A) => B, E>, fa: Result<A, E>): Result<B, E> =>
-    pmatch(ff)
-      .with('Ok', ({ value: f }) => ResultFunctor.map(fa, f))
-      .with('Err', ({ error }) => Result.Err<B, E>(error))
-      .exhaustive()
+    (ff.tag === 'Ok'
+      ? ResultFunctor.map(fa as any, ff.payload.value as any) as any
+      : Result.Err<B, E>(ff.payload.error as E))
 };
 
 /**
@@ -508,10 +507,7 @@ export const ResultApplicative: Applicative<ResultK> = {
 export const ResultMonad: Monad<ResultK> = {
   ...ResultApplicative,
   chain: <A, B, E>(fa: Result<A, E>, f: (a: A) => Result<B, E>): Result<B, E> =>
-    pmatch(fa)
-      .with('Ok', ({ value }) => f(value))
-      .with('Err', ({ error }) => Result.Err<B, E>(error))
-      .exhaustive()
+    (fa.tag === 'Ok' ? f(fa.payload.value) : Result.Err<B, E>(fa.payload.error as E))
 };
 
 // ============================================================================

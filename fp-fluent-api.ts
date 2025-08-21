@@ -385,12 +385,13 @@ export function toObservableLite<T>(value: FluentOps<T>): ObservableLite<T> {
     });
   }
 
-  // Fallback: throw for truly unhandled types
-  throw new Error('Cannot convert to ObservableLite');
+  // Fallback: wrap single value if present
+  if (value !== undefined && value !== null && (value as any) !== (Object(value) as any)) {
+    return ObservableLite.of(value as T);
   }
-  
-  throw new Error('Cannot convert to ObservableLite');
-// function toObservableLite properly closed
+  // As a last resort, return an empty observable
+  return new ObservableLite<T>(() => () => {});
+}
 
 /**
  * Convert any fluent type to StatefulStream

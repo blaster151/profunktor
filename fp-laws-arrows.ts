@@ -18,7 +18,7 @@ export async function testParTraverseIf<F extends Kind1, A, B, S, T>(
 ): Promise<B[]> {
   const plan = makeParTraverseIf(baz, s, predAsync, kAsync, { concurrency: 4, preserveOrder: true });
   const stream = compilePlanToStream(runEffect, F, asyncF, bracket, plan);
-  const out = await (stream as any).compile.fold<B[]>([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
+  const out = await (stream as any).compile.fold([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
   return out;
 }
 
@@ -40,10 +40,10 @@ export async function testFilterRewriteEquivalenceId<F extends Kind1, A, B, S, T
 ): Promise<boolean> {
   const plan0 = { tag: 'Seq', steps: [ { tag: 'FilterA', pA: pA as any, baz: baz as any, s: s as any } as any, { tag: 'Traverse', baz: baz as any, s: s as any, k: k as any } as any ] } as any;
   const s0 = compilePlanToStream(runEffect, F, asyncF, bracket, plan0);
-  const out0 = await (s0 as any).compile.fold<B[]>([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
+  const out0 = await (s0 as any).compile.fold([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
   const plan1 = optimizePlan(plan0, { fuse: true });
   const s1 = compilePlanToStream(runEffect, F, asyncF, bracket, plan1);
-  const out1 = await (s1 as any).compile.fold<B[]>([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
+  const out1 = await (s1 as any).compile.fold([], async (acc: B[], b: B) => { if (b !== undefined) acc.push(b); return acc; });
   return JSON.stringify(out0) === JSON.stringify(out1);
 }
 
@@ -191,28 +191,24 @@ export function runArrowChoiceLaws<P extends Kind2, A, B, C>(
     genA: Gen<A>;
     genB: Gen<B>;
     genC: Gen<C>;
-    eq: { EB: Eq<Left<B> | Right<C>> };
-    sum: {
-      left:  <X>(x: X) => Left<X>;
-      right: <X>(x: X) => Right<X>;
-    };
     samples?: number;
   }
 ): LawReport {
   const N = cfg.samples ?? 50;
-  const Es = repeat(N).map(i => i % 2 === 0 ? cfg.sum.left(cfg.genA()) : cfg.sum.right(cfg.genC()));
-  const eqArr = eqArrow<P, typeof Es[number], { tag: 'Left'; value: B } | { tag: 'Right'; value: C }>(
-    cfg.evalP, cfg.eq.EB, Es as any
+  const Es: Either<A, C>[] = repeat(N).map(i => i % 2 === 0 ? ({ left: cfg.genA() } as Either<A, C>) : ({ right: cfg.genC() } as Either<A, C>));
+  const eqEither: Eq<Either<B, C>> = (x, y) => (
+    'left' in (x as any)
+      ? ('left' in (y as any) && (x as any).left === (y as any).left)
+      : ('right' in (y as any) && (x as any).right === (y as any).right)
   );
+  const eqArr = eqArrow<P, Either<A, C>, Either<B, C>>(cfg.evalP, eqEither, Es);
 
   const f = (a: A) => cfg.genB();
 
   // left (arr f) = arr (left f)
   const lawLeftArr = eqArr(
-    AC.left(AC.arr<A, B>(f)),
-    AC.arr<typeof Es[number], { tag: 'Left'; value: B } | { tag: 'Right'; value: C }>(e =>
-      (e as any).tag === 'Left' ? cfg.sum.left(f((e as any).value)) : cfg.sum.right((e as any).value)
-    )
+    AC.left<A, B, C>(AC.arr<A, B>(f)),
+    AC.arr<Either<A, C>, Either<B, C>>(e => ('left' in (e as any) ? ({ left: f((e as any).left as A) } as Either<B, C>) : ({ right: (e as any).right } as Either<B, C>)))
   );
 
   return { sampleCount: N, checks: [
@@ -236,20 +232,30 @@ export function runArrowApplyLaws<P extends Kind2, A, B>(
   const N = cfg.samples ?? 50;
   const As = repeat(N).map(cfg.genA);
   const Fs = repeat(N).map(cfg.genF);
-  const eq = eqArrow<P, [ (a: A) => B, A ], B>(cfg.evalP, cfg.eqB, Fs.map((f, i) => [f, As[i % As.length]]));
+  const eq = eqArrow<P, [ Apply<P, [A, B]>, A ], B>(
+    cfg.evalP,
+    cfg.eqB,
+    Fs.map((f, i) => [AA.arr<A, B>(f), As[i % As.length]])
+  );
 
   // Beta: app ∘ (arr (\(f,a) -> (f,a))) = arr (\(f,a) -> f a)
-  const pairId = AA.arr<[ (a: A) => B, A ], [ (a: A) => B, A ]>(x => x);
+  const pairId = AA.arr<[
+    Apply<P, [A, B]>,
+    A
+  ], [
+    Apply<P, [A, B]>,
+    A
+  ]>(x => x as [Apply<P, [A, B]>, A]);
   const beta = eq(
     AA.compose(AA.app<A, B>(), pairId),
-    AA.arr(([f, a]) => f(a))
+    AA.arr(([pf, a]) => cfg.evalP(pf)(a))
   );
 
   // Eta: f = app ∘ (arr (\a -> (f,a)))
   const anyF = AA.arr<A, B>(cfg.genF()); // fixed arrow
   const etaEq = eqArrow<P, A, B>(cfg.evalP, cfg.eqB, As)(
     anyF,
-    AA.compose(AA.app<A, B>(), AA.arr<A, [(a: A) => B, A]>(a => [cfg.evalP(anyF)(undefined as any) as any, a] as any))
+    AA.compose(AA.app<A, B>(), AA.arr<A, [Apply<P, [A, B]>, A]>(a => [anyF, a]))
   );
 
   return { sampleCount: N, checks: [

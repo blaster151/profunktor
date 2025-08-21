@@ -3,7 +3,7 @@
  * Minimal version: takes a module path and export name.
  */
 
-import { hydrateKindInfoFromSideTable, defaultKindCache } from './kindCache.js';
+import { hydrateKindInfoFromSideTable, defaultKindCache } from './kindCache';
 
 export interface KindExplanation {
   modulePath: string;

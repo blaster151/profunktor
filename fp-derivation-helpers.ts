@@ -9,12 +9,9 @@ import type {
   Functor, 
   Applicative, 
   Monad, 
-  Bifunctor,
-  Kind, 
-  Apply, 
-  Type 
+  Bifunctor
 } from './fp-typeclasses';
-import type { Kind1, Kind2 } from './fp-hkt';
+import type { Kind1, Kind2, Apply, Type } from './fp-hkt';
 
 // ============================================================================
 // Core Derivation Types

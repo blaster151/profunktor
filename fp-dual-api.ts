@@ -10,12 +10,9 @@ import type {
   Applicative, 
   Monad, 
   Bifunctor, 
-  Profunctor,
-  Kind, 
-  Apply, 
-  Type 
+  Profunctor
 } from './fp-typeclasses';
-import type { Kind1, Kind2 } from './fp-hkt';
+import type { Kind1, Kind2, Apply, Type } from './fp-hkt';
 
 // ============================================================================
 // Core Typeclass Operations
@@ -103,7 +100,7 @@ export const rmap = <F extends Kind2, A, B, D>(F_: Profunctor<F>) =>
 /**
  * Configuration for dual API generation
  */
-export interface DualAPIConfig<F extends Kind<any[]>> {
+export interface DualAPIConfig<F> {
   /** The typeclass instance */
   instance: any;
   /** The type constructor name */
@@ -117,7 +114,7 @@ export interface DualAPIConfig<F extends Kind<any[]>> {
 /**
  * Generates both fluent instance methods and data-last standalone functions
  */
-export function createDualAPI<F extends Kind<any[]>>(config: DualAPIConfig<F>) {
+export function createDualAPI<F>(config: DualAPIConfig<F>) {
   const { instance, name, operations, customOperations = {} } = config;
   
   const standaloneFunctions: Record<string, any> = {};

@@ -17,7 +17,7 @@
  */
 
 import {
-  Kind, Kind1, Kind2, Kind3,
+  Kind1, Kind2, Kind3,
   Apply, Type, TypeArgs, KindArity, KindResult,
   ArrayK, MaybeK, EitherK, TupleK, FunctionK,
   ObservableLiteK, TaskEitherK,
@@ -114,7 +114,7 @@ export type HasEffect<F, E extends EffectTag> = EffectOf<F> extends E ? true : f
 /**
  * Purity typeclass for checking declared effects
  */
-export interface Purity<F extends Kind<any>> {
+export interface Purity<F> {
   readonly effect: EffectOf<F>;
 }
 
@@ -439,7 +439,7 @@ export interface PurityAwareDerivableOptions {
 /**
  * Purity-aware derivable instance result
  */
-export interface PurityAwareDerivableResult<F extends Kind<any>> {
+export interface PurityAwareDerivableResult<F> {
   readonly instance: any;
   readonly purity: Purity<F>;
   readonly runtimeMarker?: RuntimePurityInfo;
@@ -448,7 +448,7 @@ export interface PurityAwareDerivableResult<F extends Kind<any>> {
 /**
  * Derive purity-aware instance
  */
-export function derivePurityAwareInstance<F extends Kind<any>>(
+export function derivePurityAwareInstance<F>(
   instance: any,
   options: PurityAwareDerivableOptions = {}
 ): PurityAwareDerivableResult<F> {
@@ -471,7 +471,7 @@ export function derivePurityAwareInstance<F extends Kind<any>>(
 /**
  * Register purity-aware derivable instance
  */
-export function registerPurityAwareDerivableInstance<F extends Kind<any>>(
+export function registerPurityAwareDerivableInstance<F>(
   name: string,
   instance: any,
   options: PurityAwareDerivableOptions = {}
@@ -486,7 +486,7 @@ export function registerPurityAwareDerivableInstance<F extends Kind<any>>(
 /**
  * Get purity-aware derivable instance
  */
-export function getPurityAwareDerivableInstance<F extends Kind<any>>(
+export function getPurityAwareDerivableInstance<F>(
   name: string
 ): PurityAwareDerivableResult<F> | undefined {
   return (globalThis as any).__purityRegistry?.[name];

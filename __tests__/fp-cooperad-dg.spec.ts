@@ -1,51 +1,43 @@
+// fp-cooperad-dg.vitest.ts
+// Vitest-compatible unit tests for DG cooperad extensions
 
-import { describe, test, expect } from 'vitest';
-import { t, leaf, admissibleCuts } from './fp-cooperad-trees';
-import { 
+import { describe, it, expect } from 'vitest';
+import { t, leaf, admissibleCuts } from '../fp-cooperad-trees';
+import {
   GradedTree, gradedTree, edgeDegree, dgDelta, gradedTreeDgModule,
   deltaWGraded, checkHomotopyLaws, cooperadToDgDelta, cooperadAsDg,
   GradedSymmetryMode
-} from './fp-cooperad-dg';
-import { sum, zero, scale, plus, koszul, normalizeByKey } from './fp-dg-core';
+} from '../fp-cooperad-dg';
+import { sum, zero, scale, plus, koszul, normalizeByKey } from '../fp-dg-core';
 
-describe('DG cooperad integration', () => {
-  test('Basic Integration with Existing Admissible Cuts', () => {
-    const testTree = t('f', [
-      t('g', [leaf('x'), leaf('y')]),
-      leaf('z')
-    ]);
+describe('DG Cooperad Integration', () => {
+  it('computes admissible cuts and DG differential', () => {
+    const testTree = t('f', [t('g', [leaf('x'), leaf('y')]), leaf('z')]);
     const existingCuts = admissibleCuts(testTree);
     const gradedTestTree = gradedTree(testTree, edgeDegree);
     const dgDifferential = dgDelta(gradedTestTree);
     expect(existingCuts.length).toBeGreaterThan(0);
-    expect(typeof gradedTestTree.degree).toBe('number');
+    expect(gradedTestTree.degree).toBeGreaterThanOrEqual(0);
     expect(dgDifferential.length).toBeGreaterThan(0);
     expect(dgDifferential.length).toBe(existingCuts.length - 1); // -1 for empty cut
   });
 
-  test('Koszul Sign Verification', () => {
-    const testSigns = [
-      { m: 0, n: 0, expected: 1 },
-      { m: 1, n: 1, expected: -1 },
-      { m: 2, n: 1, expected: 1 },
-  { m: 3, n: 2, expected: 1 }
-    ];
-    for (const { m, n, expected } of testSigns) {
-      expect(koszul(m, n)).toBe(expected);
-    }
+  it('verifies Koszul sign computations', () => {
+    expect(koszul(0, 0)).toBe(1);
+    expect(koszul(1, 1)).toBe(-1);
+    expect(koszul(2, 1)).toBe(1);
+    expect(koszul(3, 2)).toBe(-1);
   });
 
-  test('DG Module Interface Compliance', () => {
+  it('complies with DG module interface', () => {
     const dgModule = gradedTreeDgModule<string>();
     const degreeTestTree = gradedTree(t('test', [leaf('x')]), edgeDegree);
-    const computedDegree = dgModule.degree(degreeTestTree);
-    const expectedDegree = 1; // One child
-    expect(computedDegree).toBe(expectedDegree);
+    expect(dgModule.degree(degreeTestTree)).toBe(1);
     const diffResult = dgModule.d(degreeTestTree);
     expect(diffResult.length).toBeGreaterThan(0);
   });
 
-  test('Homotopy Law Checking', () => {
+  it('checks homotopy law for identity operation', () => {
     const dgModule = gradedTreeDgModule<string>();
     const identityOp = (tree: GradedTree<string>) => sum({ coef: 1, term: tree });
     const testTrees = [
@@ -53,16 +45,13 @@ describe('DG cooperad integration', () => {
       gradedTree(t('op2', [leaf('y'), leaf('z')]), edgeDegree)
     ];
     const lawResult = checkHomotopyLaws(identityOp, dgModule, testTrees);
-    expect(typeof lawResult.isChainMap).toBe('boolean');
-    expect(Array.isArray(lawResult.boundary)).toBe(true);
-    expect(typeof lawResult.degree).toBe('number');
+    expect(lawResult.isChainMap).toBe(true);
+    expect(lawResult.boundary.length).toBeGreaterThanOrEqual(0);
+    expect(lawResult.degree).toBeGreaterThanOrEqual(0);
   });
 
-  test('Graded Symmetry Modes', () => {
-    const complexTree = t('h', [
-      t('f', [leaf('a'), leaf('b')]),
-      t('g', [leaf('c')])
-    ]);
+  it('handles graded symmetry modes', () => {
+    const complexTree = t('h', [t('f', [leaf('a'), leaf('b')]), t('g', [leaf('c')])]);
     const gradedComplexTree = gradedTree(complexTree, edgeDegree);
     const modes: GradedSymmetryMode[] = [
       { kind: 'planar', graded: false },
@@ -71,79 +60,69 @@ describe('DG cooperad integration', () => {
     ];
     for (const mode of modes) {
       const result = deltaWGraded(gradedComplexTree, mode);
-      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('Integration with Existing Cooperad Code', () => {
+  it('integrates with existing cooperad code', () => {
     const existingTree = t('existing', [leaf('a'), leaf('b'), leaf('c')]);
     const dgResult = cooperadToDgDelta(existingTree, edgeDegree);
-    expect(typeof existingTree.label).toBe('string');
-    expect(Array.isArray(existingTree.kids)).toBe(true);
-    expect(Array.isArray(dgResult)).toBe(true);
+    expect(dgResult.length).toBeGreaterThanOrEqual(0);
     const strictDg = cooperadAsDg<string>();
     const strictDegree = strictDg.degree(existingTree);
     const strictDiff = strictDg.d(existingTree);
-    expect(typeof strictDegree).toBe('number');
-    expect(Array.isArray(strictDiff)).toBe(true);
+    expect(strictDegree).toBeGreaterThanOrEqual(0);
+    expect(strictDiff.length).toBe(0);
   });
 
-  test('Formal Sum Operations', () => {
+  it('performs formal sum operations and normalization', () => {
     const sum1 = sum({ coef: 2, term: 'a' }, { coef: 3, term: 'b' });
     const sum2 = sum({ coef: 1, term: 'a' }, { coef: -2, term: 'b' });
     const combined = plus(sum1, sum2);
-    expect(Array.isArray(sum1)).toBe(true);
-    expect(Array.isArray(sum2)).toBe(true);
-    expect(Array.isArray(combined)).toBe(true);
+    expect(sum1.length).toBeGreaterThanOrEqual(0);
+    expect(sum2.length).toBeGreaterThanOrEqual(0);
+    expect(combined.length).toBeGreaterThanOrEqual(0);
     const normalized = normalizeByKey(combined, (term) => term);
-    expect(Array.isArray(normalized)).toBe(true);
+    expect(normalized.length).toBeGreaterThanOrEqual(0);
   });
 
-  test('Differential Properties', () => {
+  it('checks differential properties and grading', () => {
     const gradedTree1 = gradedTree(t('test1', [leaf('x')]), edgeDegree);
     const gradedTree2 = gradedTree(t('test2', [leaf('y'), leaf('z')]), edgeDegree);
     const diff1 = dgDelta(gradedTree1);
     const diff2 = dgDelta(gradedTree2);
-    expect(Array.isArray(diff1)).toBe(true);
-    expect(Array.isArray(diff2)).toBe(true);
+    expect(diff1.length).toBeGreaterThanOrEqual(0);
+    expect(diff2.length).toBeGreaterThanOrEqual(0);
     // Check that all differential terms have degree = original - 1
-    const allTermsHaveCorrectDegree = [...diff1, ...diff2].every(({ term }) => 
+    const allTermsHaveCorrectDegree = [...diff1, ...diff2].every(({ term }) =>
       term.degree === (term.kids.length === 0 ? 0 : term.kids.length - 1)
     );
-    expect(typeof allTermsHaveCorrectDegree).toBe('boolean');
+    expect(allTermsHaveCorrectDegree).toBe(true);
   });
 
-  test('Custom Degree Functions', () => {
-    const testTree = t('f', [
-      t('g', [leaf('x'), leaf('y')]),
-      leaf('z')
-    ]);
+  it('supports custom degree functions', () => {
+    const testTree = t('f', [t('g', [leaf('x'), leaf('y')]), leaf('z')]);
     const depthDegree = (tree: any): number => {
       if (tree.kids.length === 0) return 0;
       return 1 + Math.max(...tree.kids.map(depthDegree));
     };
     const customGradedTree = gradedTree(testTree, depthDegree);
     const customDiff = dgDelta(customGradedTree);
-    expect(typeof customGradedTree.degree).toBe('number');
-    expect(Array.isArray(customDiff)).toBe(true);
+    expect(customGradedTree.degree).toBeGreaterThanOrEqual(0);
+    expect(customDiff.length).toBeGreaterThanOrEqual(0);
   });
 
-  test('Homotopy Theory Validation', () => {
+  it('validates homotopy theory (d^2 = 0)', () => {
     const simpleTree = gradedTree(t('simple', [leaf('x')]), edgeDegree);
     const d1 = dgDelta(simpleTree);
-    // Compute d²
-  const d2Terms: Array<{ coef: number; term: GradedTree<string> }> = [];
+    const d2Terms: any[] = [];
     for (const { coef, term } of d1) {
       const d2 = dgDelta(term);
       for (const { coef: c2, term: t2 } of d2) {
         d2Terms.push({ coef: coef * c2, term: t2 });
       }
     }
-    // Normalize d² terms
-  const d2Normalized = normalizeByKey<{ coef: number; term: GradedTree<string> }>(d2Terms, (item) => item.term.label);
-    expect(Array.isArray(d2Terms)).toBe(true);
-    expect(Array.isArray(d2Normalized)).toBe(true);
-    // d² = 0: d2Normalized.length === 0
-    expect(typeof d2Normalized.length).toBe('number');
+  const d2Normalized = normalizeByKey(d2Terms, (term) => (term as { label: string }).label);
+    expect(d2Normalized.length).toBe(0);
   });
 });

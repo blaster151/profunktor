@@ -128,12 +128,15 @@ export interface DiagnosticWithLocation {
 	file: SourceFile;
 	start: number;
 	length: number;
-	messageText: string;
-	category: DiagnosticCategory | number;
+	messageText: string | { key: string; category: string; code: number; arguments?: string[] };
+	category: DiagnosticCategory | number | string;
 	code: number;
 	// convenience fields sometimes attached by our code
 	line?: number;
 	column?: number;
+	reportsUnnecessary?: boolean;
+	reportsDeprecated?: boolean;
+	source?: string;
 }
 
 export interface LineAndCharacter { line: number; character: number; }

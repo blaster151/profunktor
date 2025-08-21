@@ -36,7 +36,7 @@ export function pmatchReadonly<T extends GADT<string, any>, R>(
     [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }
 ): R {
-  const b = pmatch<T, R>(gadt);
+  const b = pmatch(gadt);
   // Register all handlers (keys are constrained by the mapped type).
   (Object.keys(handlers) as Array<GADTTags<T>>).forEach((tag) => {
     // The base pmatch builder type is `.with<Tag extends GADTTags<T>>(tag, handler)`.
@@ -91,7 +91,7 @@ export function createReadonlyPmatchBuilder<T extends GADT<string, any>, R>(
   gadt: T
 ): ReadonlyPmatchBuilder<T, R> {
   // Start from the underlying builder, but wrap types for `.with` and `.partial`.
-  const base = pmatch<T, R>(gadt);
+  const base = pmatch(gadt);
   const handlers = new Map<string, Function>();
 
   const api: ReadonlyPmatchBuilder<T, R> = {

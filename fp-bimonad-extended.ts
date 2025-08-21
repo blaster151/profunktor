@@ -125,7 +125,7 @@ export function chainLeft<F extends Kind2, L, R, L2>(
   match2: Match2<F>,
   f: (l: L) => ApplyBifunctorMonad<F, [L2, R]>
 ): (ma: ApplyBifunctorMonad<F, [L, R]>) => ApplyBifunctorMonad<F, [L2, R]> {
-  return (ma) => match2(ma, { Left: f, Right: (r: R) => M.of(r) });
+  return (ma) => match2(ma, { Left: f, Right: (r: R) => M.of(r) as any });
 }
 
 /**
@@ -623,7 +623,7 @@ export function rightFunctor<F extends Kind2, E>(
       fa: Apply<FixLeft<F, E>, [A]>,
       f: (a: A) => B
     ): Apply<FixLeft<F, E>, [B]> =>
-      M.map(fa as unknown as Apply<F, [E, A]>, f) as unknown as Apply<FixLeft<F, E>, [B]>,
+      (M.map as any)(fa as any, f as any) as any,
   };
 }
 
@@ -639,8 +639,8 @@ export function rightApplicative<F extends Kind2, E>(
       fa: Apply<FixLeft<F, E>, [A]>
     ): Apply<FixLeft<F, E>, [B]> =>
       M.ap(
-        fab as unknown as Apply<F, [E, (a: A) => B]>,
-        fa as unknown as Apply<F, [E, A]>
+        (fab as unknown) as Apply<F, [(a: A) => B]>,
+        (fa as unknown) as Apply<F, [A]>
       ) as unknown as Apply<FixLeft<F, E>, [B]>,
   };
 }
@@ -655,8 +655,8 @@ export function rightMonad<F extends Kind2, E>(
       f: (a: A) => Apply<FixLeft<F, E>, [B]>
     ): Apply<FixLeft<F, E>, [B]> =>
       M.chain(
-        fa as unknown as Apply<F, [E, A]>,
-        (a: A) => f(a) as unknown as Apply<F, [E, B]>
+        (fa as unknown) as Apply<F, [A]>,
+        (a: A) => (f(a) as unknown) as Apply<F, [B]>
       ) as unknown as Apply<FixLeft<F, E>, [B]>,
   };
 }

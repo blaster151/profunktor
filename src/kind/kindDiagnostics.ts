@@ -1,5 +1,4 @@
 import {
-    DiagnosticMessage,
     DiagnosticWithLocation,
     SourceFile,
     Node,

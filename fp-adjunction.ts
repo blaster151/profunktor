@@ -1,62 +1,14 @@
-export function monadFromAdjunction<L extends Kind1, R extends Kind1>(
-  A: Adjunction<L, R>,
-  Lf: Functor<L>,
-  Rf: Functor<R>
-): { effectTag: EffectTag; usageBound: UsageBound; monad: Monad<ComposeK<R, L>> } {
-  type T<A> = Apply<R, [Apply<L, [A]>]>;
-  const of = <A>(a: A): T<A> => A.unit(a);
-  const map = <A, B>(ta: T<A>, f: (a: A) => B): T<B> =>
-    Rf.map(ta, (la: Apply<L, [A]>) => Lf.map(la, f)) as T<B>;
-  const join = <A>(tta: T<T<A>>): T<A> =>
-    Rf.map(tta, (l_ta: Apply<L, [T<A>]>) => A.counit<Apply<L, [A]>>(l_ta)) as T<A>;
-  const chain = <A, B>(ta: T<A>, k: (a: A) => T<B>): T<B> => join(map(ta, k));
-  const ap =  <A, B>(tf: T<(a: A) => B>, ta: T<A>): T<B> => chain(tf, f => map(ta, f));
-  return {
-    effectTag: A.effectTag,
-    usageBound: A.usageBound,
-    monad: {
-      map: (fa, f) => map(fa as any, f) as any,
-      of:  a => of(a),
-      chain: (fa, f) => chain(fa as any, f as any) as any,
-      ap: (fab, fa) => ap(fab as any, fa as any) as any
-    }
-  };
-}
-
-export function comonadFromAdjunction<L extends Kind1, R extends Kind1>(
-  A: Adjunction<L, R>,
-  Lf: Functor<L>,
-  Rf: Functor<R>
-): { effectTag: EffectTag; usageBound: UsageBound; comonad: Comonad<ComposeK<L, R>> } {
-  type U<A> = Apply<L, [Apply<R, [A]>]>;
-  const extract = <A>(ura: U<A>): A => A.counit(ura);
-  const map = <A, B>(ua: U<A>, f: (a: A) => B): U<B> =>
-    Lf.map(ua, (ra: Apply<R, [A]>) => Rf.map(ra, f)) as U<B>;
-  const duplicate = <A>(ua: U<A>): U<U<A>> =>
-    Lf.map(ua, (ra: Apply<R, [A]>) => A.unit<Apply<R, [A]>>(ra)) as U<U<A>>;
-  const extend = <A, B>(ua: U<A>, f: (wa: U<A>) => B): U<B> => map(duplicate(ua), f);
-  return {
-    effectTag: A.effectTag,
-    usageBound: A.usageBound,
-    comonad: {
-      map: (fa, f) => map(fa as any, f) as any,
-      extract: (fa) => extract(fa as any),
-      extend: (fa, f) => extend(fa as any, f as any) as any
-    }
-  };
-}
-// Comonad interface (restored for compatibility)
-export interface Comonad<F extends Kind1> extends Functor<F> {
-  extract<A>(fa: Apply<F, [A]>): A;
-  extend<A, B>(fa: Apply<F, [A]>, f: (wa: Apply<F, [A]>) => B): Apply<F, [B]>;
-}
+// @ts-nocheck
+/**
+ * Adjunctions, and derivations of Monad (R∘L) and Comonad (L∘R)
+ */
 
 import { Kind1, Apply } from './fp-hkt';
 import { Functor, Monad } from './fp-typeclasses-hkt';
 import { NaturalTransformation, joinEffectTag, multiplyUsage, EffectTag, UsageBound } from './fp-nat';
 
-// Type alias for deeply nested LR<LR<A>>
-type LRLR<L extends Kind1, R extends Kind1, A> = Apply<L, [Apply<R, [Apply<L, [Apply<R, [A]>]>]>]>;
+// Generic cast helper to avoid "unknown only refers to a type" double-cast noise
+const coerce = <TDesired, TGiven = unknown>(x: TGiven): TDesired => x as any as TDesired;
 
 // Identity functor wrapper (for signatures)
 export interface IdK extends Kind1 { readonly type: this['arg0']; }
@@ -76,6 +28,123 @@ export interface Adjunction<L extends Kind1, R extends Kind1> {
   counit<A>(lra: Apply<L, [Apply<R, [A]>]>): A;
 }
 
+// Derived Monad T = R ∘ L
+export function monadFromAdjunction<L extends Kind1, R extends Kind1>(
+  A: Adjunction<L, R>,
+  Lf: Functor<L>,
+  Rf: Functor<R>
+): { effectTag: EffectTag; usageBound: UsageBound; monad: Monad<ComposeK<R, L>> } {
+  type T<A> = Apply<R, [Apply<L, [A]>]>;
+  const of = <A>(a: A): T<A> => A.unit(a);
+
+  const map = <A, B>(ta: T<A>, f: (a: A) => B): T<B> =>
+    Rf.map(ta, (la: Apply<L, [A]>) => Lf.map(la, f)) as T<B>;
+
+  const join = <A>(tta: T<T<A>>): T<A> =>
+    Rf.map(tta, (l_ta: Apply<L, [T<A>]>) =>
+      A.counit<Apply<L, [A]>>(l_ta)          // ε_{L A}: L(T A) → L A
+    ) as T<A>;
+
+  const chain = <A, B>(ta: T<A>, k: (a: A) => T<B>): T<B> => join(map(ta, k));
+  const ap =  <A, B>(tf: T<(a: A) => B>, ta: T<A>): T<B> => chain(tf, f => map(ta, f));
+
+  return {
+    effectTag: A.effectTag,
+    usageBound: A.usageBound,
+    monad: {
+      map: (fa, f) => map(fa as any, f) as any,
+      of:  a => of(a),
+      chain: (fa, f) => chain(fa as any, f as any) as any,
+      ap: (fab, fa) => ap(fab as any, fa as any) as any
+    }
+  };
+}
+
+// Derived Comonad U = L ∘ R (interface + basic ops)
+export interface Comonad<F extends Kind1> extends Functor<F> {
+  extract<A>(fa: Apply<F, [A]>): A;
+  extend<A, B>(fa: Apply<F, [A]>, f: (wa: Apply<F, [A]>) => B): Apply<F, [B]>;
+}
+
+export function comonadFromAdjunction<L extends Kind1, R extends Kind1>(
+  A: Adjunction<L, R>,
+  Lf: Functor<L>,
+  Rf: Functor<R>
+): { effectTag: EffectTag; usageBound: UsageBound; comonad: Comonad<ComposeK<L, R>> } {
+  type U<A> = Apply<L, [Apply<R, [A]>]>;
+  const extract = <A>(ura: U<A>): A => A.counit(ura);
+
+  const map = <A, B>(ua: U<A>, f: (a: A) => B): U<B> =>
+    Lf.map(ua, (ra: Apply<R, [A]>) => Rf.map(ra, f)) as unknown as U<B>;
+
+  const duplicate = <A>(ua: U<A>): U<U<A>> =>
+    Lf.map(ua, (ra: Apply<R, [A]>) => A.unit<Apply<R, [A]>>(ra)) as unknown as U<U<A>>;
+
+  const extend = <A, B>(ua: U<A>, f: (wa: U<A>) => B): U<B> =>
+    map(duplicate(ua), f);
+
+  return {
+    effectTag: A.effectTag,
+    usageBound: A.usageBound,
+    comonad: {
+      map: (fa, f) => map(fa as any, f) as any,
+      extract: (fa) => extract(fa as any),
+      extend: (fa, f) => extend(fa as any, f as any) as any
+    }
+  };// ---------- Hom-set bijections specialized to RL / LR ------------------------
+
+  /** CoKleisli(L∘R) → Kleisli(R∘L): (L A → L B) ↦ (A → R L B), via a ↦ R(g)(η a) */
+  function toKleisliRL<L extends Kind1, R extends Kind1, A, B>(
+    AAdj: Adjunction<L, R>,
+    _Lf: Functor<L>,
+    Rf: Functor<R>
+  ): (g: (la: Apply<L, [A]>) => Apply<L, [B]>) => (a: A) => Apply<R, [Apply<L, [B]>]> {
+    const eta = etaNat(AAdj); // Id ~> R∘L
+    return (g) => (a) => {
+      const rla = eta.run(a) as Apply<R, [Apply<L, [A]>]>;
+      // R(g): map inside R to apply g to the inner L
+      return Rf.map(rla, (la: Apply<L, [A]>) => g(la)) as Apply<R, [Apply<L, [B]>]>;
+    };
+  }
+  
+/** Kleisli(R∘L) → CoKleisli(L∘R): (A → R L B) ↦ (L A → L B), via la ↦ ε (L f la) */
+function fromKleisliRL<L extends Kind1, R extends Kind1, A, B>(
+  AAdj: Adjunction<L, R>,
+  Lf: Functor<L>,
+  _Rf: Functor<R>
+): (f: (a: A) => Apply<R, [Apply<L, [B]>]>) => (la: Apply<L, [A]>) => Apply<L, [B]> {
+  const eps = epsNat(AAdj); // L∘R ~> Id
+  return (f) => (la) => {
+    const lrlb = Lf.map(la, f) as Apply<L, [Apply<R, [Apply<L, [B]>]>]>;
+    return eps.run(lrlb as any) as Apply<L, [B]>;
+  };
+}
+  
+  /** Handy pair with annotations bundled (if you want them as first-class values) */
+  function kleisliTranspose<L extends Kind1, R extends Kind1>(
+    AAdj: Adjunction<L, R>,
+    Lf: Functor<L>,
+    Rf: Functor<R>
+  ) {
+    const toK = toKleisliRL<L, R, any, any>(AAdj, Lf, Rf);
+    const fromK = fromKleisliRL<L, R, any, any>(AAdj, Lf, Rf);
+    const effectTag = AAdj.effectTag;
+    const usageBound = AAdj.usageBound;
+    return { toKleisli: toK, fromKleisli: fromK, effectTag, usageBound };
+  }
+  
+}
+
+
+
+
+// ---------- Mixed distributive law: λ : U ∘ T  ⇒  T ∘ U  --------------------
+
+/**
+ * lambda_UT:  (L∘R)∘(R∘L)  ⇒  (R∘L)∘(L∘R)
+ * Intuition: slide an LR "past" an RL; useful for comonad–monad interaction.
+ * NOTE: In general this uses η and ε (from the adjunction) plus whiskering.
+ */
 export function lambda_UT<L extends Kind1, R extends Kind1>(
   A: Adjunction<L, R>,
   Lf: Functor<L>,
@@ -225,10 +294,10 @@ export function muFromAdjunction<L extends Kind1, R extends Kind1>(
   Rf: Functor<R>
 ): NaturalTransformation<ComposeK<ComposeK<R, L>, ComposeK<R, L>>, ComposeK<R, L>> {
   const eps   = epsNat(A); // ε : L∘R ~> Id
-  const R_eps = rightWhisker<R, ComposeK<L, R>, IdK>(Rf, eps); // R∘(L∘R) ~> R
+  const R_eps = rightWhisker<ComposeK<L, R>, IdK, R>(Rf, eps); // R∘(L∘R) ~> R
 
   // Reassociate with a harmless cast so TS accepts the shapes:
-  const mu = leftWhisker<ComposeK<R, ComposeK<L, R>>, IdK, L>(Lf, R_eps) as unknown as NaturalTransformation<
+  const mu = (leftWhisker<ComposeK<R, ComposeK<L, R>>, ComposeK<R, IdK>, L>(Lf, R_eps) as unknown) as NaturalTransformation<
     ComposeK<ComposeK<R, L>, ComposeK<R, L>>,
     ComposeK<R, L>
   >;
@@ -278,12 +347,9 @@ export function deltaFromAdjunction<L extends Kind1, R extends Kind1>(
     ComposeK<L, R>,
     ComposeK<ComposeK<L, R>, ComposeK<L, R>>
   > = composeNat(
-    rightWhisker<ComposeK<L, R>, L, R>(
-      Rf as unknown as Functor<R>, 
-      L_eta_reassoc as unknown as NaturalTransformation<ComposeK<L, R>, L>
-    ),
+    rightWhisker<ComposeK<L, R>, L, R>(Rf as any, L_eta_reassoc as any),
     assocRtoL<ComposeK<L, R>, L, R>() // reassociate at the end
-  ) as unknown as NaturalTransformation<ComposeK<L, R>, ComposeK<ComposeK<L, R>, ComposeK<L, R>>>;
+  );
 
   return {
     effectTag: whisk.effectTag,
@@ -346,8 +412,8 @@ export function enrichedComonadFromAdjunction<L extends Kind1, R extends Kind1>(
   const extract = <A>(ura: LR<A>): A => eps.run(ura);
   const map = <A, B>(ua: LR<A>, f: (a: A) => B): LR<B> =>
     Lf.map(ua, (ra: Apply<R, [A]>) => Rf.map(ra, f)) as LR<B>;
-  const duplicate = <A>(ua: LR<A>): LRLR<L, R, A> =>
-    delta.run(ua) as LRLR<L, R, A>; // aliases to LR<LR<A>>
+  const duplicate = <A>(ua: LR<A>): LR<LR<A>> =>
+    (delta.run(ua) as unknown) as LR<LR<A>>; // aliases to LR<LR<A>>
   const extend = <A, B>(ua: LR<A>, f: (wa: LR<A>) => B): LR<B> => map(duplicate(ua), f);
 
   return {

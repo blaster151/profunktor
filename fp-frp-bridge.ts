@@ -162,7 +162,7 @@ export function toObservableLite<S, A, O>(
     
     try {
       for (const input of Array.from(inputs as any)) {
-        const [newState, output] = stream.run(input)(state);
+        const [newState, output] = (stream.run as any)(input as any)(state as any) as [S, O];
         state = newState;
         subscriber.next(output);
       }
@@ -192,10 +192,10 @@ export function toObservableLiteAsync<S, A, O>(
     
     const processInputs = async () => {
       try {
-        for await (const input of inputs) {
+        for await (const input of inputs as any) {
           if (!isSubscribed) break;
           
-          const [newState, output] = stream.run(input)(state);
+          const [newState, output] = (stream.run as any)(input as any)(state as any) as [S, O];
           state = newState;
           subscriber.next(output);
         }

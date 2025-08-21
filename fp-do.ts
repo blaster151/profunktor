@@ -17,7 +17,7 @@ import {
   ArrayK, MaybeK, EitherK, TupleK, FunctionK, PromiseK, SetK, MapK, ListK,
   ReaderK, WriterK, StateK,
   Maybe, Either, ObservableLiteK,
-  Fix2Left, Fix2Right
+  Fix2Right, ApplyLeft, Fix3Left
 } from './fp-hkt';
 
 import {
@@ -27,8 +27,7 @@ import {
 
 import {
   EffectTag, EffectOf, Pure, IO, Async,
-  createPurityInfo, attachPurityMarker, extractPurityMarker, hasPurityMarker,
-  ComposeEffects
+  createPurityInfo, attachPurityMarker, extractPurityMarker, hasPurityMarker
 } from './fp-purity';
 
 // ============================================================================
@@ -53,7 +52,7 @@ export type DoGen3<F extends Kind3, A, B, C> = Generator<Apply<Fix3To1<F, A, B>,
 /**
  * Helper type for fixing Kind3 to Kind1
  */
-type Fix3To1<F extends Kind3, A, B> = Fix2Right<Fix2Left<F, A>, B>;
+type Fix3To1<F extends Kind3, A, B> = Fix2Right<Fix3Left<F, A>, B>;
 
 /**
  * Monadic value with effect tag
@@ -77,9 +76,9 @@ export type MonadicValue3<F extends Kind3, A, B, C, E extends EffectTag = 'Pure'
  * Effect composition result
  */
 export type ComposedEffect<T extends readonly EffectTag[]> = 
-  T extends readonly [infer First, ...infer Rest]
+  T extends readonly [infer First extends EffectTag, ...infer Rest]
     ? Rest extends readonly EffectTag[]
-      ? ComposeEffects<First, ComposedEffect<Rest>>
+      ? First | ComposedEffect<Rest>
       : First
     : 'Pure';
 
@@ -124,9 +123,9 @@ export function doM2Right<F extends Kind2, X, A>(
  * doM2 for Kind2 where the left param is the value (Reader-like): F<A, X>
  */
 export function doM2Left<F extends Kind2, A, X>(
-  M: Monad<Fix2Left<F, X>>,
-  gen: () => Generator<Apply<Fix2Left<F, X>, [any]>, A, any>
-): Apply<Fix2Left<F, X>, [A]> {
+  M: Monad<ApplyLeft<F, X>>,
+  gen: () => Generator<Apply<ApplyLeft<F, X>, [any]>, A, any>
+): Apply<ApplyLeft<F, X>, [A]> {
   return doM(M, gen);
 }
 
@@ -191,23 +190,23 @@ export function markDoMResult<F extends Kind1, A, E extends EffectTag>(
   value: Apply<F, [A]>,
   effect: E
 ): MonadicValue<F, A, E> {
-  return attachPurityMarker(value, effect) as MonadicValue<F, A, E>;
+  return (attachPurityMarker as any)(value as any, effect) as any;
 }
 
 /**
  * Infer effect from monadic value
  */
 export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag {
-  if (hasPurityMarker(value)) {
-    return extractPurityMarker(value);
+  if (hasPurityMarker(value as any)) {
+    return (extractPurityMarker as any)(value as any) as EffectTag;
   }
   
   // Default effect inference based on type
   if (value && typeof value === 'object') {
-    if ('subscribe' in value) return 'Async'; // ObservableLite
-    if ('then' in value) return 'Async'; // Promise
-    if ('run' in value) return 'IO'; // IO
-    if ('execute' in value) return 'IO'; // Task
+    if ('subscribe' in (value as any)) return 'Async'; // ObservableLite
+    if ('then' in (value as any)) return 'Async'; // Promise
+    if ('run' in (value as any)) return 'IO'; // IO
+    if ('execute' in (value as any)) return 'IO'; // Task
   }
   
   return 'Pure';
@@ -219,9 +218,11 @@ export function inferEffect<F extends Kind1, A>(value: Apply<F, [A]>): EffectTag
 export function composeMonadicEffects<Effects extends readonly EffectTag[]>(
   effects: Effects
 ): ComposedEffect<Effects> {
-  return effects.reduce((acc, effect) => 
-    ComposeEffects<typeof acc, typeof effect>(acc, effect), 'Pure' as EffectTag
-  ) as ComposedEffect<Effects>;
+  // Simplified runtime combiner: prefer 'Async' > 'IO' > 'Impure' > 'State' > 'Pure'
+  const order: Record<EffectTag, number> = { Pure: 0, State: 1, Impure: 2, IO: 3, Async: 4 } as const;
+  const result = effects.reduce<EffectTag>((acc, effect) =>
+    (order[effect] > order[acc] ? effect : acc), 'Pure');
+  return result as ComposedEffect<Effects>;
 }
 
 // ============================================================================

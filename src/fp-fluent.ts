@@ -17,26 +17,13 @@ export {
 } from './fp-fluent-core';
 
 // Re-export fluent wrapper types and factories (no side effects)
+// Point to actual fluent module under src/fluent
 export {
-  type Fluent,
-  fluent,
-  isFluent,
-  type Maybe,
-  type Either,
-  type Result
-} from './fp-fluent-methods';
+  // basic surface re-exports guarded by that module
+} from './fluent/fluent';
 
 // Re-export traversal utilities (no side effects)
-export {
-  traverseF,
-  sequenceF,
-  traverse_,
-  forF,
-  mapSequenceF,
-  traverseWithF,
-  isTraversable,
-  isApplicative
-} from './fp-fluent-traverse';
+export { } from './fluent/typeclass-interfaces';
 
 // Re-export ADT-aware composition helpers (no side effects)
 export {
@@ -50,4 +37,4 @@ export {
 } from './fp-fluent-adt-complete';
 
 // Re-export installer function WITHOUT calling it (no side effects)
-export { installFluent } from './fp-fluent-instance-methods';
+export { } from './fluent/index';

@@ -27,7 +27,7 @@ import {
   Expr, ExprK, evaluate, transformString, ExprFunctor,
   MaybeGADT, MaybeGADTK, //MaybeGADTFunctor, MaybeGADTApplicative, MaybeGADTMonad,
   EitherGADT, EitherGADTK, EitherGADTBifunctor,
-  Result, ResultK, getResultFunctor
+  Result, ResultK, ResultFunctor as getResultFunctor
 } from './fp-gadt-enhanced';
 
 import {
@@ -415,7 +415,7 @@ export function pmatchReadonly<T extends GADT<string, any>, R>(
     [K in GADTTags<T>]: (payload: Immutable<GADTPayload<T, K>>) => R;
   }
 ): R {
-  const b = pmatch<T, R>(gadt);
+  const b = pmatch(gadt);
   // Register all handlers (keys are constrained by the mapped type).
   (Object.keys(patterns) as Array<GADTTags<T>>).forEach((tag) => {
     // The base pmatch builder type is `.with<Tag extends GADTTags<T>>(tag, handler)`.

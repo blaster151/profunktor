@@ -13,7 +13,7 @@
 
 import { Apply, Kind2 } from "fp-hkt";
 // BEGIN PATCH: coproduct (sum) monoidal helper
-import type { Either } from '../../../fp-hkt'; // use the project's Either type; do not re-declare it
+import type { Either } from 'fp-hkt'; // use the project's Either type; do not re-declare it
 
 // ----------------------------------------------------------------------------
 // 2-cells between parallel profunctors as natural transformations

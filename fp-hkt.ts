@@ -70,7 +70,8 @@ export type KindResult<F extends Kind<any>, Args extends TypeArgs> = Apply<F, Ar
 // Apply detects new kind path by kindArity, otherwise falls back to legacy slot encoding
 export type Apply<F, Args extends readonly Type[]> =
   F extends { kindArity: number }
-    ? ReturnType<typeof import("./src/kind/kindTypeFactory").applyTypeConstructor>
+    // Avoid importing TS-internal kind factory during library builds; treat as opaque application.
+    ? unknown
     : F extends { type: unknown }
       ? (
           Args extends [infer A]

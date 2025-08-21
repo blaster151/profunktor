@@ -23,7 +23,7 @@ export function liftToAsync<F extends Kind1, A>(
 ): AsyncLazyCofree<F, A> {
   return {
     head: w.head,
-    tail: async () => w.tail()
+    tail: async () => Promise.resolve(w.tail() as any) as Promise<Apply<F, [AsyncLazyCofree<F, A>]>>
   };
 }
 

@@ -66,10 +66,12 @@ export function liftLazyCofreeIntoComposeLazy<G extends Kind1, H extends Kind1>(
   type GKHK<X> = Apply<G, [Apply<H, [X]>]>;
 
   return function lift<A>(wa: LazyCofree<G, A>): LazyCofree<ComposeK<G, H>, A> {
-    const tailThunk: () => GKHK<LazyCofree<ComposeK<G, H>, A>> = () =>
-      Gfunctor.map(wa.tail(), (child: LazyCofree<G, A>) => Happ.of(lift(child))) as any;
-    // Cast the thunk to unknown to bypass the type system, then cast the result
-    return lazyCofree(wa.head, tailThunk as unknown) as unknown as LazyCofree<ComposeK<G, H>, A>;
+    // Compose-aware lazy cofree constructor
+    const head = wa.head as A;
+    const tailCompose = () => (Gfunctor.map as any)(wa.tail() as any, (child: LazyCofree<G, A>) => (Happ.of as any)(lift(child))) as Apply<G, [Apply<H, [LazyCofree<ComposeK<G, H>, A>]>]>;
+    // Bridge into the LazyCofree<ComposeK<G,H>,A> expected tail signature
+    const asComposeK: () => Apply<ComposeK<G, H>, [LazyCofree<ComposeK<G, H>, A>]> = () => tailCompose() as any;
+    return lazyCofree<ComposeK<G, H>, A>(head, asComposeK) as unknown as LazyCofree<ComposeK<G, H>, A>;
   };
 }
 

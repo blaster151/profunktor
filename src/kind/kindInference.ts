@@ -1,15 +1,12 @@
 import {
     Symbol,
-    SymbolLinks,
     Type,
     TypeFlags,
-    TypeParameter,
     ClassDeclaration,
     InterfaceDeclaration,
     TypeAliasDeclaration,
     TypeParameterDeclaration,
     HeritageClause,
-    ExpressionWithTypeArguments,
     TypeReferenceNode,
     KindTypeNode,
     SyntaxKind,
@@ -38,7 +35,7 @@ export function inferKindFromTypeParameters(
             parameterKinds.push(constraintType);
         } else {
             // Default to Type (any type)
-            parameterKinds.push(checker.anyType);
+            parameterKinds.push({ flags: TypeFlags.Any } as Type);
         }
     }
 

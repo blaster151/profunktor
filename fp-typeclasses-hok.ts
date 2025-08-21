@@ -6,8 +6,8 @@
  */
 
 import {
-  Kind, Kind1, Kind2, KindAny, HigherKind, HOK1, HOK2,
-  KindInput, KindOutput, IsKindCompatible, IsHigherKindCompatible,
+  Kind1, Kind2, KindAny, HigherKind, HOK1, HOK2,
+  HKInput as KindInput, HKOutput as KindOutput, IsKindCompatible, IsHigherKindCompatible,
   Apply, TypeArgs, Type
 } from './fp-hkt';
 
