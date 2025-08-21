@@ -361,15 +361,23 @@ export class PersistentList<T> {
    * Iterator support
    */
   [Symbol.iterator](): Iterator<T> {
+    // Cache all values once using traverseNode for O(n) performance
+    const values: T[] = [];
+    if (this.root) {
+      PersistentList.traverseNode(this.root, (value) => {
+        values.push(value);
+      });
+    }
+    
     let index = 0;
     return {
       next: (): IteratorResult<T> => {
-        if (index >= this._size) {
+        if (index >= values.length) {
           return { done: true, value: undefined };
         }
-        const value = this.get(index);
+        const value = values[index];
         index++;
-        return { done: false, value: value! };
+        return { done: false, value };
       }
     };
   }
@@ -431,11 +439,13 @@ export class PersistentList<T> {
    * ForEach operation for PersistentList
    */
   forEach(fn: (value: T, index: number) => void): void {
-    for (let i = 0; i < this._size; i++) {
-      const value = this.get(i);
-      if (value !== undefined) {
-        fn(value, i);
-      }
+    let index = 0;
+    
+    if (this.root) {
+      PersistentList.traverseNode(this.root, (value) => {
+        fn(value, index);
+        index++;
+      });
     }
   }
 
@@ -1709,33 +1719,50 @@ export const PersistentSetFunctorAlt = deriveFunctorInstance<PersistentSetK>({
  * Apply fluent API to PersistentList
  */
 const PersistentListFluentImpl: FluentImpl<any> = {
-  map: (self, f) => self.map(f),
-  chain: (self, f) => {
-    if (self.flatMap) {
-      return self.flatMap(f);
-    }
-    // Fallback implementation for chain
-    return self.map(f).foldLeft(PersistentList.empty(), (acc, val) => {
-      if (val instanceof PersistentList) {
-        return val.foldLeft(acc, (acc2, v) => acc2.append(v));
-      }
-      return acc.append(val);
+  map: (self, f) => {
+    // Use the raw map method directly to avoid circular dependency
+    const result: any[] = [];
+    self.forEach((value) => {
+      result.push(f(value));
     });
+    return PersistentList.fromArray(result);
+  },
+  chain: (self, f) => {
+    // Use the raw flatMap method directly to avoid circular dependency
+    const result: any[] = [];
+    self.forEach((value) => {
+      const mapped = f(value);
+      if (mapped instanceof PersistentList) {
+        mapped.forEach(v => result.push(v));
+      } else {
+        result.push(mapped);
+      }
+    });
+    return PersistentList.fromArray(result);
   },
   flatMap: (self, f) => {
-    // Check if the object has a native flatMap method (not the fluent API one)
-    if (self.flatMap && self.flatMap !== PersistentListFluentImpl.flatMap) {
-      return self.flatMap(f);
-    }
-    // Use the new concat method for cleaner fallback
-    return self.map(f).foldLeft(PersistentList.empty(), (acc, val) => {
-      if (val instanceof PersistentList) {
-        return acc.concat(val);
+    // Use the raw flatMap method directly to avoid circular dependency
+    const result: any[] = [];
+    self.forEach((value) => {
+      const mapped = f(value);
+      if (mapped instanceof PersistentList) {
+        mapped.forEach(v => result.push(v));
+      } else {
+        result.push(mapped);
       }
-      return acc.append(val);
     });
+    return PersistentList.fromArray(result);
   },
-  filter: (self, pred) => self.filter(pred),
+  filter: (self, pred) => {
+    // Use the raw filter method directly to avoid circular dependency
+    const result: any[] = [];
+    self.forEach((value) => {
+      if (pred(value)) {
+        result.push(value);
+      }
+    });
+    return PersistentList.fromArray(result);
+  },
   scan: (self, reducer, seed) => {
     let acc = seed;
     return self.map(v => { 

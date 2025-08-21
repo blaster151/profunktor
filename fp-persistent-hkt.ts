@@ -573,16 +573,10 @@ export const PersistentListInstances = {
     return PersistentList.of(a) as Apply<PersistentListHKT, [A]>;
   },
   ap: <A, B>(fab: Apply<PersistentListHKT, [(a: A) => B]>, fa: Apply<PersistentListHKT, [A]>): Apply<PersistentListHKT, [B]> => {
+    // Use raw methods for implementation - delegate to flatMap and map
     const functions = fab as PersistentList<(a: A) => B>;
     const values = fa as PersistentList<A>;
-    // Since PersistentList doesn't have ap, we need to implement it manually
-    const result: B[] = [];
-    functions.forEach(fn => {
-      values.forEach(val => {
-        result.push(fn(val));
-      });
-    });
-    return PersistentList.fromArray(result) as Apply<PersistentListHKT, [B]>;
+    return functions.flatMap(fn => values.map(fn)) as Apply<PersistentListHKT, [B]>;
   },
   chain: <A, B>(fa: Apply<PersistentListHKT, [A]>, f: (a: A) => Apply<PersistentListHKT, [B]>): Apply<PersistentListHKT, [B]> => {
     return (fa as PersistentList<A>).flatMap(a => f(a) as PersistentList<B>) as Apply<PersistentListHKT, [B]>;
@@ -594,15 +588,15 @@ export const PersistentListFunctor: Functor<PersistentListHKT> = {
 };
 
 export const PersistentListApplicative: Applicative<PersistentListHKT> = {
-  map: PersistentListInstances.map,
+  map: PersistentListFunctor.map, // Reuse functor
   of: PersistentListInstances.of,
   ap: PersistentListInstances.ap
 };
 
 export const PersistentListMonad: Monad<PersistentListHKT> = {
-  map: PersistentListInstances.map,
-  of: PersistentListInstances.of,
-  ap: PersistentListInstances.ap,
+  map: PersistentListFunctor.map, // Reuse functor
+  of: PersistentListApplicative.of, // Reuse applicative
+  ap: PersistentListApplicative.ap, // Reuse applicative
   chain: PersistentListInstances.chain
 };
 
