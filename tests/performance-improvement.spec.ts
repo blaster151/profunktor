@@ -139,3 +139,4 @@ describe('Performance Improvements', () => {
     expect(listDuration / arrayDuration).toBeLessThan(10);
   });
 });
+

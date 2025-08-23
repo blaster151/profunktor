@@ -319,6 +319,13 @@ export class PersistentList<T> {
     
     return result;
   }
+
+  /**
+   * Reduce from left to right (alias for foldLeft)
+   */
+  reduce<U>(fn: (acc: U, value: T, index: number) => U, initial: U): U {
+    return this.foldLeft(initial, fn);
+  }
   
   /**
    * Get head and tail (for pattern matching)

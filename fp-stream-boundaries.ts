@@ -542,4 +542,4 @@ export type Multiplicity = number | "∞";
 export type StateFn<S, A> = (state: S) => [S, A];
 
 // Re-export for convenience
-export { EffectTag, EffectOf, Pure, IO, Async };
+export { EffectTag };
