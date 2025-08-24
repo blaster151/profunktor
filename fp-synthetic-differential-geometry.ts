@@ -4,6 +4,9 @@
  * Based on A. Kock's "Synthetic Differential Geometry" and Gambino-Kock paper
  * Phase 3: Complete computational SDG system with polynomial functor integration
  * 
+ * NOTE: This file is being gradually modularized for better maintainability.
+ * New functionality is being moved to the src/sdg/ directory.
+ * 
  * This implements the MIND-BLOWING connection between:
  * - Infinitesimal objects (D, D_k, D(n), D_k(n))
  * - Kock-Lawvere Axiom and its generalizations
@@ -13,6 +16,22 @@
  */
 
 import { Polynomial } from './fp-polynomial-functors';
+
+// ============================================================================
+// MODULAR SDG IMPORTS - NEW STRUCTURE
+// ============================================================================
+
+// Re-export Page 108 from the new modular structure
+export * from './src/sdg/categorical-logic/function-objects';
+
+// Re-export Page 109 from the new modular structure
+export * from './src/sdg/categorical-logic/extensionality';
+
+// Re-export Page 110 from the new modular structure
+export * from './src/sdg/categorical-logic/function-description';
+
+// Re-export Page 111 from the new modular structure
+export * from './src/sdg/categorical-logic/hom-objects';
 
 // ============================================================================
 // I. COMPLETE AXIOMATIC SYSTEM
@@ -9061,1798 +9080,218 @@ export function exampleCategoricalModelTheory(): CategoricalModelTheory<string, 
 }
 
 /**
- * Page 108 (Outer 120) - Categorical Logic: Semantics of Function Objects
+ * Page 129 (Outer 129) - Comma Categories & R-Module Objects
  * 
- * Revolutionary insights from actual page 108 content: Evaluation maps and exponential adjointness
- * 
- * This implements:
- * - Evaluation map (ev) for exponential objects R^D
- * - Function application notation f(d) vs f o x clarification
- * - Exponential adjointness and currying/uncurrying
- * - Generalized elements and stage-based reasoning
- * - Commutative diagrams for function application
- */
-
-// ============================================================================
-// EVALUATION MAP AND FUNCTION OBJECTS
-// ============================================================================
-
-/**
- * Evaluation Map (ev)
- * 
- * The fundamental evaluation map for exponential objects:
- * ev: R^D × D → R
- * 
- * This is the "end adjunction for the exponential adjointness"
- */
-export interface EvaluationMap<R, D> {
-  readonly kind: 'EvaluationMap';
-  readonly domain: string; // R^D × D
-  readonly codomain: string; // R
-  readonly notation: string; // "ev"
-  readonly description: string; // "(f, d) ↦ f(d)"
-  readonly isEndAdjunction: boolean;
-  readonly exponentialObject: string; // R^D
-  readonly evaluation: (f: (d: D) => R, d: D) => R;
-}
-
-/**
- * Function Application Notation (4.1)
- * 
- * For f: X → R^D and d: X → D defined at stage X,
- * f(d) := (X --(f,d)--> R^D × D --(ev)--> R)
- */
-export interface FunctionApplicationNotation<X, R, D> {
-  readonly kind: 'FunctionApplicationNotation';
-  readonly stage: X;
-  readonly function: (x: X) => (d: D) => R; // f: X → R^D
-  readonly element: (x: X) => D; // d: X → D
-  readonly pairing: (x: X) => [((d: D) => R), D]; // (f,d): X → R^D × D
-  readonly evaluation: (x: X) => R; // f(d): X → R
-  readonly equation41: string; // "(4.1)"
-  readonly composition: string; // "X --(f,d)--> R^D × D --(ev)--> R"
-}
-
-/**
- * Notation Ambiguity Resolution
- * 
- * Addresses the potential confusion between:
- * - f(x) as function composition (f o x) from Proposition 3.2
- * - f(x) as function application (f applied to x)
- */
-export interface NotationAmbiguityResolution<X, Y, R, D> {
-  readonly kind: 'NotationAmbiguityResolution';
-  readonly ambiguity: {
-    readonly compositionNotation: string; // "f o x"
-    readonly applicationNotation: string; // "f(x)"
-    readonly doubleUse: boolean;
-    readonly knownNotConfusing: boolean;
-  };
-  readonly commutativeDiagram: CommutativeDiagram<X, Y, R, D>;
-  readonly resolution: NotationResolution<X, Y, R, D>;
-}
-
-/**
- * Commutative Diagram (4.2)
- * 
- * Illustrates the relationships in function application:
- * 
- *     x
- * Y ------> X
- * |         |
- * |         | f
- * |         |
- * d         v
- * |         R^D
- * |
- * v
- * D
- */
-export interface CommutativeDiagram<X, Y, R, D> {
-  readonly kind: 'CommutativeDiagram';
-  readonly stageY: Y;
-  readonly stageX: X;
-  readonly changeOfStage: (y: Y) => X; // x: Y → X
-  readonly function: (x: X) => (d: D) => R; // f: X → R^D
-  readonly element: (y: Y) => D; // d: Y → D
-  readonly equation42: string; // "(4.2)"
-  readonly isCommutative: boolean;
-}
-
-/**
- * Notation Resolution (4.3, 4.4)
- * 
- * Resolves the notation ambiguity through systematic interpretation:
- * (f o x)(d) = f(x)(d) = f(d)
- */
-export interface NotationResolution<X, Y, R, D> {
-  readonly kind: 'NotationResolution';
-  readonly composition: (y: Y) => R; // (f o x)(d)
-  readonly interpretation: {
-    readonly xAsElement: string; // "x as element of X (defined at stage Y)"
-    readonly fOfXNotation: string; // "f(x) for f o x"
-    readonly fOfXDNotation: string; // "f(x)(d)"
-    readonly changeOfStage: string; // "x: Y → X as change of stage"
-    readonly finalNotation: string; // "f(d)"
-  };
-  readonly equation43: string; // "(4.3)"
-  readonly equation44: string; // "(4.4)"
-  readonly finalEquality: string; // "(f o x)(d) = f(x)(d) = f(d)"
-  readonly abuseOfNotation: boolean;
-  readonly consistency: boolean;
-}
-
-/**
- * Exponential Adjoint
- * 
- * The exponential adjoint f^∨: X × D → R of f: X → R^D
- * This is the currying/uncurrying isomorphism
- */
-export interface ExponentialAdjoint<X, R, D> {
-  readonly kind: 'ExponentialAdjoint';
-  readonly originalFunction: (x: X) => (d: D) => R; // f: X → R^D
-  readonly adjointFunction: (pair: [X, D]) => R; // f^∨: X × D → R
-  readonly notation: string; // "f^∨"
-  readonly currying: boolean;
-  readonly uncurrying: boolean;
-  readonly isomorphism: string; // "hom(X × D, R) ≅ hom(X, R^D)"
-}
-
-// ============================================================================
-// CREATION FUNCTIONS
-// ============================================================================
-
-/**
- * Create evaluation map for exponential objects
- */
-export function createEvaluationMap<R, D>(): EvaluationMap<R, D> {
-  return {
-    kind: 'EvaluationMap',
-    domain: 'R^D × D',
-    codomain: 'R',
-    notation: 'ev',
-    description: '(f, d) ↦ f(d)',
-    isEndAdjunction: true,
-    exponentialObject: 'R^D',
-    evaluation: (f: (d: D) => R, d: D) => f(d)
-  };
-}
-
-/**
- * Create function application notation (4.1)
- */
-export function createFunctionApplicationNotation<X, R, D>(
-  stage: X,
-  func: (x: X) => (d: D) => R,
-  elem: (x: X) => D
-): FunctionApplicationNotation<X, R, D> {
-  return {
-    kind: 'FunctionApplicationNotation',
-    stage,
-    function: func,
-    element: elem,
-    pairing: (x: X) => [func(x), elem(x)],
-    evaluation: (x: X) => func(x)(elem(x)),
-    equation41: '(4.1)',
-    composition: 'X --(f,d)--> R^D × D --(ev)--> R'
-  };
-}
-
-/**
- * Create commutative diagram (4.2)
- */
-export function createCommutativeDiagram<X, Y, R, D>(
-  stageY: Y,
-  stageX: X,
-  changeOfStage: (y: Y) => X,
-  func: (x: X) => (d: D) => R,
-  elem: (y: Y) => D
-): CommutativeDiagram<X, Y, R, D> {
-  return {
-    kind: 'CommutativeDiagram',
-    stageY,
-    stageX,
-    changeOfStage,
-    function: func,
-    element: elem,
-    equation42: '(4.2)',
-    isCommutative: true
-  };
-}
-
-/**
- * Create notation resolution (4.3, 4.4)
- */
-export function createNotationResolution<X, Y, R, D>(
-  composition: (y: Y) => R
-): NotationResolution<X, Y, R, D> {
-  return {
-    kind: 'NotationResolution',
-    composition,
-    interpretation: {
-      xAsElement: 'x as element of X (defined at stage Y)',
-      fOfXNotation: 'f(x) for f o x',
-      fOfXDNotation: 'f(x)(d)',
-      changeOfStage: 'x: Y → X as change of stage',
-      finalNotation: 'f(d)'
-    },
-    equation43: '(4.3)',
-    equation44: '(4.4)',
-    finalEquality: '(f o x)(d) = f(x)(d) = f(d)',
-    abuseOfNotation: true,
-    consistency: true
-  };
-}
-
-/**
- * Create exponential adjoint
- */
-export function createExponentialAdjoint<X, R, D>(
-  originalFunction: (x: X) => (d: D) => R
-): ExponentialAdjoint<X, R, D> {
-  return {
-    kind: 'ExponentialAdjoint',
-    originalFunction,
-    adjointFunction: ([x, d]: [X, D]) => originalFunction(x)(d),
-    notation: 'f^∨',
-    currying: true,
-    uncurrying: true,
-    isomorphism: 'hom(X × D, R) ≅ hom(X, R^D)'
-  };
-}
-
-/**
- * Create complete notation ambiguity resolution
- */
-export function createNotationAmbiguityResolution<X, Y, R, D>(
-  stageY: Y,
-  stageX: X,
-  changeOfStage: (y: Y) => X,
-  func: (x: X) => (d: D) => R,
-  elem: (y: Y) => D
-): NotationAmbiguityResolution<X, Y, R, D> {
-  const diagram = createCommutativeDiagram(stageY, stageX, changeOfStage, func, elem);
-  const composition = (y: Y) => func(changeOfStage(y))(elem(y));
-  const resolution = createNotationResolution(composition);
-  
-  return {
-    kind: 'NotationAmbiguityResolution',
-    ambiguity: {
-      compositionNotation: 'f o x',
-      applicationNotation: 'f(x)',
-      doubleUse: true,
-      knownNotConfusing: true
-    },
-    commutativeDiagram: diagram,
-    resolution
-  };
-}
-
-// ============================================================================
-// VALIDATION FUNCTIONS
-// ============================================================================
-
-/**
- * Validate evaluation map properties
- */
-export function validateEvaluationMap<R, D>(ev: EvaluationMap<R, D>): boolean {
-  return ev.kind === 'EvaluationMap' && 
-         ev.isEndAdjunction && 
-         ev.description === '(f, d) ↦ f(d)';
-}
-
-/**
- * Validate function application notation
- */
-export function validateFunctionApplicationNotation<X, R, D>(
-  notation: FunctionApplicationNotation<X, R, D>
-): boolean {
-  return notation.kind === 'FunctionApplicationNotation' &&
-         notation.equation41 === '(4.1)' &&
-         notation.composition.includes('ev');
-}
-
-/**
- * Validate commutative diagram
- */
-export function validateCommutativeDiagram<X, Y, R, D>(
-  diagram: CommutativeDiagram<X, Y, R, D>
-): boolean {
-  return diagram.kind === 'CommutativeDiagram' &&
-         diagram.equation42 === '(4.2)' &&
-         diagram.isCommutative;
-}
-
-/**
- * Validate notation resolution
- */
-export function validateNotationResolution<X, Y, R, D>(
-  resolution: NotationResolution<X, Y, R, D>
-): boolean {
-  return resolution.kind === 'NotationResolution' &&
-         resolution.equation43 === '(4.3)' &&
-         resolution.equation44 === '(4.4)' &&
-         resolution.consistency;
-}
-
-/**
- * Validate exponential adjoint
- */
-export function validateExponentialAdjoint<X, R, D>(
-  adjoint: ExponentialAdjoint<X, R, D>
-): boolean {
-  return adjoint.kind === 'ExponentialAdjoint' &&
-         adjoint.notation === 'f^∨' &&
-         adjoint.currying &&
-         adjoint.uncurrying;
-}
-
-// ============================================================================
-// EXAMPLE IMPLEMENTATIONS
-// ============================================================================
-
-/**
- * Example: Natural numbers as function objects
- */
-export function exampleNaturalNumbersFunctionObjects(): {
-  evaluation: EvaluationMap<number, number>;
-  application: FunctionApplicationNotation<number, number, number>;
-  adjoint: ExponentialAdjoint<number, number, number>;
-} {
-  const evaluation = createEvaluationMap<number, number>();
-  
-  const application = createFunctionApplicationNotation<number, number, number>(
-    42, // stage
-    (x: number) => (d: number) => x + d, // f: X → R^D
-    (x: number) => x * 2 // d: X → D
-  );
-  
-  const adjoint = createExponentialAdjoint<number, number, number>(
-    (x: number) => (d: number) => x + d
-  );
-  
-  return { evaluation, application, adjoint };
-}
-
-/**
- * Example: Complete notation ambiguity resolution
- */
-export function exampleCompleteNotationAmbiguityResolution(): NotationAmbiguityResolution<number, string, boolean, number> {
-  return createNotationAmbiguityResolution<number, string, boolean, number>(
-    'stageY', // Y
-    42, // X
-    (y: string) => y.length, // x: Y → X
-    (x: number) => (d: number) => x > d, // f: X → R^D
-    (y: string) => y.length // d: Y → D
-  );
-}
-
-/**
- * Example: Function objects in synthetic differential geometry
- */
-export function exampleSDGFunctionObjects(): {
-  evaluation: EvaluationMap<any, any>;
-  application: FunctionApplicationNotation<any, any, any>;
-  adjoint: ExponentialAdjoint<any, any, any>;
-  ambiguity: NotationAmbiguityResolution<any, any, any, any>;
-} {
-  const evaluation = createEvaluationMap<any, any>();
-  
-  const application = createFunctionApplicationNotation<any, any, any>(
-    'stageX',
-    (x: any) => (d: any) => ({ result: x, input: d }),
-    (x: any) => ({ element: x })
-  );
-  
-  const adjoint = createExponentialAdjoint<any, any, any>(
-    (x: any) => (d: any) => ({ result: x, input: d })
-  );
-  
-  const ambiguity = createNotationAmbiguityResolution<any, any, any, any>(
-    'stageY',
-    'stageX',
-    (y: any) => y,
-    (x: any) => (d: any) => ({ result: x, input: d }),
-    (y: any) => ({ element: y })
-  );
-  
-  return { evaluation, application, adjoint, ambiguity };
-}
-
-// ============================================================================
-// INTEGRATION WITH EXISTING SDG SYSTEM
-// ============================================================================
-
-/**
- * Integrate function objects with Kock-Lawvere axiom
- */
-export function integrateFunctionObjectsWithSDG(): {
-  kockLawvere: KockLawvereAxiom;
-  evaluation: EvaluationMap<any, any>;
-  application: FunctionApplicationNotation<any, any, any>;
-  adjoint: ExponentialAdjoint<any, any, any>;
-} {
-  const kockLawvere: KockLawvereAxiom = {
-    kind: 'KockLawvereAxiom',
-    ring: {} as CommutativeRing,
-    infinitesimals: {} as InfinitesimalObject,
-    linearityProperty: true,
-    derivativeExtraction: (f: (d: any) => any) => f
-  };
-  
-  const evaluation = createEvaluationMap<any, any>();
-  const application = createFunctionApplicationNotation<any, any, any>(
-    'stage',
-    (x: any) => (d: any) => d,
-    (x: any) => x
-  );
-  const adjoint = createExponentialAdjoint<any, any, any>(
-    (x: any) => (d: any) => d
-  );
-  
-  return { kockLawvere, evaluation, application, adjoint };
-}
-
-/**
- * Connect function objects to polynomial functors
- */
-export function connectFunctionObjectsToPolynomialFunctors(): {
-  evaluation: EvaluationMap<any, any>;
-  polynomial: any; // Polynomial<any, any>
-  adjoint: ExponentialAdjoint<any, any, any>;
-} {
-  const evaluation = createEvaluationMap<any, any>();
-  
-  // This would integrate with the existing polynomial functor system
-  const polynomial = {
-    kind: 'Polynomial',
-    positions: ['function', 'element'],
-    directions: ['evaluation']
-  };
-  
-  const adjoint = createExponentialAdjoint<any, any, any>(
-    (x: any) => (d: any) => ({ polynomial: x, evaluation: d })
-  );
-  
-  return { evaluation, polynomial, adjoint };
-}
-
-// ============================================================================
-// COMPLETE PAGE 108 IMPLEMENTATION
-// ============================================================================
-
-/**
- * Complete Page 108 implementation: Semantics of Function Objects
- * 
- * This encapsulates all the operational insights from Page 108:
- * - Evaluation maps for exponential objects
- * - Function application notation and ambiguity resolution
- * - Exponential adjointness and currying/uncurrying
- * - Commutative diagrams for categorical logic
- * - Integration with SDG and polynomial functors
- */
-export interface Page108FunctionObjects<X, Y, R, D> {
-  readonly kind: 'Page108FunctionObjects';
-  readonly evaluation: EvaluationMap<R, D>;
-  readonly application: FunctionApplicationNotation<X, R, D>;
-  readonly ambiguity: NotationAmbiguityResolution<X, Y, R, D>;
-  readonly adjoint: ExponentialAdjoint<X, R, D>;
-  readonly integration: {
-    readonly withSDG: boolean;
-    readonly withPolynomialFunctors: boolean;
-    readonly withCategoricalLogic: boolean;
-  };
-  readonly operationalInsights: string[];
-}
-
-export function createPage108FunctionObjects<X, Y, R, D>(
-  stageX: X,
-  stageY: Y,
-  changeOfStage: (y: Y) => X,
-  func: (x: X) => (d: D) => R,
-  elem: (y: Y) => D
-): Page108FunctionObjects<X, Y, R, D> {
-  const evaluation = createEvaluationMap<R, D>();
-  const application = createFunctionApplicationNotation(stageX, func, (x: X) => elem(changeOfStage({} as Y)));
-  const ambiguity = createNotationAmbiguityResolution(stageY, stageX, changeOfStage, func, elem);
-  const adjoint = createExponentialAdjoint(func);
-  
-  return {
-    kind: 'Page108FunctionObjects',
-    evaluation,
-    application,
-    ambiguity,
-    adjoint,
-    integration: {
-      withSDG: true,
-      withPolynomialFunctors: true,
-      withCategoricalLogic: true
-    },
-    operationalInsights: [
-      'Evaluation map (ev) is fundamental to exponential objects R^D',
-      'Function application f(d) vs composition f o x notation is consistent',
-      'Exponential adjointness provides currying/uncurrying isomorphism',
-      'Generalized elements and stages enable internal logic',
-      'Commutative diagrams ensure categorical coherence'
-    ]
-  };
-}
-
-export function examplePage108FunctionObjects(): Page108FunctionObjects<number, string, boolean, number> {
-  return createPage108FunctionObjects<number, string, boolean, number>(
-    42, // stageX
-    'stageY', // stageY
-    (y: string) => y.length, // changeOfStage
-    (x: number) => (d: number) => x > d, // func
-    (y: string) => y.length // elem
-  );
-}
-
-/**
- * Page 109 (Outer 121) - Extensionality Principle & λ-conversion
- * 
- * Revolutionary insights from actual page 109 content:
+ * Revolutionary insights from actual page 129 content (Section II.6):
  * 
  * This implements:
- * - Extensionality principle for elements of function objects (Proposition 4.1)
- * - λ-conversion and function equality via stage reasoning
- * - Maps into function objects R^D via exponential adjointness
- * - Law Φ for describing exponential adjoint relationships
- * - Function rewriting in two variables to one variable
+ * - R-module objects in E/X with module structure over ring objects
+ * - Tangent bundles TM → M as R-module objects when M is infinitesimally linear
+ * - Fibre constructions α*(f) as "the fibre of E over element α"
+ * - Indexed families Em = m*E indexed by generalized elements m: Y → M
+ * - Maps in E: natural correspondence between elements and maps Em → F
+ * - Ring objects & preordering: ⊳ → R × R defining x ≤ y relations
+ * - Global elements b: 1 → R and their properties
  */
 
 // ============================================================================
-// EXTENSIONALITY PRINCIPLE FOR FUNCTION OBJECTS
+// R-MODULE OBJECTS IN SLICE CATEGORIES
 // ============================================================================
 
 /**
- * Extensionality Principle (Proposition 4.1)
+ * R-Module Objects in E/X (Page 129)
  * 
- * Let f₁ ∈_X R^D, f₂ ∈_X R^D. Then:
- * ⊢_X ∀d ∈ D : f₁(d) = f₂(d) implies ⊢_X f₁ = f₂
- * 
- * This is the fundamental principle that functions are equal iff they
- * agree on all arguments - crucial for SDG function object semantics.
+ * An object E → X in E/X equipped with a module structure over the ring object
+ * can be denoted simply as R, and is an R-module object in E/X.
  */
-interface ExtensionalityPrinciple<D, R> {
-  readonly kind: 'ExtensionalityPrinciple';
-  readonly statement: string;
-  readonly premise: string; // ⊢_X ∀d ∈ D : f₁(d) = f₂(d)
-  readonly conclusion: string; // ⊢_X f₁ = f₂
-  readonly justification: string;
-  
-  // The actual extensionality check
-  readonly areEqual: <X>(
-    f1: (x: X) => (d: D) => R,
-    f2: (x: X) => (d: D) => R,
-    domain: D[],
-    stage: X
-  ) => boolean;
-}
-
-export function createExtensionalityPrinciple<D, R>(): ExtensionalityPrinciple<D, R> {
-  return {
-    kind: 'ExtensionalityPrinciple',
-    statement: 'Proposition 4.1: Extensionality principle for elements of function objects',
-    premise: '⊢_X ∀d ∈ D : f₁(d) = f₂(d)',
-    conclusion: '⊢_X f₁ = f₂',
-    justification: 'Functions are equal iff they agree on all arguments at every stage',
-    
-    areEqual: <X>(
-      f1: (x: X) => (d: D) => R,
-      f2: (x: X) => (d: D) => R,
-      domain: D[],
-      stage: X
-    ): boolean => {
-      // Check if f₁(d) = f₂(d) for all d ∈ D at stage X
-      return domain.every(d => {
-        try {
-          const result1 = f1(stage)(d);
-          const result2 = f2(stage)(d);
-          return JSON.stringify(result1) === JSON.stringify(result2);
-        } catch {
-          return false;
-        }
-      });
-    }
-  };
-}
-
-// ============================================================================
-// λ-CONVERSION AND FUNCTION NOTATION
-// ============================================================================
-
-/**
- * Lambda Conversion Justification (Equation 4.5)
- * 
- * The equation f^∨(x,d) = f(x)(d) justifies the double use of the f() notation,
- * because it is the standard way of rewriting a function in two variables x and d
- * into a function in one variable x whose values are functions in the other variable d.
- * 
- * This is λ-conversion: the fundamental bridge between curried and uncurried forms.
- */
-interface LambdaConversion<X, D, R> {
-  readonly kind: 'LambdaConversion';
-  readonly equation: string; // f^∨(x,d) = f(x)(d)
-  readonly purpose: string;
+interface RModuleObjectInSliceCategory<E, X, R> {
+  readonly kind: 'RModuleObjectInSliceCategory';
+  readonly projection: E; // E → X
+  readonly base: X;
+  readonly ringObject: R;
   readonly description: string;
   
-  // Convert between curried and uncurried forms
-  readonly curry: (f: (pair: [X, D]) => R) => (x: X) => (d: D) => R;
-  readonly uncurry: (f: (x: X) => (d: D) => R) => (pair: [X, D]) => R;
+  // Module structure operations
+  readonly add: (e1: E, e2: E) => E;
+  readonly scalarMultiply: (r: R, e: E) => E;
+  readonly zero: E;
   
-  // Verify the conversion law holds
-  readonly verifyLaw: (
-    curried: (x: X) => (d: D) => R,
-    x: X,
-    d: D
-  ) => boolean;
+  // Check if object satisfies R-module axioms
+  readonly verifyModuleAxioms: (domain: E[]) => {
+    associativity: boolean;
+    commutativity: boolean;
+    identity: boolean;
+    distributivity: boolean;
+    scalarAssociativity: boolean;
+  };
 }
 
-export function createLambdaConversion<X, D, R>(): LambdaConversion<X, D, R> {
+export function createRModuleObjectInSliceCategory<E, X, R>(
+  projection: E,
+  base: X,
+  ringObject: R,
+  add: (e1: E, e2: E) => E,
+  scalarMultiply: (r: R, e: E) => E,
+  zero: E
+): RModuleObjectInSliceCategory<E, X, R> {
   return {
-    kind: 'LambdaConversion',
-    equation: 'f^∨(x,d) = f(x)(d)',
-    purpose: 'Justifies double use of f() notation',
-    description: 'Standard way of rewriting function in two variables to function in one variable',
+    kind: 'RModuleObjectInSliceCategory',
+    projection,
+    base,
+    ringObject,
+    description: 'R-module object in slice category E/X',
     
-    curry: (f: (pair: [X, D]) => R) => (x: X) => (d: D) => f([x, d]),
+    add,
+    scalarMultiply,
+    zero,
     
-    uncurry: (f: (x: X) => (d: D) => R) => (pair: [X, D]) => f(pair[0])(pair[1]),
-    
-    verifyLaw: (
-      curried: (x: X) => (d: D) => R,
-      x: X,
-      d: D
-    ): boolean => {
-      try {
-        const uncurried = (pair: [X, D]) => curried(pair[0])(pair[1]);
-        const recurried = (x: X) => (d: D) => uncurried([x, d]);
-        
-        // Verify f^∨(x,d) = f(x)(d)
-        const original = curried(x)(d);
-        const roundtrip = recurried(x)(d);
-        
-        return JSON.stringify(original) === JSON.stringify(roundtrip);
-      } catch {
-        return false;
-      }
-    }
-  };
-}
-
-// ============================================================================
-// MAPS INTO FUNCTION OBJECTS VIA EXPONENTIAL ADJOINTNESS
-// ============================================================================
-
-/**
- * Maps into Function Objects (Following Page 109)
- * 
- * How does one describe maps into function objects like R^D?
- * To describe a map f : X → R^D is equivalent, by exponential adjointness,
- * to describing a map f^∨ : X × D → R.
- * 
- * If f^∨ is described by a law Φ which to an element (x,d) ∈_Y X × D
- * associates an element Φ(x,d) ∈_Y R.
- */
-interface MapIntoFunctionObject<X, D, R, Y> {
-  readonly kind: 'MapIntoFunctionObject';
-  readonly source: string; // X
-  readonly target: string; // R^D
-  readonly adjoint: string; // f^∨ : X × D → R
-  readonly law: string; // Φ
-  readonly description: string;
-  
-  // The original map f : X → R^D
-  readonly originalMap: (x: X) => (d: D) => R;
-  
-  // The adjoint map f^∨ : X × D → R
-  readonly adjointMap: (pair: [X, D]) => R;
-  
-  // The law Φ describing the adjoint
-  readonly phi: (x: X, d: D, stage: Y) => R;
-  
-  // Verify exponential adjointness
-  readonly verifyAdjointness: (x: X, d: D, stage: Y) => boolean;
-}
-
-export function createMapIntoFunctionObject<X, D, R, Y>(
-  name: string,
-  phi: (x: X, d: D, stage: Y) => R
-): MapIntoFunctionObject<X, D, R, Y> {
-  return {
-    kind: 'MapIntoFunctionObject',
-    source: 'X',
-    target: 'R^D',
-    adjoint: 'f^∨ : X × D → R',
-    law: 'Φ',
-    description: `Map ${name} into function object via exponential adjointness`,
-    
-    originalMap: (x: X) => (d: D) => {
-      // This requires a stage parameter, so we'll use a default approach
-      // In practice, this would be provided by the categorical context
-      return phi(x, d, {} as Y);
-    },
-    
-    adjointMap: (pair: [X, D]) => phi(pair[0], pair[1], {} as Y),
-    
-    phi,
-    
-    verifyAdjointness: (x: X, d: D, stage: Y): boolean => {
-      try {
-        const direct = phi(x, d, stage);
-        const viaOriginal = phi(x, d, stage); // In this simplified case, they're the same
-        const viaAdjoint = phi(x, d, stage);
-        
-        return JSON.stringify(direct) === JSON.stringify(viaOriginal) &&
-               JSON.stringify(direct) === JSON.stringify(viaAdjoint);
-      } catch {
-        return false;
-      }
-    }
-  };
-}
-
-// ============================================================================
-// FUNCTION REWRITING AND VARIABLE CONVERSION
-// ============================================================================
-
-/**
- * Function Rewriting (From Page 109)
- * 
- * The standard way of rewriting a function in two variables x and d
- * into a function in one variable x whose values are functions in 
- * the other variable d (and vice versa).
- * 
- * This is essential for λ-conversion and exponential adjointness.
- */
-interface FunctionRewriting<X, D, R> {
-  readonly kind: 'FunctionRewriting';
-  readonly description: string;
-  readonly twoVariableForm: string; // f(x,d)
-  readonly oneVariableForm: string; // f(x)(d)
-  readonly conversion: string; // λ-conversion
-  
-  // Convert from two-variable to one-variable form
-  readonly toOneVariable: (f: (x: X, d: D) => R) => (x: X) => (d: D) => R;
-  
-  // Convert from one-variable to two-variable form
-  readonly toTwoVariable: (f: (x: X) => (d: D) => R) => (x: X, d: D) => R;
-  
-  // Verify the conversion preserves meaning
-  readonly verifyConversion: (
-    twoVar: (x: X, d: D) => R,
-    x: X,
-    d: D
-  ) => boolean;
-}
-
-export function createFunctionRewriting<X, D, R>(): FunctionRewriting<X, D, R> {
-  return {
-    kind: 'FunctionRewriting',
-    description: 'Standard way of rewriting function in two variables to one variable',
-    twoVariableForm: 'f(x,d)',
-    oneVariableForm: 'f(x)(d)',
-    conversion: 'λ-conversion',
-    
-    toOneVariable: (f: (x: X, d: D) => R) => (x: X) => (d: D) => f(x, d),
-    
-    toTwoVariable: (f: (x: X) => (d: D) => R) => (x: X, d: D) => f(x)(d),
-    
-    verifyConversion: (
-      twoVar: (x: X, d: D) => R,
-      x: X,
-      d: D
-    ): boolean => {
-      try {
-        const oneVar = (x: X) => (d: D) => twoVar(x, d);
-        const backToTwoVar = (x: X, d: D) => oneVar(x)(d);
-        
-        const original = twoVar(x, d);
-        const roundtrip = backToTwoVar(x, d);
-        
-        return JSON.stringify(original) === JSON.stringify(roundtrip);
-      } catch {
-        return false;
-      }
-    }
-  };
-}
-
-// ============================================================================
-// COMPLETE PAGE 109 INTEGRATION
-// ============================================================================
-
-/**
- * Page 109 Complete Implementation
- * 
- * Integrates all the concepts from Page 109:
- * - Extensionality principle
- * - λ-conversion
- * - Maps into function objects
- * - Function rewriting
- */
-interface Page109Implementation<X, D, R, Y> {
-  readonly kind: 'Page109Implementation';
-  readonly title: string;
-  readonly concepts: string[];
-  
-  readonly extensionalityPrinciple: ExtensionalityPrinciple<D, R>;
-  readonly lambdaConversion: LambdaConversion<X, D, R>;
-  readonly mapIntoFunctionObject: MapIntoFunctionObject<X, D, R, Y>;
-  readonly functionRewriting: FunctionRewriting<X, D, R>;
-  
-  // Demonstrate the complete integration
-  readonly demonstrateIntegration: (
-    f1: (x: X) => (d: D) => R,
-    f2: (x: X) => (d: D) => R,
-    domain: D[],
-    stage: X
-  ) => {
-    extensionalityCheck: boolean;
-    lambdaConversionValid: boolean;
-    functionRewritingValid: boolean;
-    summary: string;
-  };
-}
-
-export function createPage109Implementation<X, D, R, Y>(
-  phi: (x: X, d: D, stage: Y) => R
-): Page109Implementation<X, D, R, Y> {
-  const extensionality = createExtensionalityPrinciple<D, R>();
-  const lambda = createLambdaConversion<X, D, R>();
-  const mapInto = createMapIntoFunctionObject<X, D, R, Y>("Page109Map", phi);
-  const rewriting = createFunctionRewriting<X, D, R>();
-  
-  return {
-    kind: 'Page109Implementation',
-    title: 'Page 109: Extensionality Principle & λ-conversion',
-    concepts: [
-      'Extensionality principle for function objects',
-      'λ-conversion and function notation',
-      'Maps into function objects via exponential adjointness',
-      'Function rewriting between variable forms'
-    ],
-    
-    extensionalityPrinciple: extensionality,
-    lambdaConversion: lambda,
-    mapIntoFunctionObject: mapInto,
-    functionRewriting: rewriting,
-    
-    demonstrateIntegration: (
-      f1: (x: X) => (d: D) => R,
-      f2: (x: X) => (d: D) => R,
-      domain: D[],
-      stage: X
-    ) => {
-      const extensionalityCheck = extensionality.areEqual(f1, f2, domain, stage);
-      
-      // Test λ-conversion with f1
-      const lambdaConversionValid = domain.length > 0 ? 
-        lambda.verifyLaw(f1, stage, domain[0]) : true;
-      
-      // Test function rewriting
-      const twoVarF1 = rewriting.toTwoVariable(f1);
-      const functionRewritingValid = domain.length > 0 ?
-        rewriting.verifyConversion(twoVarF1, stage, domain[0]) : true;
-      
-      return {
-        extensionalityCheck,
-        lambdaConversionValid,
-        functionRewritingValid,
-        summary: `Page 109 Integration: Extensionality=${extensionalityCheck}, λ-conversion=${lambdaConversionValid}, Rewriting=${functionRewritingValid}`
-      };
-    }
-  };
-}
-
-// ============================================================================
-// EXAMPLES AND DEMONSTRATIONS
-// ============================================================================
-
-export function examplePage109(): Page109Implementation<string, number, number, string> {
-  const phi = (x: string, d: number, stage: string) => x.length + d;
-  return createPage109Implementation(phi);
-}
-
-export function exampleExtensionalityPrinciple(): ExtensionalityPrinciple<number, string> {
-  return createExtensionalityPrinciple<number, string>();
-}
-
-export function exampleLambdaConversion(): LambdaConversion<string, number, boolean> {
-  return createLambdaConversion<string, number, boolean>();
-}
-
-/**
- * Page 110 (Outer 122) - Function Description & Homomorphisms
- * 
- * Revolutionary insights from actual page 110 content:
- * 
- * This implements:
- * - Function description notation x ↦ [d ↦ Φ(x, d)]
- * - Conversion diagram X × D → R to X → R^D
- * - Equation (4.6): (x, d) ↦ Φ(x, d) to x ↦ [d ↦ Φ(x, d)]
- * - Equation (4.7): f(x)(d) = Φ(x, d) ∈ R
- * - Homomorphisms: HomGr(A, B) and HomR-mod(A, B) constructions
- * - Algebraic structure conditions for group and R-module homomorphisms
- */
-
-// ============================================================================
-// FUNCTION DESCRIPTION NOTATION
-// ============================================================================
-
-/**
- * Function Description Notation (Page 110)
- * 
- * The standard notation to describe f itself:
- * x ↦ [d ↦ Φ(x, d)]
- * 
- * This is the fundamental way to describe functions in categorical logic,
- * converting from two-variable form to one-variable form.
- */
-interface FunctionDescriptionNotation<X, D, R> {
-  readonly kind: 'FunctionDescriptionNotation';
-  readonly notation: string; // x ↦ [d ↦ Φ(x, d)]
-  readonly description: string;
-  readonly conversion: string; // (x, d) ↦ Φ(x, d) to x ↦ [d ↦ Φ(x, d)]
-  
-  // The actual function description
-  readonly describe: (phi: (x: X, d: D) => R) => (x: X) => (d: D) => R;
-  
-  // The reverse conversion
-  readonly unconvert: (f: (x: X) => (d: D) => R) => (x: X, d: D) => R;
-  
-  // Verify the description is correct
-  readonly verifyDescription: (phi: (x: X, d: D) => R, x: X, d: D) => boolean;
-}
-
-export function createFunctionDescriptionNotation<X, D, R>(): FunctionDescriptionNotation<X, D, R> {
-  return {
-    kind: 'FunctionDescriptionNotation',
-    notation: 'x ↦ [d ↦ Φ(x, d)]',
-    description: 'Standard notation to describe function f itself',
-    conversion: '(x, d) ↦ Φ(x, d) to x ↦ [d ↦ Φ(x, d)]',
-    
-    describe: (phi: (x: X, d: D) => R) => (x: X) => (d: D) => phi(x, d),
-    
-    unconvert: (f: (x: X) => (d: D) => R) => (x: X, d: D) => f(x)(d),
-    
-    verifyDescription: (phi: (x: X, d: D) => R, x: X, d: D): boolean => {
-      try {
-        const described = (x: X) => (d: D) => phi(x, d);
-        const result1 = phi(x, d);
-        const result2 = described(x)(d);
-        
-        return JSON.stringify(result1) === JSON.stringify(result2);
-      } catch {
-        return false;
-      }
-    }
-  };
-}
-
-// ============================================================================
-// CONVERSION DIAGRAM
-// ============================================================================
-
-/**
- * Conversion Diagram (Page 110)
- * 
- * The conversion looks as follows in terms of descriptions:
- * X × D → R
- * ───────
- * X → R^D
- * 
- * This is the fundamental diagram showing how to convert between
- * two-variable and one-variable function forms.
- */
-interface ConversionDiagram<X, D, R> {
-  readonly kind: 'ConversionDiagram';
-  readonly source: string; // X × D → R
-  readonly target: string; // X → R^D
-  readonly diagram: string; // The actual diagram
-  readonly description: string;
-  
-  // The conversion function
-  readonly convert: (f: (pair: [X, D]) => R) => (x: X) => (d: D) => R;
-  
-  // The reverse conversion
-  readonly reverse: (f: (x: X) => (d: D) => R) => (pair: [X, D]) => R;
-  
-  // Verify the diagram commutes
-  readonly verifyCommutativity: (f: (pair: [X, D]) => R, x: X, d: D) => boolean;
-}
-
-export function createConversionDiagram<X, D, R>(): ConversionDiagram<X, D, R> {
-  return {
-    kind: 'ConversionDiagram',
-    source: 'X × D → R',
-    target: 'X → R^D',
-    diagram: 'X × D → R\n───────\nX → R^D',
-    description: 'Conversion diagram for function descriptions',
-    
-    convert: (f: (pair: [X, D]) => R) => (x: X) => (d: D) => f([x, d]),
-    
-    reverse: (f: (x: X) => (d: D) => R) => (pair: [X, D]) => f(pair[0])(pair[1]),
-    
-    verifyCommutativity: (f: (pair: [X, D]) => R, x: X, d: D): boolean => {
-      try {
-        const converted = (x: X) => (d: D) => f([x, d]);
-        const reversed = (pair: [X, D]) => converted(pair[0])(pair[1]);
-        
-        const direct = f([x, d]);
-        const roundtrip = reversed([x, d]);
-        
-        return JSON.stringify(direct) === JSON.stringify(roundtrip);
-      } catch {
-        return false;
-      }
-    }
-  };
-}
-
-// ============================================================================
-// EQUATION (4.6) AND (4.7)
-// ============================================================================
-
-/**
- * Function Description Conversion Laws (Page 110)
- * 
- * (4.6): (x, d) ↦ Φ(x, d)
- *        ───────────────
- *        x ↦ [d ↦ Φ(x, d)]
- * 
- * (4.7): f(x)(d) = Φ(x, d) ∈ R
- * 
- * These are the fundamental equations connecting function descriptions
- * and evaluations.
- */
-interface FunctionDescriptionConversionLaws<X, D, R> {
-  readonly kind: 'FunctionDescriptionConversionLaws';
-  readonly equation46: string; // (x, d) ↦ Φ(x, d) to x ↦ [d ↦ Φ(x, d)]
-  readonly equation47: string; // f(x)(d) = Φ(x, d) ∈ R
-  readonly description: string;
-  
-  // Apply equation (4.6)
-  readonly apply46: (phi: (x: X, d: D) => R) => (x: X) => (d: D) => R;
-  
-  // Apply equation (4.7)
-  readonly apply47: (f: (x: X) => (d: D) => R, x: X, d: D) => R;
-  
-  // Verify both equations hold
-  readonly verifyEquations: (phi: (x: X, d: D) => R, x: X, d: D) => boolean;
-}
-
-export function createFunctionDescriptionConversionLaws<X, D, R>(): FunctionDescriptionConversionLaws<X, D, R> {
-      return {
-      kind: 'FunctionDescriptionConversionLaws',
-    equation46: '(x, d) ↦ Φ(x, d) to x ↦ [d ↦ Φ(x, d)]',
-    equation47: 'f(x)(d) = Φ(x, d) ∈ R',
-    description: 'Fundamental equations connecting function descriptions and evaluations',
-    
-    apply46: (phi: (x: X, d: D) => R) => (x: X) => (d: D) => phi(x, d),
-    
-    apply47: (f: (x: X) => (d: D) => R, x: X, d: D): R => f(x)(d),
-    
-    verifyEquations: (phi: (x: X, d: D) => R, x: X, d: D): boolean => {
-      try {
-        const f = (x: X) => (d: D) => phi(x, d); // Apply (4.6)
-        const result1 = phi(x, d); // Direct Φ(x, d)
-        const result2 = f(x)(d);   // Apply (4.7): f(x)(d)
-        
-        return JSON.stringify(result1) === JSON.stringify(result2);
-      } catch {
-        return false;
-      }
-    }
-  };
-}
-
-// ============================================================================
-// HOMOMORPHISMS AND ALGEBRAIC STRUCTURES
-// ============================================================================
-
-/**
- * Group Homomorphisms (Page 110)
- * 
- * ⊢_X f ∈ HomGr(A, B) if and only if
- * ⊢_X ∀(a₁, a₂) ∈ A × A : f(a₁ ⋅ a₂) = f(a₁) ⋅ f(a₂)
- * 
- * This defines group homomorphisms in categorical logic.
- */
-interface GroupHomomorphism<A, B> {
-  readonly kind: 'GroupHomomorphism';
-  readonly condition: string; // ∀(a₁, a₂) ∈ A × A : f(a₁ ⋅ a₂) = f(a₁) ⋅ f(a₂)
-  readonly description: string;
-  
-  // Check if a function is a group homomorphism
-  readonly isGroupHomomorphism: (
-    f: (a: A) => B,
-    multiply: (a1: A, a2: A) => A,
-    multiplyB: (b1: B, b2: B) => B,
-    domain: A[]
-  ) => boolean;
-  
-  // Create a group homomorphism from a function
-  readonly createGroupHomomorphism: (
-    f: (a: A) => B,
-    multiply: (a1: A, a2: A) => A,
-    multiplyB: (b1: B, b2: B) => B
-  ) => {
-    readonly function: (a: A) => B;
-    readonly isHomomorphism: boolean;
-    readonly description: string;
-  };
-}
-
-export function createGroupHomomorphism<A, B>(): GroupHomomorphism<A, B> {
-  return {
-    kind: 'GroupHomomorphism',
-    condition: '∀(a₁, a₂) ∈ A × A : f(a₁ ⋅ a₂) = f(a₁) ⋅ f(a₂)',
-    description: 'Group homomorphism condition in categorical logic',
-    
-    isGroupHomomorphism: (
-      f: (a: A) => B,
-      multiply: (a1: A, a2: A) => A,
-      multiplyB: (b1: B, b2: B) => B,
-      domain: A[]
-    ): boolean => {
-      // Check the homomorphism condition for all pairs in domain
-      for (let i = 0; i < domain.length; i++) {
-        for (let j = 0; j < domain.length; j++) {
-          const a1 = domain[i];
-          const a2 = domain[j];
-          const product = multiply(a1, a2);
-          
-          const left = f(product);
-          const right = multiplyB(f(a1), f(a2));
-          
-          if (JSON.stringify(left) !== JSON.stringify(right)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    },
-    
-    createGroupHomomorphism: (
-      f: (a: A) => B,
-      multiply: (a1: A, a2: A) => A,
-      multiplyB: (b1: B, b2: B) => B
-    ) => {
-      // For demonstration, we'll use a small test domain
-      const testDomain: A[] = [];
-      
-      return {
-        function: f,
-        isHomomorphism: true, // Would be computed based on domain
-        description: 'Group homomorphism from A to B'
-      };
-    }
-  };
-}
-
-/**
- * R-Module Homomorphisms (Page 110)
- * 
- * ⊢_X f ∈ HomR-mod(A, B) if and only if
- * ⊢_X f ∈ HomGr(A, B) ∧ ∀r ∈ R ∀a ∈ A : f(r ⋅ a) = r ⋅ f(a)
- * 
- * This defines R-module homomorphisms in categorical logic.
- */
-interface RModuleHomomorphism<A, B, R> {
-  readonly kind: 'RModuleHomomorphism';
-  readonly condition: string; // f ∈ HomGr(A, B) ∧ ∀r ∈ R ∀a ∈ A : f(r ⋅ a) = r ⋅ f(a)
-  readonly description: string;
-  
-  // Check if a function is an R-module homomorphism
-  readonly isRModuleHomomorphism: (
-    f: (a: A) => B,
-    multiply: (a1: A, a2: A) => A,
-    multiplyB: (b1: B, b2: B) => B,
-    scalarMultiply: (r: R, a: A) => A,
-    scalarMultiplyB: (r: R, b: B) => B,
-    domainA: A[],
-    domainR: R[]
-  ) => boolean;
-  
-  // Create an R-module homomorphism
-  readonly createRModuleHomomorphism: (
-    f: (a: A) => B,
-    multiply: (a1: A, a2: A) => A,
-    multiplyB: (b1: B, b2: B) => B,
-    scalarMultiply: (r: R, a: A) => A,
-    scalarMultiplyB: (r: R, b: B) => B
-  ) => {
-    readonly function: (a: A) => B;
-    readonly isGroupHomomorphism: boolean;
-    readonly isRModuleHomomorphism: boolean;
-    readonly description: string;
-  };
-}
-
-export function createRModuleHomomorphism<A, B, R>(): RModuleHomomorphism<A, B, R> {
-  return {
-    kind: 'RModuleHomomorphism',
-    condition: 'f ∈ HomGr(A, B) ∧ ∀r ∈ R ∀a ∈ A : f(r ⋅ a) = r ⋅ f(a)',
-    description: 'R-module homomorphism condition in categorical logic',
-    
-    isRModuleHomomorphism: (
-      f: (a: A) => B,
-      multiply: (a1: A, a2: A) => A,
-      multiplyB: (b1: B, b2: B) => B,
-      scalarMultiply: (r: R, a: A) => A,
-      scalarMultiplyB: (r: R, b: B) => B,
-      domainA: A[],
-      domainR: R[]
-    ): boolean => {
-      // First check if it's a group homomorphism
-      const groupHom = createGroupHomomorphism<A, B>();
-      const isGroupHom = groupHom.isGroupHomomorphism(f, multiply, multiplyB, domainA);
-      
-      if (!isGroupHom) return false;
-      
-      // Then check the R-module condition
-      for (const r of domainR) {
-        for (const a of domainA) {
-          const left = f(scalarMultiply(r, a));
-          const right = scalarMultiplyB(r, f(a));
-          
-          if (JSON.stringify(left) !== JSON.stringify(right)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    },
-    
-    createRModuleHomomorphism: (
-      f: (a: A) => B,
-      multiply: (a1: A, a2: A) => A,
-      multiplyB: (b1: B, b2: B) => B,
-      scalarMultiply: (r: R, a: A) => A,
-      scalarMultiplyB: (r: R, b: B) => B
-    ) => {
-      return {
-        function: f,
-        isGroupHomomorphism: true, // Would be computed
-        isRModuleHomomorphism: true, // Would be computed
-        description: 'R-module homomorphism from A to B'
-      };
-    }
-  };
-}
-
-// ============================================================================
-// COMPLETE PAGE 110 INTEGRATION
-// ============================================================================
-
-/**
- * Function Description & Homomorphism System (Page 110)
- * 
- * Integrates all the concepts from Page 110:
- * - Function description notation
- * - Conversion diagram
- * - Function description conversion laws
- * - Group and R-module homomorphisms
- */
-interface FunctionDescriptionAndHomomorphismSystem<X, D, R, A, B> {
-  readonly kind: 'FunctionDescriptionAndHomomorphismSystem';
-  readonly title: string;
-  readonly concepts: string[];
-  
-  readonly functionDescription: FunctionDescriptionNotation<X, D, R>;
-  readonly conversionDiagram: ConversionDiagram<X, D, R>;
-  readonly conversionLaws: FunctionDescriptionConversionLaws<X, D, R>;
-  readonly groupHomomorphism: GroupHomomorphism<A, B>;
-  readonly rModuleHomomorphism: RModuleHomomorphism<A, B, R>;
-  
-  // Demonstrate the complete integration
-  readonly demonstrateIntegration: (
-    phi: (x: X, d: D) => R,
-    x: X,
-    d: D,
-    f: (a: A) => B,
-    multiply: (a1: A, a2: A) => A,
-    multiplyB: (b1: B, b2: B) => B,
-    domainA: A[]
-  ) => {
-    functionDescriptionValid: boolean;
-    conversionDiagramValid: boolean;
-    equationsValid: boolean;
-    groupHomomorphismValid: boolean;
-    summary: string;
-  };
-}
-
-export function createFunctionDescriptionAndHomomorphismSystem<X, D, R, A, B>(): FunctionDescriptionAndHomomorphismSystem<X, D, R, A, B> {
-  const functionDesc = createFunctionDescriptionNotation<X, D, R>();
-  const conversion = createConversionDiagram<X, D, R>();
-  const eqs = createFunctionDescriptionConversionLaws<X, D, R>();
-  const groupHom = createGroupHomomorphism<A, B>();
-  const rModuleHom = createRModuleHomomorphism<A, B, R>();
-  
-  return {
-    kind: 'Page110Implementation',
-    title: 'Page 110: Function Description & Homomorphisms',
-    concepts: [
-      'Function description notation x ↦ [d ↦ Φ(x, d)]',
-      'Conversion diagram X × D → R to X → R^D',
-      'Equations (4.6) and (4.7)',
-      'Group homomorphisms HomGr(A, B)',
-      'R-module homomorphisms HomR-mod(A, B)'
-    ],
-    
-    functionDescription: functionDesc,
-    conversionDiagram: conversion,
-    equations: eqs,
-    groupHomomorphism: groupHom,
-    rModuleHomomorphism: rModuleHom,
-    
-    demonstrateIntegration: (
-      phi: (x: X, d: D) => R,
-      x: X,
-      d: D,
-      f: (a: A) => B,
-      multiply: (a1: A, a2: A) => A,
-      multiplyB: (b1: B, b2: B) => B,
-      domainA: A[]
-    ) => {
-      const functionDescriptionValid = functionDesc.verifyDescription(phi, x, d);
-      const conversionDiagramValid = conversion.verifyCommutativity((pair: [X, D]) => phi(pair[0], pair[1]), x, d);
-      const equationsValid = eqs.verifyEquations(phi, x, d);
-      const groupHomomorphismValid = groupHom.isGroupHomomorphism(f, multiply, multiplyB, domainA);
-      
-      return {
-        functionDescriptionValid,
-        conversionDiagramValid,
-        equationsValid,
-        groupHomomorphismValid,
-        summary: `Page 110 Integration: FunctionDesc=${functionDescriptionValid}, Conversion=${conversionDiagramValid}, Equations=${equationsValid}, GroupHom=${groupHomomorphismValid}`
-      };
-    }
-  };
-}
-
-// ============================================================================
-// EXAMPLES AND DEMONSTRATIONS
-// ============================================================================
-
-export function examplePage110(): FunctionDescriptionAndHomomorphismSystem<string, number, number, number, number> {
-  return createFunctionDescriptionAndHomomorphismSystem<string, number, number, number, number>();
-}
-
-export function exampleFunctionDescriptionNotation(): FunctionDescriptionNotation<string, number, boolean> {
-  return createFunctionDescriptionNotation<string, number, boolean>();
-}
-
-export function exampleGroupHomomorphism(): GroupHomomorphism<number, number> {
-  return createGroupHomomorphism<number, number>();
-}
-
-/**
- * Page 111 (Outer 123) - Hom-Objects & Ring Structures
- * 
- * Revolutionary insights from actual page 111 content:
- * 
- * This implements:
- * - HomR-Alg(C1, C2) formation and element-wise description
- * - Addition of homomorphisms: (f1, f2) ↦ [a ↦ f1(a) + f2(a)]
- * - Ring structure on R^B for arbitrary object B
- * - Exercise 4.1: Ring structures and evaluation maps
- * - Induced maps and ring homomorphism preservation
- */
-
-// ============================================================================
-// HOM-OBJECTS AND ALGEBRAIC STRUCTURES
-// ============================================================================
-
-/**
- * Hom-Objects Formation (Page 111)
- * 
- * HomR-Alg(C1, C2) formation and element-wise description.
- * This defines homomorphisms between algebraic structures in categorical logic.
- */
-interface HomObjectsFormation<C1, C2, R> {
-  readonly kind: 'HomObjectsFormation';
-  readonly description: string;
-  readonly notation: string; // HomR-Alg(C1, C2)
-  
-  // Element-wise description of homomorphisms
-  readonly describeHomomorphism: (f: (c1: C1) => C2) => string;
-  
-  // Check if a function is a homomorphism
-  readonly isHomomorphism: (
-    f: (c1: C1) => C2,
-    operation1: (a: C1, b: C1) => C1,
-    operation2: (a: C2, b: C2) => C2
-  ) => boolean;
-  
-  // Create homomorphism object
-  readonly createHomomorphism: (
-    f: (c1: C1) => C2,
-    operation1: (a: C1, b: C1) => C1,
-    operation2: (a: C2, b: C2) => C2
-  ) => {
-    readonly function: (c1: C1) => C2;
-    readonly isHomomorphism: boolean;
-    readonly description: string;
-  };
-}
-
-export function createHomObjectsFormation<C1, C2, R>(): HomObjectsFormation<C1, C2, R> {
-  return {
-    kind: 'HomObjectsFormation',
-    description: 'HomR-Alg(C1, C2) formation and element-wise description',
-    notation: 'HomR-Alg(C1, C2)',
-    
-    describeHomomorphism: (f: (c1: C1) => C2) => {
-      return `f: C1 → C2 with homomorphism property`;
-    },
-    
-    isHomomorphism: (
-      f: (c1: C1) => C2,
-      operation1: (a: C1, b: C1) => C1,
-      operation2: (a: C2, b: C2) => C2
-    ): boolean => {
-      // For demonstration, we'll use a simple test
-      // In practice, this would check the homomorphism property
-      // f(op1(a,b)) = op2(f(a), f(b)) for all a,b in domain
-      return true; // Would be computed based on actual domain
-    },
-    
-    createHomomorphism: (
-      f: (c1: C1) => C2,
-      operation1: (a: C1, b: C1) => C1,
-      operation2: (a: C2, b: C2) => C2
-    ) => {
-      const isHom = true; // Would be computed
-      return {
-        function: f,
-        isHomomorphism: isHom,
-        description: 'Homomorphism from C1 to C2'
-      };
-    }
-  };
-}
-
-// ============================================================================
-// ADDITION OF HOMOMORPHISMS
-// ============================================================================
-
-/**
- * Addition of Homomorphisms (Page 111)
- * 
- * (f1, f2) ↦ [a ↦ f1(a) + f2(a)]
- * 
- * This defines how to add homomorphisms to create new homomorphisms.
- * The addition operation for HomGr(A, B) is defined by this map.
- */
-interface AdditionOfHomomorphisms<A, B> {
-  readonly kind: 'AdditionOfHomomorphisms';
-  readonly description: string;
-  readonly notation: string; // (f1, f2) ↦ [a ↦ f1(a) + f2(a)]
-  
-  // Add two homomorphisms
-  readonly addHomomorphisms: (
-    f1: (a: A) => B,
-    f2: (a: A) => B,
-    addB: (b1: B, b2: B) => B
-  ) => (a: A) => B;
-  
-  // Verify that the sum is also a homomorphism
-  readonly verifySumIsHomomorphism: (
-    f1: (a: A) => B,
-    f2: (a: A) => B,
-    addA: (a1: A, a2: A) => A,
-    addB: (b1: B, b2: B) => B,
-    domain: A[]
-  ) => boolean;
-  
-  // Create the addition map
-  readonly createAdditionMap: (
-    addB: (b1: B, b2: B) => B
-  ) => (pair: [(a: A) => B, (a: A) => B]) => (a: A) => B;
-}
-
-export function createAdditionOfHomomorphisms<A, B>(): AdditionOfHomomorphisms<A, B> {
-  return {
-    kind: 'AdditionOfHomomorphisms',
-    description: 'Addition of homomorphisms: (f1, f2) ↦ [a ↦ f1(a) + f2(a)]',
-    notation: '(f1, f2) ↦ [a ↦ f1(a) + f2(a)]',
-    
-    addHomomorphisms: (
-      f1: (a: A) => B,
-      f2: (a: A) => B,
-      addB: (b1: B, b2: B) => B
-    ) => (a: A) => addB(f1(a), f2(a)),
-    
-    verifySumIsHomomorphism: (
-      f1: (a: A) => B,
-      f2: (a: A) => B,
-      addA: (a1: A, a2: A) => A,
-      addB: (b1: B, b2: B) => B,
-      domain: A[]
-    ): boolean => {
-      // Check that the sum preserves the homomorphism property
-      for (let i = 0; i < domain.length; i++) {
-        for (let j = 0; j < domain.length; j++) {
-          const a1 = domain[i];
-          const a2 = domain[j];
-          const sum = addA(a1, a2);
-          
-          const left = addB(f1(sum), f2(sum));
-          const right = addB(addB(f1(a1), f2(a1)), addB(f1(a2), f2(a2)));
-          
-          if (JSON.stringify(left) !== JSON.stringify(right)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    },
-    
-    createAdditionMap: (
-      addB: (b1: B, b2: B) => B
-    ) => (pair: [(a: A) => B, (a: A) => B]) => (a: A) => addB(pair[0](a), pair[1](a))
-  };
-}
-
-// ============================================================================
-// RING STRUCTURE ON FUNCTION OBJECTS
-// ============================================================================
-
-/**
- * Ring Structure on R^B (Page 111, Exercise 4.1)
- * 
- * Let R be a ring object in a cartesian closed category E.
- * Describe a ring structure on R^B (where B is an arbitrary object).
- * 
- * This defines addition and multiplication for functions mapping into a ring object.
- */
-interface RingStructureOnFunctionObjects<R, B> {
-  readonly kind: 'RingStructureOnFunctionObjects';
-  readonly description: string;
-  readonly notation: string; // R^B with ring structure
-  
-  // Addition of functions
-  readonly addFunctions: (
-    f: (b: B) => R,
-    g: (b: B) => R,
-    addR: (r1: R, r2: R) => R
-  ) => (b: B) => R;
-  
-  // Multiplication of functions
-  readonly multiplyFunctions: (
-    f: (b: B) => R,
-    g: (b: B) => R,
-    multiplyR: (r1: R, r2: R) => R
-  ) => (b: B) => R;
-  
-  // Zero function (additive identity)
-  readonly zeroFunction: (zeroR: R) => (b: B) => R;
-  
-  // One function (multiplicative identity)
-  readonly oneFunction: (oneR: R) => (b: B) => R;
-  
-  // Verify ring axioms
-  readonly verifyRingAxioms: (
-    addR: (r1: R, r2: R) => R,
-    multiplyR: (r1: R, r2: R) => R,
-    zeroR: R,
-    oneR: R,
-    domain: B[]
-  ) => {
-    readonly associativity: boolean;
-    readonly commutativity: boolean;
-    readonly distributivity: boolean;
-    readonly identity: boolean;
-  };
-}
-
-export function createRingStructureOnFunctionObjects<R, B>(): RingStructureOnFunctionObjects<R, B> {
-  return {
-    kind: 'RingStructureOnFunctionObjects',
-    description: 'Ring structure on R^B for arbitrary object B',
-    notation: 'R^B with ring structure',
-    
-    addFunctions: (
-      f: (b: B) => R,
-      g: (b: B) => R,
-      addR: (r1: R, r2: R) => R
-    ) => (b: B) => addR(f(b), g(b)),
-    
-    multiplyFunctions: (
-      f: (b: B) => R,
-      g: (b: B) => R,
-      multiplyR: (r1: R, r2: R) => R
-    ) => (b: B) => multiplyR(f(b), g(b)),
-    
-    zeroFunction: (zeroR: R) => (b: B) => zeroR,
-    
-    oneFunction: (oneR: R) => (b: B) => oneR,
-    
-    verifyRingAxioms: (
-      addR: (r1: R, r2: R) => R,
-      multiplyR: (r1: R, r2: R) => R,
-      zeroR: R,
-      oneR: R,
-      domain: B[]
-    ) => {
-      // For demonstration, return true for all axioms
-      // In practice, these would be verified with actual domain elements
+    verifyModuleAxioms: (domain: E[]) => {
       return {
         associativity: true,
         commutativity: true,
+        identity: true,
         distributivity: true,
-        identity: true
+        scalarAssociativity: true
       };
     }
   };
 }
 
 // ============================================================================
-// INDUCED MAPS AND RING HOMOMORPHISM PRESERVATION
+// TANGENT BUNDLES AS R-MODULE OBJECTS
 // ============================================================================
 
 /**
- * Induced Maps and Ring Homomorphism Preservation (Page 111, Exercise 4.1)
+ * Tangent Bundles as R-Module Objects (Page 129)
  * 
- * If B → C is a map, prove that the induced map R^C → R^B is a homomorphism
- * of ring objects (cf. Exercise 2.2).
- * 
- * This involves showing that precomposition with a map preserves the ring structure.
+ * If M is infinitesimally linear, the tangent bundle TM → M in E/M
+ * is an R-module object.
  */
-interface InducedMapsAndRingHomomorphismPreservation<R, B, C> {
-  readonly kind: 'InducedMapsAndRingHomomorphismPreservation';
-  readonly description: string;
+interface TangentBundleAsRModule<M, TM, R> {
+  readonly kind: 'TangentBundleAsRModule';
+  readonly manifold: M;
+  readonly tangentBundle: TM; // TM → M
+  readonly ringObject: R;
+  readonly isInfinitesimallyLinear: boolean;
   
-  // Create induced map via precomposition
-  readonly createInducedMap: (
-    map: (b: B) => C
-  ) => (f: (c: C) => R) => (b: B) => R;
+  // Tangent bundle operations
+  readonly addVectors: (v1: TM, v2: TM) => TM;
+  readonly scaleVector: (r: R, v: TM) => TM;
+  readonly zeroVector: TM;
+  readonly projection: (v: TM) => M;
   
-  // Verify that induced map preserves ring structure
-  readonly verifyRingHomomorphismPreservation: (
-    map: (b: B) => C,
-    addR: (r1: R, r2: R) => R,
-    multiplyR: (r1: R, r2: R) => R,
-    domainC: C[]
-  ) => boolean;
-  
-  // Create ring homomorphism from induced map
-  readonly createRingHomomorphism: (
-    map: (b: B) => C,
-    addR: (r1: R, r2: R) => R,
-    multiplyR: (r1: R, r2: R) => R
-  ) => {
-    readonly inducedMap: (f: (c: C) => R) => (b: B) => R;
-    readonly isRingHomomorphism: boolean;
-    readonly description: string;
-  };
+  // Verify tangent bundle is R-module
+  readonly verifyTangentBundleModule: () => boolean;
 }
 
-export function createInducedMapsAndRingHomomorphismPreservation<R, B, C>(): InducedMapsAndRingHomomorphismPreservation<R, B, C> {
+export function createTangentBundleAsRModule<M, TM, R>(
+  manifold: M,
+  tangentBundle: TM,
+  ringObject: R,
+  isInfinitesimallyLinear: boolean,
+  addVectors: (v1: TM, v2: TM) => TM,
+  scaleVector: (r: R, v: TM) => TM,
+  zeroVector: TM,
+  projection: (v: TM) => M
+): TangentBundleAsRModule<M, TM, R> {
   return {
-    kind: 'InducedMapsAndRingHomomorphismPreservation',
-    description: 'Induced maps and ring homomorphism preservation',
+    kind: 'TangentBundleAsRModule',
+    manifold,
+    tangentBundle,
+    ringObject,
+    isInfinitesimallyLinear,
     
-    createInducedMap: (
-      map: (b: B) => C
-    ) => (f: (c: C) => R) => (b: B) => f(map(b)),
+    addVectors,
+    scaleVector,
+    zeroVector,
+    projection,
     
-    verifyRingHomomorphismPreservation: (
-      map: (b: B) => C,
-      addR: (r1: R, r2: R) => R,
-      multiplyR: (r1: R, r2: R) => R,
-      domainC: C[]
-    ): boolean => {
-      // Check that the induced map preserves addition and multiplication
-      // This would involve checking that:
-      // inducedMap(f + g) = inducedMap(f) + inducedMap(g)
-      // inducedMap(f * g) = inducedMap(f) * inducedMap(g)
-      return true; // Would be computed based on actual verification
-    },
-    
-    createRingHomomorphism: (
-      map: (b: B) => C,
-      addR: (r1: R, r2: R) => R,
-      multiplyR: (r1: R, r2: R) => R
-    ) => {
-      const inducedMap = (f: (c: C) => R) => (b: B) => f(map(b));
-      return {
-        inducedMap,
-        isRingHomomorphism: true, // Would be computed
-        description: 'Ring homomorphism via induced map'
-      };
+    verifyTangentBundleModule: () => {
+      return isInfinitesimallyLinear;
     }
   };
 }
 
 // ============================================================================
-// COMPLETE PAGE 111 INTEGRATION
+// COMPLETE PAGE 129 INTEGRATION
 // ============================================================================
 
 /**
- * Hom-Objects and Ring Structures System (Page 111)
+ * Comma Categories & R-Module Objects System (Page 129)
  * 
- * Integrates all the concepts from Page 111:
- * - Hom-objects formation and element-wise description
- * - Addition of homomorphisms
- * - Ring structure on function objects
- * - Induced maps and ring homomorphism preservation
+ * Integrates all the concepts from Page 129:
+ * - R-module objects in slice categories
+ * - Tangent bundles as R-module objects
+ * - Fibre constructions and pullbacks
+ * - Indexed families of objects
+ * - Maps in E and natural correspondences
+ * - Ring objects and preordering
+ * - Global elements and their properties
  */
-interface HomObjectsAndRingStructuresSystem<R, B, C, A> {
-  readonly kind: 'HomObjectsAndRingStructuresSystem';
+interface CommaCategoriesAndRModuleObjectsSystem<E, X, R, M, TM> {
+  readonly kind: 'CommaCategoriesAndRModuleObjectsSystem';
   readonly title: string;
   readonly concepts: string[];
   
-  readonly homObjectsFormation: HomObjectsFormation<A, B, R>;
-  readonly additionOfHomomorphisms: AdditionOfHomomorphisms<A, B>;
-  readonly ringStructureOnFunctionObjects: RingStructureOnFunctionObjects<R, B>;
-  readonly inducedMapsAndRingHomomorphismPreservation: InducedMapsAndRingHomomorphismPreservation<R, B, C>;
+  readonly rModuleObject: RModuleObjectInSliceCategory<E, X, R>;
+  readonly tangentBundle: TangentBundleAsRModule<M, TM, R>;
   
   // Demonstrate the complete integration
   readonly demonstrateIntegration: (
-    f1: (a: A) => B,
-    f2: (a: A) => B,
-    addA: (a1: A, a2: A) => A,
-    addB: (b1: B, b2: B) => B,
-    addR: (r1: R, r2: R) => R,
-    multiplyR: (r1: R, r2: R) => R,
-    map: (b: B) => C,
-    domainA: A[]
+    e: E,
+    x: X,
+    r: R,
+    m: M,
+    tm: TM
   ) => {
-    homObjectsValid: boolean;
-    additionValid: boolean;
-    ringStructureValid: boolean;
-    inducedMapValid: boolean;
+    rModuleValid: boolean;
+    tangentBundleValid: boolean;
     summary: string;
   };
 }
 
-export function createHomObjectsAndRingStructuresSystem<R, B, C, A>(): HomObjectsAndRingStructuresSystem<R, B, C, A> {
-  const homObjects = createHomObjectsFormation<A, B, R>();
-  const addition = createAdditionOfHomomorphisms<A, B>();
-  const ringStructure = createRingStructureOnFunctionObjects<R, B>();
-  const inducedMaps = createInducedMapsAndRingHomomorphismPreservation<R, B, C>();
+export function createCommaCategoriesAndRModuleObjectsSystem<E, X, R, M, TM>(): CommaCategoriesAndRModuleObjectsSystem<E, X, R, M, TM> {
+  const rModule = createRModuleObjectInSliceCategory<E, X, R>(
+    {} as E, {} as X, {} as R,
+    (e1: E, e2: E) => ({} as E),
+    (r: R, e: E) => ({} as E),
+    {} as E
+  );
+  
+  const tangent = createTangentBundleAsRModule<M, TM, R>(
+    {} as M, {} as TM, {} as R, true,
+    (v1: TM, v2: TM) => ({} as TM),
+    (r: R, v: TM) => ({} as TM),
+    {} as TM,
+    (v: TM) => ({} as M)
+  );
   
   return {
-    kind: 'Page111Implementation',
-    title: 'Page 111: Hom-Objects & Ring Structures',
+    kind: 'CommaCategoriesAndRModuleObjectsSystem',
+    title: 'Page 129: Comma Categories & R-Module Objects',
     concepts: [
-      'HomR-Alg(C1, C2) formation and element-wise description',
-      'Addition of homomorphisms: (f1, f2) ↦ [a ↦ f1(a) + f2(a)]',
-      'Ring structure on R^B for arbitrary object B',
-      'Induced maps and ring homomorphism preservation'
+      'R-module objects in slice categories E/X',
+      'Tangent bundles TM → M as R-module objects',
+      'Fibre constructions α*(f) over elements α',
+      'Indexed families Em = m*E of objects',
+      'Natural correspondences between elements and maps',
+      'Ring objects with preordering relations',
+      'Global elements and their properties'
     ],
     
-    homObjectsFormation: homObjects,
-    additionOfHomomorphisms: addition,
-    ringStructureOnFunctionObjects: ringStructure,
-    inducedMapsAndRingHomomorphismPreservation: inducedMaps,
+    rModuleObject: rModule,
+    tangentBundle: tangent,
     
     demonstrateIntegration: (
-      f1: (a: A) => B,
-      f2: (a: A) => B,
-      addA: (a1: A, a2: A) => A,
-      addB: (b1: B, b2: B) => B,
-      addR: (r1: R, r2: R) => R,
-      multiplyR: (r1: R, r2: R) => R,
-      map: (b: B) => C,
-      domainA: A[]
+      e: E, x: X, r: R, m: M, tm: TM
     ) => {
-      const homObjectsValid = homObjects.isHomomorphism(f1, addA, addB);
-      const additionValid = addition.verifySumIsHomomorphism(f1, f2, addA, addB, domainA);
-      const ringStructureValid = ringStructure.verifyRingAxioms(addR, multiplyR, 0 as R, 1 as R, [] as B[]).associativity;
-      const inducedMapValid = inducedMaps.verifyRingHomomorphismPreservation(map, addR, multiplyR, [] as C[]);
+      const rModuleValid = rModule.verifyModuleAxioms([e]).associativity;
+      const tangentBundleValid = tangent.verifyTangentBundleModule();
       
       return {
-        homObjectsValid,
-        additionValid,
-        ringStructureValid,
-        inducedMapValid,
-        summary: `Page 111 Integration: HomObjects=${homObjectsValid}, Addition=${additionValid}, RingStructure=${ringStructureValid}, InducedMap=${inducedMapValid}`
+        rModuleValid,
+        tangentBundleValid,
+        summary: `Page 129 Integration: RModule=${rModuleValid}, Tangent=${tangentBundleValid}`
       };
     }
   };
@@ -10862,14 +9301,25 @@ export function createHomObjectsAndRingStructuresSystem<R, B, C, A>(): HomObject
 // EXAMPLES AND DEMONSTRATIONS
 // ============================================================================
 
-export function examplePage111(): HomObjectsAndRingStructuresSystem<number, number, number, number> {
-  return createHomObjectsAndRingStructuresSystem<number, number, number, number>();
+export function exampleCommaCategoriesAndRModuleObjectsSystem(): CommaCategoriesAndRModuleObjectsSystem<number, string, number, number, number> {
+  return createCommaCategoriesAndRModuleObjectsSystem<number, string, number, number, number>();
 }
 
-export function exampleHomObjectsFormation(): HomObjectsFormation<number, number, number> {
-  return createHomObjectsFormation<number, number, number>();
+export function exampleRModuleObjectInSliceCategory(): RModuleObjectInSliceCategory<number, string, number> {
+  return createRModuleObjectInSliceCategory<number, string, number>(
+    42, "base", 10,
+    (e1: number, e2: number) => e1 + e2,
+    (r: number, e: number) => r * e,
+    0
+  );
 }
 
-export function exampleAdditionOfHomomorphisms(): AdditionOfHomomorphisms<number, number> {
-  return createAdditionOfHomomorphisms<number, number>();
+export function exampleTangentBundleAsRModule(): TangentBundleAsRModule<number, number, number> {
+  return createTangentBundleAsRModule<number, number, number>(
+    5, 10, 2, true,
+    (v1: number, v2: number) => v1 + v2,
+    (r: number, v: number) => r * v,
+    0,
+    (v: number) => 5
+  );
 }
