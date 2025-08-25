@@ -14,6 +14,7 @@
  */
 
 import { Polynomial } from './fp-polynomial-functors';
+import { Degree, IndexedObject, withDegree } from './fp-polynomial-degree';
 
 // ============================================================================
 // SECTION 1.4: DEFINITION OF A POLYNOMIAL OVER A CATEGORY
@@ -36,6 +37,41 @@ export interface PolynomialDiagram<I, B, A, J> {
   readonly B: B;            // Base object
   readonly A: A;            // Argument object
   readonly J: J;            // Output object
+}
+
+/** Indexed variant that carries (p,q) on every object. */
+export interface IndexedPolynomialDiagram<I, B, A, J> {
+  readonly kind: 'IndexedPolynomialDiagram';
+  readonly s: (b: IndexedObject<B>) => IndexedObject<I>;
+  readonly f: (b: IndexedObject<B>) => IndexedObject<A>;
+  readonly t: (a: IndexedObject<A>) => IndexedObject<J>;
+  readonly I: IndexedObject<I>;
+  readonly B: IndexedObject<B>;
+  readonly A: IndexedObject<A>;
+  readonly J: IndexedObject<J>;
+}
+
+/**
+ * Wrap a plain diagram with degree metadata. Callers supply degree functions for each object.
+ * The underlying maps operate on `.value` and we rewrap with fresh degrees.
+ */
+export function indexDiagram<I, B, A, J>(
+  d: PolynomialDiagram<I, B, A, J>,
+  degI: (i: I) => Degree,
+  degB: (b: B) => Degree,
+  degA: (a: A) => Degree,
+  degJ: (j: J) => Degree
+): IndexedPolynomialDiagram<I, B, A, J> {
+  return {
+    kind: 'IndexedPolynomialDiagram',
+    s: (b) => withDegree(d.s(b.value), degI(d.s(b.value))),
+    f: (b) => withDegree(d.f(b.value), degA(d.f(b.value))),
+    t: (a) => withDegree(d.t(a.value), degJ(d.t(a.value))),
+    I: withDegree(d.I, degI(d.I)),
+    B: withDegree(d.B, degB(d.B)),
+    A: withDegree(d.A, degA(d.A)),
+    J: withDegree(d.J, degJ(d.J))
+  };
 }
 
 /**

@@ -1,451 +1,293 @@
-// ============================================================================
-// DOT-Style Stream Coordination with Dependent Object Types
-// ============================================================================
-// 
-// This file demonstrates how to encode Dependent Object Types (DOT) calculus
-// patterns in TypeScript for stream coordination and shared state management.
-// DOT enables objects with both concrete fields and abstract type members,
-// providing precise modular reasoning about type-level relationships.
-
-// ============================================================================
-// 1. DOT-Style Object Types with Abstract Type Members
-// ============================================================================
-
 /**
- * Base interface for DOT-style objects with abstract type members
+ * DOT-Style Stream Coordination
+ * 
+ * Provides stream coordination for sequential colimits with scheduling hooks
+ * and cancellation semantics.
  */
-interface DOTObject {
-  readonly __brand: string; // flexible base brand
+
+import type { 
+  SequentialColimitPlan, 
+  PushoutStep, 
+  Diagram 
+} from './fp-colimit-sequentializer';
+
+// Stream coordination types
+export interface StreamState<Obj, Mor> {
+  readonly currentDiagram: Diagram<number, Obj, Mor>;
+  readonly stepIndex: number;
+  readonly isComplete: boolean;
+  readonly error?: Error;
 }
 
-/**
- * Abstract type member for multiplicity
- */
-type MultiplicityType<T extends DOTObject> = T extends { multiplicity: infer M } ? M : never;
-
-/**
- * Abstract type member for state
- */
-type StateType<T extends DOTObject> = T extends { state: infer S } ? S : never;
-
-/**
- * Abstract type member for input type
- */
-type InputType<T extends DOTObject> = T extends { input: infer I } ? I : never;
-
-/**
- * Abstract type member for output type
- */
-type OutputType<T extends DOTObject> = T extends { output: infer O } ? O : never;
-
-// ============================================================================
-// 2. Stream Context with Dependent Types
-// ============================================================================
-
-/**
- * Stream context that coordinates multiple streams with shared state
- */
-interface StreamContext<State extends DOTObject, Multiplicity extends number> extends DOTObject {
-  readonly state: State;
-  readonly multiplicity: Multiplicity;
+// Pushout computation context
+export interface PushoutContext<Obj, Mor> {
+  readonly Qk: Obj;
+  readonly Lk: Obj;
+  readonly glue: Mor;
 }
 
-/**
- * Type-level function to extract multiplicity from context
- */
-type ContextMultiplicity<C extends StreamContext<any, any>> = MultiplicityType<C>;
+// Pushout computation function
+export type PushoutComputation<Obj, Mor> = (
+  prevPk: Diagram<number, Obj, Mor>,
+  context: PushoutContext<Obj, Mor>
+) => Diagram<number, Obj, Mor>;
 
-/**
- * Type-level function to extract state from context
- */
-type ContextState<C extends StreamContext<any, any>> = StateType<C>;
+// Emission function for streaming results
+export type EmissionFunction<Obj, Mor> = (
+  state: StreamState<Obj, Mor>,
+  step?: PushoutStep<Obj, Mor>
+) => void;
 
-// ============================================================================
-// 3. Token Bucket State as DOT Object
-// ============================================================================
-
-/**
- * Token bucket state as a DOT object with abstract type members
- */
-interface TokenBucketState extends DOTObject {
-  readonly tokens: number;
-  readonly lastRefill: number;
-  readonly maxTokens: number;
-  readonly refillRate: number;
-  readonly multiplicity: 1; // Abstract type member
-  readonly state: TokenBucketState; // Self-referential abstract member
+// Scheduling hook types
+export interface SchedulingHooks {
+  readonly onStepStart?: (stepIndex: number) => void;
+  readonly onStepEnd?: (stepIndex: number) => void;
+  readonly onError?: (error: Error, stepIndex: number) => void;
+  readonly onComplete?: (finalResult: unknown) => void;
 }
 
-/**
- * Type-level function to compute available capacity
- */
-type AvailableCapacity<S extends TokenBucketState> = 
-  S['tokens'] extends number 
-    ? S['tokens'] extends 0 
-      ? 0 
-      : 1 
-    : 1;
-
-/**
- * Type-level function to compute refill amount
- */
-type RefillAmount<S extends TokenBucketState, Time extends number> = 
-  S['refillRate'] extends number 
-    ? Time extends number 
-      ? number // Simplified for TypeScript compatibility
-      : 0
-    : 0;
-
-// ============================================================================
-// 4. Throttle Stream with DOT-Style Dependencies
-// ============================================================================
-
-/**
- * Throttle stream that depends on token bucket state
- */
-interface ThrottleStream<In, State extends TokenBucketState> extends DOTObject {
-  readonly type: 'ThrottleStream';
-  readonly input: In;
-  readonly output: In | never;
-  readonly state: State;
-  readonly multiplicity: AvailableCapacity<State>;
-  readonly costPerEvent: number;
-  readonly timeoutMs: number;
+// Cancellation token for stream coordination
+export interface CancellationToken {
+  readonly isCancelled: boolean;
+  readonly reason?: string;
 }
 
-/**
- * Type-level function to compute throttle multiplicity
- */
-type ThrottleMultiplicity<S extends TokenBucketState, Cost extends number> = 
-  S['tokens'] extends number 
-    ? S['tokens'] extends Cost 
-      ? S['tokens'] extends 0 
-        ? 0 
-        : 1 
-      : 1 
-    : 1;
-
-/**
- * Type-level function to compute new state after throttle
- */
-type ThrottleNewState<S extends TokenBucketState, Cost extends number, Time extends number> = 
-  S['tokens'] extends number 
-    ? S['tokens'] extends Cost 
-      ? {
-          tokens: S['tokens'] extends number ? S['tokens'] extends Cost ? S['tokens'] extends 0 ? 0 : S['tokens'] : S['tokens'] : 0;
-          lastRefill: Time;
-          maxTokens: S['maxTokens'];
-          refillRate: S['refillRate'];
-          multiplicity: 1;
-          state: ThrottleNewState<S, Cost, Time>;
-          __brand: 'TokenBucketState';
-        }
-      : S
-    : S;
-
-// ============================================================================
-// 5. Stream Coordination with DOT Patterns
-// ============================================================================
-
-/**
- * Stream coordinator that manages multiple streams with shared state
- */
-interface StreamCoordinator<
-  Context extends StreamContext<any, any>,
-  Streams extends readonly DOTObject[]
-> extends DOTObject {
-  readonly context: Context;
-  readonly streams: Streams;
-  readonly multiplicity: ContextMultiplicity<Context>;
-  readonly state: ContextState<Context>;
+// Create a cancellation token
+export function createCancellationToken(): CancellationToken {
+  return { isCancelled: false };
 }
 
-/**
- * Type-level function to compute coordinated multiplicity
- */
-type CoordinatedMultiplicity<C extends StreamContext<any, any>, S extends readonly DOTObject[]> = number;
-
-// ============================================================================
-// 6. Implementation of DOT-Style Stream Coordination
-// ============================================================================
-
-/**
- * Creates a token bucket state
- */
-function createTokenBucketState(
-  tokens: number,
-  maxTokens: number,
-  refillRate: number
-): TokenBucketState {
-  return {
-    tokens,
-    lastRefill: Date.now(),
-    maxTokens,
-    refillRate,
-    multiplicity: 1,
-    state: {} as TokenBucketState, // Will be set after creation
-    __brand: 'DOTObject'
-  } as TokenBucketState;
+// Create default scheduling hooks
+export function createDefaultSchedulingHooks(): SchedulingHooks {
+  return {};
 }
 
-/**
- * Creates a throttle stream with DOT-style dependencies
- */
-function createThrottleStream<In>(
-  costPerEvent: number,
-  timeoutMs: number
-): <State extends TokenBucketState>(
-  state: State
-) => ThrottleStream<In, State> {
-  return <State extends TokenBucketState>(state: State) => ({
-    type: 'ThrottleStream',
-    input: {} as In,
-    output: {} as In | never,
-    state,
-    multiplicity: (state.tokens >= costPerEvent ? 1 : 0) as AvailableCapacity<State>,
-    costPerEvent,
-    timeoutMs,
-    __brand: 'DOTObject'
-  } as ThrottleStream<In, State>);
+// Stream coordination options
+export interface StreamCoordinationOptions<Obj, Mor> {
+  readonly schedulingHooks?: SchedulingHooks;
+  readonly cancellationToken?: CancellationToken;
+  readonly batchSize?: number;
+  readonly timeoutMs?: number;
+  readonly initialDiagram: Diagram<number, Obj, Mor>;
 }
 
-/**
- * Creates a stream coordinator
- */
-function createStreamCoordinator<
-  Context extends StreamContext<any, any>,
-  Streams extends readonly DOTObject[]
->(
-  context: Context,
-  streams: Streams
-): StreamCoordinator<Context, Streams> {
-  return {
-    context,
-    streams,
-    multiplicity: context.multiplicity,
-    state: context.state,
-    __brand: 'DOTObject'
-  } as StreamCoordinator<Context, Streams>;
+// Run sequential colimit with stream coordination
+export async function runSequentialColimit<Obj, Mor>(
+  plan: SequentialColimitPlan<Obj, Mor>,
+  pushout: PushoutComputation<Obj, Mor>,
+  emit: EmissionFunction<Obj, Mor>,
+  options: StreamCoordinationOptions<Obj, Mor>
+): Promise<StreamState<Obj, Mor>> {
+  const {
+    schedulingHooks = createDefaultSchedulingHooks(),
+    cancellationToken = createCancellationToken(),
+    batchSize = 1,
+    timeoutMs = 30000,
+    initialDiagram
+  } = options;
+
+  let currentState: StreamState<Obj, Mor> = {
+    currentDiagram: initialDiagram,
+    stepIndex: 0,
+    isComplete: false
+  };
+
+  emit(currentState);
+
+  try {
+    for (let i = 0; i < plan.steps.length; i++) {
+      schedulingHooks.onStepStart?.(i);
+
+      const step = plan.steps[i];
+      const context: PushoutContext<Obj, Mor> = {
+        Qk: step.Qk,
+        Lk: step.Lk,
+        glue: step.glue
+      };
+
+      const nextPk = pushout(currentState.currentDiagram, context);
+
+      currentState = {
+        currentDiagram: nextPk,
+        stepIndex: i + 1,
+        isComplete: i + 1 === plan.steps.length
+      };
+
+      emit(currentState, step);
+
+      schedulingHooks.onStepEnd?.(i);
+
+      if (cancellationToken.isCancelled) break;
+
+      // optional batching/yielding
+      if (batchSize > 0 && (i + 1) % batchSize === 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, Math.min(timeoutMs, 0)));
+      }
+    }
+
+    return currentState;
+  } catch (err) {
+    const errorObj = err instanceof Error ? err : new Error(String(err));
+    currentState = { ...currentState, error: errorObj, isComplete: true };
+    emit(currentState);
+    throw errorObj;
+  }
 }
 
-// ============================================================================
-// 7. Runtime Coordination Logic
-// ============================================================================
 
-/**
- * Coordinates multiple streams with shared state
- */
-function coordinateStreams<
-  Context extends StreamContext<any, any>,
-  Streams extends readonly DOTObject[]
->(
-  coordinator: StreamCoordinator<Context, Streams>,
-  input: InputType<Streams[0]>
-): [ContextState<Context>, OutputType<Streams[number]>] {
-  let currentState = coordinator.state;
-  let currentInput = input;
+
+
+// Utility functions for stream coordination
+
+// Create a simple emission function that logs to console
+export function createConsoleEmission<Obj, Mor>(): EmissionFunction<Obj, Mor> {
+  return (state: StreamState<Obj, Mor>, step?: PushoutStep<Obj, Mor>) => {
+    if (state.error) {
+      console.error(`Step ${state.stepIndex} failed:`, state.error.message);
+    } else if (state.isComplete) {
+      console.log(`Sequential colimit completed at step ${state.stepIndex}`);
+    } else {
+      console.log(`Step ${state.stepIndex}: processing diagram`);
+    }
+  };
+}
+
+// Create a buffered emission function
+export function createBufferedEmission<Obj, Mor>(
+  buffer: StreamState<Obj, Mor>[] = []
+): EmissionFunction<Obj, Mor> {
+  return (state: StreamState<Obj, Mor>, step?: PushoutStep<Obj, Mor>) => {
+    buffer.push(state);
+  };
+}
+
+// Create scheduling hooks for monitoring
+export function createMonitoringHooks(): SchedulingHooks {
+  const startTime = Date.now();
   
-  // Process through each stream in sequence
-  for (const stream of coordinator.streams) {
-    if ((stream as any).type === 'ThrottleStream') {
-      const throttle = stream as ThrottleStream<any, any>;
+  return {
+    onStepStart: (stepIndex: number) => {
+      console.log(`Starting step ${stepIndex} at ${Date.now() - startTime}ms`);
+    },
+    onStepEnd: (stepIndex: number) => {
+      console.log(`Completed step ${stepIndex} at ${Date.now() - startTime}ms`);
+    },
+    onError: (error: Error, stepIndex: number) => {
+      console.error(`Error at step ${stepIndex}:`, error.message);
+    },
+    onComplete: (finalResult: unknown) => {
+      console.log(`Sequential colimit completed in ${Date.now() - startTime}ms`);
+    }
+  };
+}
+
+// Create a timeout-based cancellation token
+export function createTimeoutCancellationToken(timeoutMs: number): CancellationToken {
+  const token = createCancellationToken();
+  
+  setTimeout(() => {
+    (token as any).isCancelled = true;
+    (token as any).reason = `Timeout after ${timeoutMs}ms`;
+  }, timeoutMs);
+  
+  return token;
+}
+
+// Create a manual cancellation token
+export function createManualCancellationToken(): CancellationToken & { cancel: (reason?: string) => void } {
+  const token = createCancellationToken();
+  
+  return {
+    ...token,
+    cancel: (reason?: string) => {
+      (token as any).isCancelled = true;
+      (token as any).reason = reason || 'Manually cancelled';
+    }
+  };
+}
+
+// Stream coordination with error recovery
+export async function runSequentialColimitWithRecovery<Obj, Mor>(
+  plan: SequentialColimitPlan<Obj, Mor>,
+  pushout: PushoutComputation<Obj, Mor>,
+  emit: EmissionFunction<Obj, Mor>,
+  options: StreamCoordinationOptions<Obj, Mor> & {
+    maxRetries?: number;
+    retryDelayMs?: number;
+  }
+): Promise<StreamState<Obj, Mor>> {
+  const { maxRetries = 3, retryDelayMs = 1000, ...baseOptions } = options;
+  
+  let lastError: Error | undefined;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await runSequentialColimit(plan, pushout, emit, baseOptions);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       
-      // Check if we have enough tokens
-      if (currentState.tokens >= throttle.costPerEvent) {
-        // Consume tokens and produce output
-        const newState = {
-          ...currentState,
-          tokens: currentState.tokens - throttle.costPerEvent,
-          lastRefill: Date.now()
-        };
-        currentState = newState;
-        // Output is the same as input for throttle
-        return [currentState, currentInput as OutputType<Streams[number]>];
-      } else {
-        // No tokens available, no output - this should not happen in a well-typed system
-        // but we need to return something of the correct type
-        throw new Error('Throttle stream blocked: insufficient tokens');
+      if (attempt < maxRetries) {
+        console.warn(`Attempt ${attempt + 1} failed, retrying in ${retryDelayMs}ms:`, lastError.message);
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
       }
     }
   }
   
-  return [currentState, currentInput as OutputType<Streams[number]>];
+  throw lastError!;
 }
 
-// ============================================================================
-// 8. Advanced DOT Patterns: Dependent Multiplicities
-// ============================================================================
-
-/**
- * Type-level function to compute dependent multiplicity based on state
- */
-type DependentMultiplicity<
-  State extends DOTObject,
-  Operation extends string
-> = Operation extends 'throttle'
-  ? State extends TokenBucketState
-    ? AvailableCapacity<State>
-    : 1
-  : 1;
-
-/**
- * Stream with dependent multiplicity
- */
-interface DependentStream<
-  In,
-  Out,
-  State extends DOTObject,
-  Operation extends string
-> extends DOTObject {
-  readonly input: In;
-  readonly output: Out;
-  readonly state: State;
-  readonly multiplicity: DependentMultiplicity<State, Operation>;
-  readonly operation: Operation;
-}
-
-/**
- * Creates a dependent stream
- */
-function createDependentStream<In, Out, State extends DOTObject, Op extends string>(
-  operation: Op,
-  transform: (input: In, state: State) => [State, Out]
-): <S extends State>(state: S) => DependentStream<In, Out, S, Op> {
-  return <S extends State>(state: S) => ({
-    input: {} as In,
-    output: {} as Out,
-    state,
-    multiplicity: (operation === 'throttle' && (state as any).tokens === 0 ? 0 : 1) as DependentMultiplicity<S, Op>,
-    operation,
-    __brand: 'DOTObject'
-  } as DependentStream<In, Out, S, Op>);
-}
-
-// ============================================================================
-// 9. Working Example: DOT-Style Stream Coordination
-// ============================================================================
-
-/**
- * Demonstrates DOT-style stream coordination with shared state
- */
-function demonstrateDOTStreamCoordination() {
-  console.log('=== DOT-Style Stream Coordination ===');
+// Batch processing for large sequential colimits
+export async function runSequentialColimitInBatches<Obj, Mor>(
+  plan: SequentialColimitPlan<Obj, Mor>,
+  pushout: PushoutComputation<Obj, Mor>,
+  emit: EmissionFunction<Obj, Mor>,
+  options: StreamCoordinationOptions<Obj, Mor> & {
+    batchSize: number;
+    interBatchDelayMs?: number;
+  }
+): Promise<StreamState<Obj, Mor>> {
+  const { batchSize, interBatchDelayMs = 100, ...baseOptions } = options;
   
-  // Create initial token bucket state
-  const initialState = createTokenBucketState(5, 10, 1000);
-  console.log('Initial state:', {
-    tokens: initialState.tokens,
-    maxTokens: initialState.maxTokens,
-    refillRate: initialState.refillRate
-  });
-  
-  // Create throttle stream with DOT-style dependencies
-  const throttleStream = createThrottleStream<number>(2, 1000);
-  const throttle = throttleStream(initialState);
-  
-  console.log('Throttle multiplicity:', throttle.multiplicity); // Should be 1 (5 >= 2)
-  
-  // Create stream coordinator
-  const context: StreamContext<TokenBucketState, 1> = {
-    state: initialState,
-    multiplicity: 1,
-    __brand: 'DOTObject'
+  let currentState: StreamState<Obj, Mor> = {
+    currentDiagram: options.initialDiagram,
+    stepIndex: 0,
+    isComplete: false
   };
-  
-  const coordinator = createStreamCoordinator(context, [throttle]);
-  
-  // Simulate events
-  const events = [1, 2, 3, 4, 5];
-  let currentState = initialState;
-  
-  for (const event of events) {
-    const [newState, output] = coordinateStreams(coordinator, event);
-    currentState = newState;
+
+  emit(currentState);
+
+  for (let batchStart = 0; batchStart < plan.steps.length; batchStart += batchSize) {
+    const batchEnd = Math.min(batchStart + batchSize, plan.steps.length);
+    const batchSteps = plan.steps.slice(batchStart, batchEnd);
     
-    console.log(`Event ${event}: tokens=${currentState.tokens}, output=${output}`);
+    // Process batch
+    for (let i = 0; i < batchSteps.length; i++) {
+      const step = batchSteps[i];
+      const context: PushoutContext<Obj, Mor> = {
+        Qk: step.Qk,
+        Lk: step.Lk,
+        glue: step.glue
+      };
+      
+      const nextPk = pushout(currentState.currentDiagram, context);
+      
+      currentState = {
+        currentDiagram: nextPk,
+        stepIndex: batchStart + i + 1,
+        isComplete: false
+      };
+      
+      emit(currentState, step);
+    }
+    
+    // Inter-batch delay
+    if (batchEnd < plan.steps.length && interBatchDelayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, interBatchDelayMs));
+    }
   }
   
-  // Demonstrate dependent multiplicity
-  const emptyState = createTokenBucketState(0, 10, 1000);
-  const emptyThrottle = throttleStream(emptyState);
-  console.log('Empty throttle multiplicity:', emptyThrottle.multiplicity); // Should be 0 (0 < 2)
-}
-
-// ============================================================================
-// 10. Type-Level Validation of DOT Patterns
-// ============================================================================
-
-/**
- * Type-level validation that DOT patterns work correctly
- */
-type ValidateDOTPatterns = {
-  // Token bucket state validation
-  tokenBucketState: TokenBucketState;
+  currentState = { ...currentState, isComplete: true };
+  emit(currentState);
   
-  // Throttle stream validation
-  throttleStream: ThrottleStream<number, TokenBucketState>;
-  
-  // Stream coordinator validation
-  streamCoordinator: StreamCoordinator<
-    StreamContext<TokenBucketState, 1>,
-    readonly [ThrottleStream<number, TokenBucketState>]
-  >;
-  
-  // Dependent multiplicity validation
-  dependentMultiplicity: DependentMultiplicity<TokenBucketState, 'throttle'>;
-  
-  // Context extraction validation
-  contextMultiplicity: ContextMultiplicity<StreamContext<TokenBucketState, 1>>;
-  contextState: ContextState<StreamContext<TokenBucketState, 1>>;
-};
-
-// ============================================================================
-// 11. Export and Run Examples
-// ============================================================================
-
-export {
-  // DOT Types
-  DOTObject,
-  MultiplicityType,
-  StateType,
-  InputType,
-  OutputType,
-  
-  // Stream Context
-  StreamContext,
-  ContextMultiplicity,
-  ContextState,
-  
-  // Token Bucket
-  TokenBucketState,
-  AvailableCapacity,
-  RefillAmount,
-  
-  // Throttle Stream
-  ThrottleStream,
-  ThrottleMultiplicity,
-  ThrottleNewState,
-  
-  // Stream Coordination
-  StreamCoordinator,
-  CoordinatedMultiplicity,
-  
-  // Dependent Streams
-  DependentMultiplicity,
-  DependentStream,
-  
-  // Functions
-  createTokenBucketState,
-  createThrottleStream,
-  createStreamCoordinator,
-  createDependentStream,
-  coordinateStreams,
-  
-  // Examples
-  demonstrateDOTStreamCoordination
-};
-
-// Run examples if this file is executed directly
-if (typeof window === 'undefined') {
-  // demonstrateDOTStreamCoordination();
+  return currentState;
 }

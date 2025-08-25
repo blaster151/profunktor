@@ -42,19 +42,32 @@ export type PolynomialF<Positions, Directions, A> = {
  * 
  * This is the composition of polynomial functors
  */
-export interface PolynomialProduct<P extends Polynomial<any, any>, Q extends Polynomial<any, any>> {
-  readonly left: P;
-  readonly right: Q;
-}
+export type PolynomialProduct<
+  P extends Polynomial<any, any>,
+  Q extends Polynomial<any, any>
+> = Polynomial<
+  { left: P['positions']; right: Q['positions'] },
+  { left: P['directions']; right: Q['directions'] }
+>;
 
 /**
  * Compose two polynomial functors
  */
-export function composePolynomials<P extends Polynomial<any, any>, Q extends Polynomial<any, any>>(
-  p: P,
-  q: Q
-): PolynomialProduct<P, Q> {
-  return { left: p, right: q };
+export function composePolynomials<
+  P extends Polynomial<any, any>,
+  Q extends Polynomial<any, any>
+>(p: P, q: Q): PolynomialProduct<P, Q> {
+  return {
+    positions: { left: p.positions, right: q.positions } as any,
+    directions: (_pos) => ({
+      left: (typeof p.directions === 'function'
+        ? p.directions(p.positions as any)
+        : p.directions) as any,
+      right: (typeof q.directions === 'function'
+        ? q.directions(q.positions as any)
+        : q.directions) as any
+    })
+  };
 }
 
 // ============================================================================
@@ -89,9 +102,11 @@ export const teaInterviewPolynomial: Polynomial<
   directions: (pos) => {
     switch (pos) {
       case 'Tea?':
-        return 'yes' as const;
+        return { 'Tea?': 'yes' as const, 'Kind?': 'green' as const };
       case 'Kind?':
-        return 'green' as const;
+        return { 'Tea?': 'no' as const, 'Kind?': 'black' as const };
+      default:
+        return { 'Tea?': 'yes' as const, 'Kind?': 'green' as const };
     }
   }
 };
@@ -263,13 +278,14 @@ export function cofreePolynomial<P extends Polynomial<any, any>, A>(
           extract: cofree,
           respond,
           get duplicate() {
-            return _duplicate!;
+            // ensure the duplicate is one level deeper: Cofree<P, Cofree<P, Cofree<P, A>>>
+            return cofreePolynomial(_duplicate!, respond);
           },
           extend: <C>(f: (wa: CofreeComonadPolynomial<P, CofreeComonadPolynomial<P, A>>) => C) => 
             cofreePolynomial(f(_duplicate!), respond)
         };
       }
-      return _duplicate;
+      return _duplicate!;
     },
     extend: <B>(f: (wa: CofreeComonadPolynomial<P, A>) => B) => 
       cofreePolynomial(f(cofree), respond)
@@ -318,10 +334,10 @@ export function moduleActionΞ<P extends Polynomial<any, any>, Q extends Polynom
  * Example: Tea Interview Pattern
  */
 export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPolynomial, string> {
-  return suspendPolynomial('Tea?', (answer) => {
-    if (answer === 'yes') {
-      return suspendPolynomial('Kind?', (kind) => {
-        return purePolynomial(`You chose ${kind} tea!`);
+  return suspendPolynomial('Tea?', (dir1) => {
+    if (dir1['Tea?'] === 'yes') {
+      return suspendPolynomial('Kind?', (dir2) => {
+        return purePolynomial(`You chose ${dir2['Kind?']} tea!`);
       });
     } else {
       return purePolynomial('No tea for you!');
@@ -334,12 +350,16 @@ export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPol
  */
 export function createTeaPerson(): CofreeComonadPolynomial<typeof teaInterviewPolynomial, string> {
   return cofreePolynomial('Alice', (question) => {
-    switch (question) {
-      case 'Tea?':
-        return 'yes';
-      case 'Kind?':
-        return 'green';
+    // Always return a full directions object matching the polynomial's directions for the given position.
+    // Example policy: prefers tea and defaults to green.
+    if (question === 'Tea?') {
+      return { 'Tea?': 'yes', 'Kind?': 'green' } as any;
     }
+    if (question === 'Kind?') {
+      return { 'Tea?': 'yes', 'Kind?': 'green' } as any;
+    }
+    // Fallback (shouldn't be hit if positions are only 'Tea?' | 'Kind?')
+    return { 'Tea?': 'no', 'Kind?': 'green' } as any;
   });
 }
 
@@ -385,7 +405,7 @@ export const guessingGameProgram: ProgramSemantics<
     }
     
     return suspendPolynomial({ read: true }, (guess) => {
-      if (guess === input.goal) {
+      if (guess({ read: true }) === input.goal) {
         return purePolynomial(true);
       }
       

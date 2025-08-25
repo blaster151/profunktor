@@ -4,11 +4,11 @@
 import { Kind1, Apply } from './fp-hkt';
 import { Applicative } from './fp-typeclasses-hkt';
 import { Bazaar } from './fp-bazaar-traversable-bridge';
-import { StreamK, Chunk } from './src/fp-stream-core';
-import { Pull, streamFromPull } from './src/fp-stream-pull';
-import { AsyncEffect, parEvalMap } from './src/fp-stream-concurrent';
-import { Bracket, Resource } from './src/fp-resource';
-import { CancelToken } from './src/fp-interrupt';
+import { StreamK, Chunk } from './fp-stream-core';
+import { Pull, streamFromPull } from './fp-stream-pull';
+import { AsyncEffect, parEvalMap } from './fp-stream-concurrent';
+import { Bracket, Resource } from './fp-resource';
+import { CancelToken } from './fp-interrupt';
 import { ConstApplicative, Const, Monoid } from './fp-bazaar-effects';
 
 // Sequential: emit each k(a) in order

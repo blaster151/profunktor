@@ -56,6 +56,8 @@ import {
   EffectTag, EffectOf, Pure, IO, Async
 } from './fp-purity';
 
+import { lens as __mkLens, optional as __mkOptional, prism as __mkPrism } from './fp-optics-core';
+
 // ============================================================================
 // Part 1: Unified ADT Definition Types
 // ============================================================================
@@ -332,13 +334,34 @@ function defineADT<Spec extends Record<string, (...args: any[]) => any>>(
     
     // Optics methods (placeholder)
     lens<K extends string>(key: K): any {
-      // TODO: Implement optics
-      return null;
+      if (!finalConfig.optics) return null;
+      // If this unified ADT is a *product* type, we can return a total Lens.
+      if (metadata.isProductType) {
+        return __mkLens<UnifiedADT, UnifiedADT, any, any>(
+          (s) => (s.payload ? (s.payload as any)[key] : undefined),
+          (b, s) => new UnifiedADT(s.tag, Object.assign({}, s.payload || {}, { [key]: b }))
+        );
+      }
+      // Otherwise (sum type), act as an Optional focusing a field present on this branch.
+      return __mkOptional<UnifiedADT, UnifiedADT, any, any>(
+        (s) => (s.payload && Object.prototype.hasOwnProperty.call(s.payload, key)
+                  ? { tag: 'Just' as const, value: (s.payload as any)[key] }
+                  : { tag: 'Nothing' as const }),
+        (b, s) => (s.payload && Object.prototype.hasOwnProperty.call(s.payload, key)
+                    ? new UnifiedADT(s.tag, Object.assign({}, s.payload, { [key]: b }))
+                    : s)
+      );
     }
     
     prism<K extends string>(key: K): any {
-      // TODO: Implement optics
-      return null;
+      if (!finalConfig.optics) return null;
+      // Prism that matches on the constructor tag == key and builds a value from payload
+      return __mkPrism<UnifiedADT, UnifiedADT, any, any>(
+        (s) => (s.tag === (key as any)
+                  ? { tag: 'Just' as const, value: s.payload }
+                  : { tag: 'Nothing' as const }),
+        (b) => new UnifiedADT(key as any, b)
+      );
     }
     
     // Utility methods

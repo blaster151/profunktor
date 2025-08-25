@@ -46,12 +46,12 @@ export * from './src/sdg/categorical-logic/hom-objects';
  * 
  * This axiom states that functions on infinitesimals are LINEAR!
  */
-export interface KockLawvereAxiom {
+export interface KockLawvereAxiom<A> {
   readonly kind: 'KockLawvereAxiom';
-  readonly ring: CommutativeRing;
-  readonly infinitesimals: InfinitesimalObject;
+  readonly ring: CommutativeRing<A>;
+  readonly infinitesimals: InfinitesimalObject<A>;
   readonly linearityProperty: boolean;
-  readonly derivativeExtraction: (f: (d: any) => any) => any;
+  readonly derivativeExtraction: (f: (d: A) => A) => A;
 }
 
 /**
@@ -62,15 +62,15 @@ export interface KockLawvereAxiom {
  * - Q-algebra (contains rational numbers)
  * - 2 must be invertible (1/2 exists)
  */
-export interface CommutativeRing {
+export interface CommutativeRing<A> {
   readonly kind: 'CommutativeRing';
   readonly isCommutative: boolean;
   readonly hasUnity: boolean;
   readonly isQAlgebra: boolean;
   readonly twoInvertible: boolean;
-  readonly add: (a: any, b: any) => any;
-  readonly multiply: (a: any, b: any) => any;
-  readonly scalarMultiply: (r: number, a: any) => any; // Q-algebra property
+  readonly add: (a: A, b: A) => A;
+  readonly multiply: (a: A, b: A) => A;
+  readonly scalarMultiply: (r: number, a: A) => A; // Q-algebra property
 }
 
 /**
@@ -79,14 +79,14 @@ export interface CommutativeRing {
  * D = {x ∈ R | x² = 0} - the set of nilpotent elements
  * This is the fundamental infinitesimal object used everywhere in SDG
  */
-export interface InfinitesimalObject {
+export interface InfinitesimalObject<A> {
   readonly kind: 'InfinitesimalObject';
-  readonly ring: CommutativeRing;
-  readonly nilpotencyCondition: (x: any) => boolean; // x² = 0
-  readonly elements: any[];
-  readonly isNilpotent: (x: any) => boolean;
-  readonly add: (d1: any, d2: any) => any;
-  readonly multiply: (d1: any, d2: any) => any;
+  readonly ring: CommutativeRing<A>;
+  readonly nilpotencyCondition: (x: A) => boolean; // x² = 0
+  readonly elements: ReadonlyArray<A>;
+  readonly isNilpotent: (x: A) => boolean;
+  readonly add: (d1: A, d2: A) => A;
+  readonly multiply: (d1: A, d2: A) => A;
 }
 
 /**

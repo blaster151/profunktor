@@ -58,7 +58,7 @@ export interface Axiom1W<W, R> {
 }
 
 // W(p,q) Weil Algebras
-export interface WpqWeilAlgebra<W, R> extends WeilAlgebra<W, R> {
+export interface WpqWeilAlgebra<W, R> extends Omit<WeilAlgebra<W, R>, 'kind'> {
   kind: 'WpqWeilAlgebra';
   p: number; // number of variables
   q: number; // nilpotency degree
