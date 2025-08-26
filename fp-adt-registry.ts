@@ -10,6 +10,11 @@
  * with automatic integration with derivable instances and purity tracking.
  */
 
+import { FPKey } from './src/types/brands';
+
+// Type alias for unknown to replace any in generic defaults
+type Unknown = unknown;
+
 
 import {
   // Unified ADT imports
@@ -88,7 +93,7 @@ export const ADTRegistry = {
       Traversable: MaybeUnified.HKT ? {} as Traversable<MaybeK> : undefined,
       Foldable: MaybeUnified.HKT ? {} as Foldable<MaybeK> : undefined
     }
-  } as ADTRegistryEntry<MaybeK, Maybe<any>, typeof MaybeUnified.constructors, { match: typeof matchMaybe }>,
+  } as ADTRegistryEntry<MaybeK, Maybe<Unknown>, typeof MaybeUnified.constructors, { match: typeof matchMaybe }>,
 
   // Either ADT
   Either: {
@@ -101,12 +106,12 @@ export const ADTRegistry = {
   // Provide factories because Either is Kind2: we must fix L first  
   getFunctor: getEitherFunctor, // call as getFunctor<L>()
   getApplicative: getEitherApplicative, // call as getApplicative<L>()
-  getMonad: getEitherMonad, // call as getMonad<L>()
+  // getMonad: getEitherMonad, // call as getMonad<L>() - not available
   Bifunctor: EitherUnified.HKT ? {} as Bifunctor<EitherK> : undefined,
   Traversable: EitherUnified.HKT ? {} as Traversable<EitherK> : undefined,
   Foldable: EitherUnified.HKT ? {} as Foldable<EitherK> : undefined
     }
-  } as ADTRegistryEntry<EitherK, Either<any, any>, typeof EitherUnified.constructors, { match: typeof matchEither }>,
+  } as ADTRegistryEntry<EitherK, Either<Unknown, Unknown>, typeof EitherUnified.constructors, { match: typeof matchEither }>,
 
   // Result ADT
   Result: {
@@ -119,12 +124,12 @@ export const ADTRegistry = {
   // Provide factories because Result is Kind2: we must fix E first
   getFunctor: getResultFunctor, // call as getFunctor<E>()
   getApplicative: getResultApplicative, // call as getApplicative<E>()
-  getMonad: getResultMonad, // call as getMonad<E>()
+  // getMonad: getResultMonad, // call as getMonad<E>() - not available
   Bifunctor: ResultUnified.HKT ? {} as Bifunctor<ResultK> : undefined,
   Traversable: ResultUnified.HKT ? {} as Traversable<ResultK> : undefined,
   Foldable: ResultUnified.HKT ? {} as Foldable<ResultK> : undefined
     }
-  } as ADTRegistryEntry<ResultK, Result<any, any>, typeof ResultUnified.constructors, { match: typeof matchResult }>
+  } as ADTRegistryEntry<ResultK, Result<Unknown, Unknown>, typeof ResultUnified.constructors, { match: typeof matchResult }>
 };
 
 // ============================================================================
@@ -200,6 +205,18 @@ export function getADTEffect<K extends keyof typeof ADTRegistry>(
 }
 
 /**
+ * Local dictionary for dynamic ADT registration
+ */
+const ADTIndex = new Map<FPKey, typeof ADTRegistry[keyof typeof ADTRegistry]>();
+
+/**
+ * Register an ADT with branded key
+ */
+export function registerADT(name: string, entry: typeof ADTRegistry[keyof typeof ADTRegistry]): void {
+  ADTIndex.set(name as unknown as FPKey, entry);
+}
+
+/**
  * Get typeclass instances for an ADT
  */
 export function getADTTypeclassInstances<K extends keyof typeof ADTRegistry>(
@@ -247,33 +264,33 @@ export function generateTypeclassInstances(): void {
   if (EitherUnified.HKT) {
     // Functor instance
   // Use factory for unary Functor instance
-  (ADTRegistry.Either.typeclassInstances as any).getFunctor = getEitherFunctor;
+  (ADTRegistry.Either.typeclassInstances as Record<string, unknown>).getFunctor = getEitherFunctor;
 
     // Bifunctor instance
     ADTRegistry.Either.typeclassInstances.Bifunctor = {
-      bimap: <A, B, C, D>(fa: any, f: (a: A) => C, g: (b: B) => D) => matchEither(fa as any, {
+      bimap: <A, B, C, D>(fa: Either<A, B>, f: (a: A) => C, g: (b: B) => D) => matchEither(fa, {
         Left: (value: A) => Left(f(value)),
         Right: (value: B) => Right(g(value))
       }),
-      mapLeft: <A, B, C>(fa: any, f: (a: A) => C) => matchEither(fa as any, {
+      mapLeft: <A, B, C>(fa: Either<A, B>, f: (a: A) => C) => matchEither(fa, {
         Left: (value: A) => Left(f(value)),
         Right: (value: B) => Right(value)
       }),
-      mapRight: <A, B, D>(fa: any, g: (b: B) => D) => matchEither(fa as any, {
+      mapRight: <A, B, D>(fa: Either<A, B>, g: (b: B) => D) => matchEither(fa, {
         Left: (value: A) => Left(value),
         Right: (value: B) => Right(g(value))
       })
     } as unknown as Bifunctor<EitherK>;
 
     // Factory functions
-    (ADTRegistry.Either.typeclassInstances as any).getFunctor = getEitherFunctor;
-    (ADTRegistry.Either.typeclassInstances as any).getApplicative = getEitherApplicative;
+    (ADTRegistry.Either.typeclassInstances as Record<string, unknown>).getFunctor = getEitherFunctor;
+    (ADTRegistry.Either.typeclassInstances as Record<string, unknown>).getApplicative = getEitherApplicative;
 
     // Monad instance
     ADTRegistry.Either.typeclassInstances.Monad = {
       ...ADTRegistry.Either.typeclassInstances.Applicative,
-      chain: <A, B>(fa: any, f: (a: A) => any) => matchEither(fa as any, {
-        Left: (value: any) => Left(value),
+      chain: <A, B>(fa: Either<A, B>, f: (a: A) => Either<Unknown, B>) => matchEither(fa, {
+        Left: (value: A) => Left(value),
         Right: (value: A) => f(value)
       })
     } as Monad<EitherK>;

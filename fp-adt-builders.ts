@@ -40,6 +40,9 @@ import {
   Eq, Ord, Show
 } from './fp-derivation-helpers';
 
+import { ensureFPRegistry } from './fp-registry-init';
+import { FPKey } from './src/types/brands';
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -526,18 +529,18 @@ export function createSumType<
     }
 
     // Register with derivable instances system if enabled
-    if (enableDerivableInstances && typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-      const registry = (globalThis as any).__FP_REGISTRY;
+    if (enableDerivableInstances) {
+      const registry = ensureFPRegistry();
       const typeName = config.name || 'SumType';
       
       if (derivedInstances.Eq) {
-        registry.register(`${typeName}Eq`, derivedInstances.Eq);
+        registry.register(`${typeName}Eq` as unknown as FPKey, derivedInstances.Eq);
       }
       if (derivedInstances.Ord) {
-        registry.register(`${typeName}Ord`, derivedInstances.Ord);
+        registry.register(`${typeName}Ord` as unknown as FPKey, derivedInstances.Ord);
       }
       if (derivedInstances.Show) {
-        registry.register(`${typeName}Show`, derivedInstances.Show);
+        registry.register(`${typeName}Show` as unknown as FPKey, derivedInstances.Show);
       }
     }
   }
@@ -751,18 +754,18 @@ export function createProductType<
     }
 
     // Register with derivable instances system if enabled
-    if (enableDerivableInstances && typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-      const registry = (globalThis as any).__FP_REGISTRY;
+    if (enableDerivableInstances) {
+      const registry = ensureFPRegistry();
       const typeName = config.name || 'ProductType';
       
       if (derivedInstances.Eq) {
-        registry.register(`${typeName}Eq`, derivedInstances.Eq);
+        registry.register(`${typeName}Eq` as unknown as FPKey, derivedInstances.Eq);
       }
       if (derivedInstances.Ord) {
-        registry.register(`${typeName}Ord`, derivedInstances.Ord);
+        registry.register(`${typeName}Ord` as unknown as FPKey, derivedInstances.Ord);
       }
       if (derivedInstances.Show) {
-        registry.register(`${typeName}Show`, derivedInstances.Show);
+        registry.register(`${typeName}Show` as unknown as FPKey, derivedInstances.Show);
       }
     }
   }
@@ -880,12 +883,12 @@ function registerSumTypeForDerivableInstances<Spec extends ConstructorSpec>(
   };
   
   // Register with global registry
-  (globalThis as any).__adtRegistry = (globalThis as any).__adtRegistry || {};
-  (globalThis as any).__adtRegistry[`sum_${builder.effect}`] = {
+  const registry = ensureFPRegistry();
+  registry.register(`sum_${builder.effect}` as unknown as FPKey, {
     builder,
     instance: sumTypeInstance,
     effect: builder.effect
-  };
+  });
 }
 
 /**
@@ -923,12 +926,12 @@ function registerProductTypeForDerivableInstances<Fields extends ProductFields>(
   };
   
   // Register with global registry
-  (globalThis as any).__adtRegistry = (globalThis as any).__adtRegistry || {};
-  (globalThis as any).__adtRegistry[`product_${builder.effect}`] = {
+  const registry = ensureFPRegistry();
+  registry.register(`product_${builder.effect}` as unknown as FPKey, {
     builder,
     instance: productTypeInstance,
     effect: builder.effect
-  };
+  });
 }
 
 // ============================================================================

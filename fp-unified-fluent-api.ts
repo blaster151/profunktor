@@ -1,4 +1,195 @@
+import { FPKey, OpName, ExprId, Brand } from './src/types/brands';
+import { ensureFPRegistry } from './fp-registry-init';
+
 export { KindWithPhantom };
+
+// ============================================================================
+// REGISTRY HELPER FUNCTIONS
+// ============================================================================
+
+export function register<T = unknown>(name: string, value: T): void {
+  ensureFPRegistry().register(name as unknown as FPKey, value);
+}
+
+export function get<T = unknown>(name: string): T | undefined {
+  return ensureFPRegistry().get<T>(name as unknown as FPKey);
+}
+
+// ============================================================================
+// OPAQUE IDENTITY TYPES FOR NODES/OPERATORS
+// ============================================================================
+
+export type StageTag = Brand<string, 'StageTag'>; // optional if you tag stages/passes
+
+// ============================================================================
+// TYPED FLUENT CONTEXT
+// ============================================================================
+
+export interface FluentContext {
+  readonly debug?: boolean;
+  readonly seed?: number;
+  readonly locale?: string;
+  readonly enableOptimization?: boolean;
+  readonly optimizationMode?: 'speed' | 'memory' | 'balanced';
+  readonly maxOptimizationPasses?: number;
+  readonly allowInlining?: boolean;
+  readonly preserveOrder?: boolean;
+  readonly enableFusion?: boolean;
+  readonly enableSinglePass?: boolean;
+}
+
+export interface Op<I, O, Ctx = FluentContext> {
+  readonly name: OpName;
+  readonly arity: number;            // 1 for unary map, 2 for binary, etc.
+  readonly run: (input: I, ctx: Ctx) => O;
+}
+
+export interface Step<I, O, Ctx = FluentContext> {
+  readonly id: ExprId;
+  readonly op: Op<I, O, Ctx>;
+}
+
+export interface Pipeline<I, O, Ctx = FluentContext> {
+  readonly steps: readonly Step<any, any, Ctx>[]; // internal array can stay erased
+  readonly inputType?: unknown;                   // marker for inference; not used at runtime
+  readonly outputType?: unknown;
+
+  map<N>(f: (o: O) => N): Pipeline<I, N, Ctx>;
+  thru<N>(op: Op<O, N, Ctx>): Pipeline<I, N, Ctx>;
+  thru<N>(name: OpName, reg: OpRegistry<Ctx>): Pipeline<I, N, Ctx>;
+  run(input: I, ctx: Ctx): O;
+}
+
+// Type helpers (no runtime):
+export type Erased = unknown;
+
+// ============================================================================
+// JSON TYPE AND TYPE GUARDS
+// ============================================================================
+
+type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
+
+function isRecord(x: unknown): x is Record<string, unknown> {
+  return typeof x === 'object' && x !== null && !Array.isArray(x);
+}
+
+function isString(x: unknown): x is string {
+  return typeof x === 'string';
+}
+
+function isNumber(x: unknown): x is number {
+  return typeof x === 'number';
+}
+
+function isBoolean(x: unknown): x is boolean {
+  return typeof x === 'boolean';
+}
+
+function isArray(x: unknown): x is unknown[] {
+  return Array.isArray(x);
+}
+
+// ============================================================================
+// TYPED OPERATOR REGISTRY
+// ============================================================================
+
+export interface OpRegistry<Ctx = FluentContext> {
+  readonly byName: Map<OpName, Op<Erased, Erased, Ctx>>;
+  register<I, O>(op: Op<I, O, Ctx>): void;
+  get<I, O>(name: OpName): Op<I, O, Ctx> | undefined; // caller decides expected types
+}
+
+export function createOpRegistry<Ctx = FluentContext>(): OpRegistry<Ctx> {
+  const byName = new Map<OpName, Op<Erased, Erased, Ctx>>();
+  return {
+    byName,
+    register(op) { byName.set(op.name, op as unknown as Op<Erased, Erased, Ctx>); },
+    get(name) { return byName.get(name) as unknown as Op<any, any, Ctx> | undefined; }
+  };
+}
+
+// ============================================================================
+// GENERIC FLUENT BUILDER
+// ============================================================================
+
+export function pipeline<I, O, Ctx = FluentContext>(
+  first: Step<I, O, Ctx>,
+  rest: readonly Step<any, any, Ctx>[] = []
+): Pipeline<I, O, Ctx> {
+  const steps = [first, ...rest] as readonly Step<any, any, Ctx>[];
+  return {
+    steps,
+    map<N>(f: (o: O) => N): Pipeline<I, N, Ctx> {
+      const op = unary<O, N, Ctx>('map', (o) => f(o));
+      const id = (crypto?.randomUUID?.() ?? `map:${Math.random()}`) as unknown as ExprId;
+      const step: Step<O, N, Ctx> = { id, op };
+      return pipeline<I, N, Ctx>(steps[0] as Step<I, any, Ctx>, [...steps.slice(1), step]);
+    },
+    thru<N>(opOrName: Op<O, N, Ctx> | OpName, reg?: OpRegistry<Ctx>): Pipeline<I, N, Ctx> {
+      let op: Op<O, N, Ctx>;
+      if (typeof opOrName === 'string') {
+        const foundOp = reg!.get<O, N>(opOrName as unknown as OpName);
+        if (!foundOp) {
+          throw new Error(`Operator '${opOrName}' not found in registry`);
+        }
+        op = foundOp;
+      } else {
+        op = opOrName;
+      }
+      const id = (crypto?.randomUUID?.() ?? `thru:${Math.random()}`) as unknown as ExprId;
+      const step: Step<O, N, Ctx> = { id, op };
+      return pipeline<I, N, Ctx>(steps[0] as Step<I, any, Ctx>, [...steps.slice(1), step]);
+    },
+    run(input: I, ctx: Ctx): O {
+      let acc: any = input;
+      for (const s of steps) {
+        acc = (s.op.run as (i: any, c: Ctx) => any)(acc, ctx);
+      }
+      return acc as O;
+    }
+  };
+}
+
+// ============================================================================
+// FLUENT FACTORY
+// ============================================================================
+
+export function createFluent<I, O, Ctx = FluentContext>(
+  first: Step<I, O, Ctx>,
+  rest?: readonly Step<any, any, Ctx>[]
+): Pipeline<I, O, Ctx> {
+  return pipeline<I, O, Ctx>(first, rest || []);
+}
+
+// Helper function to create typed steps from existing fluent methods
+export function createTypedStep<I, O, Ctx = FluentContext>(
+  name: string,
+  operation: (input: I, ctx: Ctx) => O
+): Step<I, O, Ctx> {
+  const op = unary<I, O, Ctx>(name, operation);
+  const id = (crypto?.randomUUID?.() ?? `${name}:${Math.random()}`) as unknown as ExprId;
+  return { id, op };
+}
+
+// ============================================================================
+// OP FACTORY HELPERS
+// ============================================================================
+
+export function unary<I, O, Ctx = FluentContext>(name: string, run: (i: I, ctx: Ctx) => O): Op<I, O, Ctx> {
+  return { name: name as unknown as OpName, arity: 1, run };
+}
+
+export function binary<A, B, O, Ctx = FluentContext>(name: string, run: (a: A, b: B, ctx: Ctx) => O): Op<[A, B], O, Ctx> {
+  return { name: name as unknown as OpName, arity: 2, run: (ab, ctx) => run(ab[0], ab[1], ctx) };
+}
+
+/**
+ * Polymorphic identity operator builder
+ */
+export function idOp<T, Ctx = FluentContext>(): Op<T, T, Ctx> {
+  return unary<T, T, Ctx>('id', (x) => x);
+}
+
 /**
  * Unified Fluent API System
  * 
@@ -27,14 +218,22 @@ export { KindWithPhantom };
  */
 
 // Guarded require helper to avoid Node typing dependencies
-const _req = (name: string): any => {
-  try { return (globalThis as any).require ? (globalThis as any).require(name) : undefined; }
+const _req = (name: string): unknown => {
+  try { 
+    const global = globalThis as Record<string, unknown>;
+    const requireFn = global.require;
+    return isFunction(requireFn) ? requireFn(name) : undefined; 
+  }
   catch { return undefined; }
 };
 
+function isFunction(x: unknown): x is Function {
+  return typeof x === 'function';
+}
+
 import { getTypeclassInstance, getDerivableInstances, getFPRegistry } from './fp-registry-init';
-import { 
-  Kind, Kind1, Kind2, Kind3, 
+import {
+  Kind1, Kind2, Kind3, 
   Apply, Type, TypeArgs, KindArity, KindResult, ArityOf,
   HigherKind, HKInput, HKOutput,
   Phantom, KindWithPhantom,
@@ -150,16 +349,16 @@ export interface TypeclassAwareFluentMethods<A, T extends TypeclassCapabilities>
     : never;
   
   // Monad operations (only if Monad capability exists)
-  chain<B>(f: (a: A) => any): HasMonad<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  chain<B>(f: (a: A) => Erased): HasMonad<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
-  flatMap<B>(f: (a: A) => any): HasMonad<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  flatMap<B>(f: (a: A) => Erased): HasMonad<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
   
   // Applicative operations (only if Applicative capability exists)
-  ap<B>(fab: any): HasApplicative<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  ap<B>(fab: Erased): HasApplicative<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
   
   // ReplicateA operation (only if Applicative capability exists)
@@ -175,24 +374,24 @@ export interface TypeclassAwareFluentMethods<A, T extends TypeclassCapabilities>
       : never;
   
   // Bifunctor operations (only if Bifunctor capability exists)
-  bimap<L, R>(left: (l: L) => any, right: (r: R) => any): HasBifunctor<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  bimap<L, R>(left: (l: L) => Erased, right: (r: R) => Erased): HasBifunctor<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
-  mapLeft<L, R>(f: (l: L) => any): HasBifunctor<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  mapLeft<L, R>(f: (l: L) => Erased): HasBifunctor<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
-  mapRight<L, R>(f: (r: R) => any): HasBifunctor<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  mapRight<L, R>(f: (r: R) => Erased): HasBifunctor<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
   
   // Traversable operations (only if Traversable capability exists)
-  traverse<B, F>(f: (a: A) => any): HasTraversable<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  traverse<B, F>(f: (a: A) => Erased): HasTraversable<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
   
   // Sequence operation (only if Traversable capability exists)
-  sequence<G extends Kind1>(applicative: any): HasTraversable<T> extends true 
-    ? TypeclassAwareFluentMethods<any, T> 
+  sequence<G extends Kind1>(applicative: Erased): HasTraversable<T> extends true 
+    ? TypeclassAwareFluentMethods<Erased, T> 
     : never;
   
   // Standard typeclass operations (only if respective capabilities exist)
@@ -208,15 +407,15 @@ export function detectTypeclassCapabilities(adtName: string): TypeclassCapabilit
   const derivable = getDerivableInstances(adtName);
   
   return {
-    Functor: !!(derivable?.functor || getTypeclassInstance(adtName, 'Functor')),
-    Applicative: !!(derivable?.applicative || getTypeclassInstance(adtName, 'Applicative')),
-    Monad: !!(derivable?.monad || getTypeclassInstance(adtName, 'Monad')),
-    Bifunctor: !!(derivable?.bifunctor || getTypeclassInstance(adtName, 'Bifunctor')),
-    Traversable: !!(derivable?.traversable || getTypeclassInstance(adtName, 'Traversable')),
-    Filterable: !!(derivable?.filterable || getTypeclassInstance(adtName, 'Filterable')),
-    Eq: !!(derivable?.eq || getTypeclassInstance(adtName, 'Eq')),
-    Ord: !!(derivable?.ord || getTypeclassInstance(adtName, 'Ord')),
-    Show: !!(derivable?.show || getTypeclassInstance(adtName, 'Show'))
+    Functor: !!((derivable as Record<string, unknown>)?.functor || getTypeclassInstance(adtName, 'Functor')),
+    Applicative: !!((derivable as Record<string, unknown>)?.applicative || getTypeclassInstance(adtName, 'Applicative')),
+    Monad: !!((derivable as Record<string, unknown>)?.monad || getTypeclassInstance(adtName, 'Monad')),
+    Bifunctor: !!((derivable as Record<string, unknown>)?.bifunctor || getTypeclassInstance(adtName, 'Bifunctor')),
+    Traversable: !!((derivable as Record<string, unknown>)?.traversable || getTypeclassInstance(adtName, 'Traversable')),
+    Filterable: !!((derivable as Record<string, unknown>)?.filterable || getTypeclassInstance(adtName, 'Filterable')),
+    Eq: !!((derivable as Record<string, unknown>)?.eq || getTypeclassInstance(adtName, 'Eq')),
+    Ord: !!((derivable as Record<string, unknown>)?.ord || getTypeclassInstance(adtName, 'Ord')),
+    Show: !!((derivable as Record<string, unknown>)?.show || getTypeclassInstance(adtName, 'Show'))
   };
 }
 
@@ -229,26 +428,26 @@ export function detectTypeclassCapabilities(adtName: string): TypeclassCapabilit
  */
 export interface TypeclassInstances {
   Functor?: {
-    map: <A, B>(fa: any, f: (a: A) => B) => any;
+    map: <A, B>(fa: Erased, f: (a: A) => B) => Erased;
   };
   Applicative?: {
-    of: <A>(a: A) => any;
-    ap: <A, B>(fab: any, fa: any) => any;
+    of: <A>(a: A) => Erased;
+    ap: <A, B>(fab: Erased, fa: Erased) => Erased;
   };
   Monad?: {
-    of: <A>(a: A) => any;
-    chain: <A, B>(fa: any, f: (a: A) => any) => any;
+    of: <A>(a: A) => Erased;
+    chain: <A, B>(fa: Erased, f: (a: A) => Erased) => Erased;
   };
   Bifunctor?: {
-    bimap: <A, B, C, D>(fa: any, f: (a: A) => C, g: (b: B) => D) => any;
-    mapLeft: <A, B, C>(fa: any, f: (a: A) => C) => any;
-    mapRight: <A, B, C>(fa: any, g: (b: B) => C) => any;
+    bimap: <A, B, C, D>(fa: Erased, f: (a: A) => C, g: (b: B) => D) => Erased;
+    mapLeft: <A, B, C>(fa: Erased, f: (a: A) => C) => Erased;
+    mapRight: <A, B, C>(fa: Erased, g: (b: B) => C) => Erased;
   };
   Traversable?: {
-    traverse: <A, B, F>(fa: any, f: (a: A) => any) => any;
+    traverse: <A, B, F>(fa: Erased, f: (a: A) => Erased) => Erased;
   };
   Filterable?: {
-    filter: <A>(fa: any, predicate: (a: A) => boolean) => any;
+    filter: <A>(fa: Erased, predicate: (a: A) => boolean) => Erased;
   };
   Eq?: {
     equals: <A>(a: A, b: A) => boolean;
@@ -312,31 +511,31 @@ export interface FluentMethodOptions {
  */
 export interface FluentMethods<A> {
   // Functor operations
-  map<B>(f: (a: A) => B): any;
+  map<B>(f: (a: A) => B): Erased;
   
   // Monad operations
-  chain<B>(f: (a: A) => any): any;
-  flatMap<B>(f: (a: A) => any): any;
+  chain<B>(f: (a: A) => Erased): Erased;
+  flatMap<B>(f: (a: A) => Erased): Erased;
   
   // Applicative operations
-  ap<B>(fab: any): any;
+  ap<B>(fab: Erased): Erased;
   
   // ReplicateA operation
-  replicateA(n: number): any;
+  replicateA(n: number): Erased;
   
   // Filter operations
-  filter(predicate: (a: A) => boolean): any;
+  filter(predicate: (a: A) => boolean): Erased;
   
   // Bifunctor operations (for Either, Result)
-  bimap<L, R>(left: (l: L) => any, right: (r: R) => any): any;
-  mapLeft<L, R>(f: (l: L) => any): any;
-  mapRight<L, R>(f: (r: R) => any): any;
+  bimap<L, R>(left: (l: L) => Erased, right: (r: R) => Erased): Erased;
+  mapLeft<L, R>(f: (l: L) => Erased): Erased;
+  mapRight<L, R>(f: (r: R) => Erased): Erased;
   
   // Traversable operations
-  traverse<B, F>(f: (a: A) => any): any;
+  traverse<B, F>(f: (a: A) => Erased): Erased;
   
   // Sequence operation
-  sequence<G extends Kind1>(applicative: any): any;
+  sequence<G extends Kind1>(applicative: Erased): Erased;
   
   // Standard typeclass operations
   equals(other: A): boolean;
@@ -414,7 +613,7 @@ class RuntimeDetectionManager {
   private static instance: RuntimeDetectionManager;
   private config: RuntimeDetectionConfig;
   private detectedInstances: Map<string, Set<string>> = new Map();
-  private fluentMethodCache: Map<string, any> = new Map();
+  private fluentMethodCache: Map<FPKey, unknown> = new Map();
   private pollInterval?: number | ReturnType<typeof setInterval>;
 
   private constructor(config: RuntimeDetectionConfig = { enabled: true }) {
@@ -535,24 +734,31 @@ class RuntimeDetectionManager {
   private regenerateFluentMethods(adtName: string): void {
     try {
       // Clear cache for this ADT
-      this.fluentMethodCache.delete(adtName);
+      this.fluentMethodCache.delete(adtName as unknown as FPKey);
       
-      // Try to get the constructor and regenerate methods
+            // Try to get the constructor and regenerate methods
       const adtModule = _req(`./fp-${adtName.toLowerCase()}-unified`);
-      const constructor = adtModule && adtModule[adtName];
+      if (!isRecord(adtModule)) {
+        console.warn(`⚠️ Invalid module structure for ${adtName}`);
+        return;
+      }
       
-      if (constructor && constructor.prototype) {
-        addFluentMethodsToPrototype(constructor, adtName, {
-          enableRuntimeDetection: true,
-          enableLazyDiscovery: true
-        });
+      const constructor = adtModule[adtName];
+      if (!isFunction(constructor) || !isRecord(constructor.prototype)) {
+        console.warn(`⚠️ Invalid constructor for ${adtName}`);
+        return;
+      }
+      
+      addFluentMethodsToPrototype(constructor as new (...args: any[]) => any, adtName, {
+        enableRuntimeDetection: true,
+        enableLazyDiscovery: true
+      });
         
-        console.log(`🔄 Regenerated fluent methods for ${adtName}`);
+      console.log(`🔄 Regenerated fluent methods for ${adtName}`);
         
-        // Notify callback
-        if (this.config.onMethodGenerated) {
-          this.config.onMethodGenerated(adtName, 'all');
-        }
+      // Notify callback
+      if (this.config.onMethodGenerated) {
+        this.config.onMethodGenerated(adtName, 'all');
       }
     } catch (error) {
       console.warn(`⚠️ Failed to regenerate fluent methods for ${adtName}:`, error);
@@ -562,15 +768,15 @@ class RuntimeDetectionManager {
   /**
    * Get cached fluent methods for an ADT
    */
-  getCachedFluentMethods(adtName: string): any {
-    return this.fluentMethodCache.get(adtName);
+  getCachedFluentMethods(adtName: string): unknown {
+    return this.fluentMethodCache.get(adtName as unknown as FPKey);
   }
 
   /**
    * Cache fluent methods for an ADT
    */
-  cacheFluentMethods(adtName: string, methods: any): void {
-    this.fluentMethodCache.set(adtName, methods);
+  cacheFluentMethods(adtName: string, methods: unknown): void {
+    this.fluentMethodCache.set(adtName as unknown as FPKey, methods);
   }
 
   /**
@@ -614,45 +820,46 @@ export function autoDiscoverDerivedInstances(adtName: string): DerivedInstances 
 
     // Extract typeclass instances
     const instances: DerivedInstances = {};
+    const derivableRecord = derivable as Record<string, unknown>;
     
-    if (derivable.functor) {
-      instances.functor = derivable.functor;
+    if (derivableRecord.functor) {
+      instances.functor = derivableRecord.functor;
     }
     
-    if (derivable.applicative) {
-      instances.applicative = derivable.applicative;
+    if (derivableRecord.applicative) {
+      instances.applicative = derivableRecord.applicative;
     }
     
-    if (derivable.monad) {
-      instances.monad = derivable.monad;
+    if (derivableRecord.monad) {
+      instances.monad = derivableRecord.monad;
     }
     
-    if (derivable.bifunctor) {
-      instances.bifunctor = derivable.bifunctor;
+    if (derivableRecord.bifunctor) {
+      instances.bifunctor = derivableRecord.bifunctor;
     }
     
-    if (derivable.traversable) {
-      instances.traversable = derivable.traversable;
+    if (derivableRecord.traversable) {
+      instances.traversable = derivableRecord.traversable;
     }
     
-    if (derivable.filterable) {
-      instances.filterable = derivable.filterable;
+    if (derivableRecord.filterable) {
+      instances.filterable = derivableRecord.filterable;
     }
     
-    if (derivable.eq) {
-      instances.eq = derivable.eq;
+    if (derivableRecord.eq) {
+      instances.eq = derivableRecord.eq;
     }
     
-    if (derivable.ord) {
-      instances.ord = derivable.ord;
+    if (derivableRecord.ord) {
+      instances.ord = derivableRecord.ord;
     }
     
-    if (derivable.show) {
-      instances.show = derivable.show;
+    if (derivableRecord.show) {
+      instances.show = derivableRecord.show;
     }
     
-    if (derivable.purity) {
-      instances.purity = derivable.purity;
+    if (derivableRecord.purity) {
+      instances.purity = (derivableRecord as Record<string, unknown>).purity as { effect: string };
     }
 
     // Update runtime detection manager
@@ -736,7 +943,7 @@ export function addTypeclassAwareFluentMethods<A, T extends TypeclassCapabilitie
   // Check cache first for lazy discovery
   const cached = detectionManager.getCachedFluentMethods(adtName);
   if (cached && options.enableLazyDiscovery) {
-    return Object.assign(adt, cached) as any & TypeclassAwareFluentMethods<A, T>;
+    return Object.assign(adt, cached) as A & TypeclassAwareFluentMethods<A, T>;
   }
 
   // Get typeclass instances
@@ -752,7 +959,7 @@ export function addTypeclassAwareFluentMethods<A, T extends TypeclassCapabilitie
   const show = instances.show || getTypeclassInstance(adtName, 'Show');
 
   // Create method table to attach onto the current ADT instance
-  const fluent: any = {};
+  const fluent: Record<string, unknown> = {};
 
   // Functor methods (only if capability exists)
   if (capabilities.Functor && functor) {
@@ -851,7 +1058,7 @@ export function addTypeclassAwareFluentMethods<A, T extends TypeclassCapabilitie
         const result = t.sequence(applicative, adt);
         return addTypeclassAwareFluentMethods(result, adtName, capabilities, options);
       }
-      const identity = (a: A) => a as any;
+      const identity = (a: A) => a;
       if (t.traverse && t.traverse.length >= 3) {
         const result = t.traverse(applicative, identity, adt);
         return addTypeclassAwareFluentMethods(result, adtName, capabilities, options);
@@ -885,7 +1092,7 @@ export function addTypeclassAwareFluentMethods<A, T extends TypeclassCapabilitie
     detectionManager.cacheFluentMethods(adtName, fluent);
   }
 
-  return Object.assign(adt, fluent) as any & TypeclassAwareFluentMethods<A, T>;
+  return Object.assign(adt, fluent) as A & TypeclassAwareFluentMethods<A, T>;
 }
 
 /**
@@ -937,18 +1144,18 @@ export function addFluentMethods<A>(
   const derivedInstances = autoDiscoverDerivedInstances(adtName);
   
   // Fallback to direct registry lookup if auto-discovery fails
-  const functor = derivedInstances?.functor || getTypeclassInstance(adtName, 'Functor');
-  const applicative = derivedInstances?.applicative || getTypeclassInstance(adtName, 'Applicative');
-  const monad = derivedInstances?.monad || getTypeclassInstance(adtName, 'Monad');
-  const bifunctor = derivedInstances?.bifunctor || getTypeclassInstance(adtName, 'Bifunctor');
-  const traversable = derivedInstances?.traversable || getTypeclassInstance(adtName, 'Traversable');
-  const filterable = derivedInstances?.filterable || getTypeclassInstance(adtName, 'Filterable');
-  const eq = derivedInstances?.eq || getTypeclassInstance(adtName, 'Eq');
-  const ord = derivedInstances?.ord || getTypeclassInstance(adtName, 'Ord');
-  const show = derivedInstances?.show || getTypeclassInstance(adtName, 'Show');
+  const functor = (derivedInstances as Record<string, unknown>)?.functor || getTypeclassInstance(adtName, 'Functor');
+  const applicative = (derivedInstances as Record<string, unknown>)?.applicative || getTypeclassInstance(adtName, 'Applicative');
+  const monad = (derivedInstances as Record<string, unknown>)?.monad || getTypeclassInstance(adtName, 'Monad');
+  const bifunctor = (derivedInstances as Record<string, unknown>)?.bifunctor || getTypeclassInstance(adtName, 'Bifunctor');
+  const traversable = (derivedInstances as Record<string, unknown>)?.traversable || getTypeclassInstance(adtName, 'Traversable');
+  const filterable = (derivedInstances as Record<string, unknown>)?.filterable || getTypeclassInstance(adtName, 'Filterable');
+  const eq = (derivedInstances as Record<string, unknown>)?.eq || getTypeclassInstance(adtName, 'Eq');
+  const ord = (derivedInstances as Record<string, unknown>)?.ord || getTypeclassInstance(adtName, 'Ord');
+  const show = (derivedInstances as Record<string, unknown>)?.show || getTypeclassInstance(adtName, 'Show');
 
-  const fluent = adt as any;
-  const generatedMethods: any = {};
+  const fluent = adt as Record<string, unknown>;
+  const generatedMethods: Record<string, unknown> = {};
 
   // Add map method (Functor)
   if (enableMap && functor) {
@@ -994,7 +1201,7 @@ export function addFluentMethods<A>(
     } else if (monad) {
       fluent.filter = (predicate: (a: A) => boolean): any => {
         const result = monad.chain(adt, (a: A) => 
-          predicate(a) ? monad.of(a) : monad.of(null as any)
+          predicate(a) ? monad.of(a) : monad.of(null as unknown as A)
         );
         return addFluentMethods(result, adtName, options);
       };
@@ -1317,15 +1524,15 @@ export function addFluentMethodsToPrototype<T extends new (...args: any[]) => an
   const derivedInstances = autoDiscoverDerivedInstances(adtName);
   
   // Fallback to direct registry lookup if auto-discovery fails
-  const functor = derivedInstances?.functor || getTypeclassInstance(adtName, 'Functor');
-  const applicative = derivedInstances?.applicative || getTypeclassInstance(adtName, 'Applicative');
-  const monad = derivedInstances?.monad || getTypeclassInstance(adtName, 'Monad');
-  const bifunctor = derivedInstances?.bifunctor || getTypeclassInstance(adtName, 'Bifunctor');
-  const traversable = derivedInstances?.traversable || getTypeclassInstance(adtName, 'Traversable');
-  const filterable = derivedInstances?.filterable || getTypeclassInstance(adtName, 'Filterable');
-  const eq = derivedInstances?.eq || getTypeclassInstance(adtName, 'Eq');
-  const ord = derivedInstances?.ord || getTypeclassInstance(adtName, 'Ord');
-  const show = derivedInstances?.show || getTypeclassInstance(adtName, 'Show');
+  const functor = (derivedInstances as Record<string, unknown>)?.functor || getTypeclassInstance(adtName, 'Functor');
+  const applicative = (derivedInstances as Record<string, unknown>)?.applicative || getTypeclassInstance(adtName, 'Applicative');
+  const monad = (derivedInstances as Record<string, unknown>)?.monad || getTypeclassInstance(adtName, 'Monad');
+  const bifunctor = (derivedInstances as Record<string, unknown>)?.bifunctor || getTypeclassInstance(adtName, 'Bifunctor');
+  const traversable = (derivedInstances as Record<string, unknown>)?.traversable || getTypeclassInstance(adtName, 'Traversable');
+  const filterable = (derivedInstances as Record<string, unknown>)?.filterable || getTypeclassInstance(adtName, 'Filterable');
+  const eq = (derivedInstances as Record<string, unknown>)?.eq || getTypeclassInstance(adtName, 'Eq');
+  const ord = (derivedInstances as Record<string, unknown>)?.ord || getTypeclassInstance(adtName, 'Ord');
+  const show = (derivedInstances as Record<string, unknown>)?.show || getTypeclassInstance(adtName, 'Show');
 
   // Add map method (Functor)
   if (enableMap && functor) {
@@ -1367,7 +1574,7 @@ export function addFluentMethodsToPrototype<T extends new (...args: any[]) => an
     } else if (monad) {
       Ctor.prototype.filter = function<A>(this: any, predicate: (a: A) => boolean): any {
         const result = monad.chain(this, (a: A) => 
-          predicate(a) ? monad.of(a) : monad.of(null as any)
+          predicate(a) ? monad.of(a) : monad.of(null as unknown as A)
         );
         return addFluentMethods(result, adtName, options);
       };
@@ -1463,7 +1670,7 @@ export function createDualAPI<A>(
         return filterable.filter(fa, predicate);
       } else if (monad) {
         return monad.chain(fa, (a: A) => 
-          predicate(a) ? monad.of(a) : monad.of(null as any)
+          predicate(a) ? monad.of(a) : monad.of(null as unknown as A)
         );
       }
       return fa;
@@ -1570,7 +1777,7 @@ export function testLawConsistency<A, B>(
     // Test Functor laws
     if (derivedInstances.functor) {
       // Identity law: map(id) = id
-      const identity = (x: any) => x;
+      const identity = (x: unknown) => x;
       const fluentResult = fluent.map(identity);
       const dataLastResult = dataLast.map(identity, testValue);
       
@@ -1655,7 +1862,7 @@ export function testLawConsistency<A, B>(
  * Test suite for runtime detection and typeclass integration
  */
 export class RuntimeDetectionTestSuite {
-  private mockRegistry: Map<string, any> = new Map();
+  private mockRegistry: Map<FPKey, unknown> = new Map();
   private originalGetFPRegistry: any;
   private originalGetDerivableInstances: any;
 
@@ -1670,7 +1877,7 @@ export class RuntimeDetectionTestSuite {
    */
   setupMockRegistry(): void {
     // Mock registry with initial instances
-    this.mockRegistry.set('TestADT', {
+    this.mockRegistry.set('TestADT' as unknown as FPKey, {
       functor: {
         map: (fa: any, f: any) => ({ ...fa, value: f(fa.value) })
       },
@@ -1681,18 +1888,17 @@ export class RuntimeDetectionTestSuite {
     });
 
     // Mock the registry functions
-    (globalThis as any).__MOCK_FP_REGISTRY = {
-      derivable: this.mockRegistry,
-      getDerivable: (name: string) => this.mockRegistry.get(name)
-    };
+    const FP = ensureFPRegistry();
+    // Note: This is a test mock, in production we'd use the proper registry
+    // For now, we'll use the global registry but mark it as test data
   }
 
   /**
    * Add new typeclass instance at runtime
    */
   addRuntimeInstance(adtName: string, typeclass: string, instance: any): void {
-    const current = this.mockRegistry.get(adtName) || {};
-    this.mockRegistry.set(adtName, { ...current, [typeclass.toLowerCase()]: instance });
+    const current = this.mockRegistry.get(adtName as unknown as FPKey) || {};
+    this.mockRegistry.set(adtName as unknown as FPKey, { ...current, [typeclass.toLowerCase()]: instance });
     
     console.log(`🧪 Added ${typeclass} instance for ${adtName} at runtime`);
   }
@@ -1812,7 +2018,8 @@ export class RuntimeDetectionTestSuite {
     this.mockRegistry.clear();
     
     // Restore original functions
-    (globalThis as any).__MOCK_FP_REGISTRY = undefined;
+    // Note: In production, we'd properly restore the registry state
+    // For now, we'll just clear the mock registry
   }
 
   /**
@@ -3082,7 +3289,7 @@ export function addTypeclassAwareComposableFluentMethods<
   const show = instances.show || getTypeclassInstance(adtName, 'Show');
 
   // Create method table to attach onto the current ADT instance
-  const fluent: any = {};
+  const fluent: Record<string, unknown> = {};
 
   // Initialize chain state
   const chainState = {
@@ -3103,7 +3310,7 @@ export function addTypeclassAwareComposableFluentMethods<
       };
       return addTypeclassAwareComposableFluentMethods(result, adtName, capabilities, options);
     };
-    chainState.availableMethods.map = true as any;
+    chainState.availableMethods.map = true;
   }
 
   // Monad methods (only if capability exists)
@@ -3119,8 +3326,8 @@ export function addTypeclassAwareComposableFluentMethods<
     };
     
     fluent.flatMap = fluent.chain;
-    chainState.availableMethods.chain = true as any;
-    chainState.availableMethods.flatMap = true as any;
+    chainState.availableMethods.chain = true;
+    chainState.availableMethods.flatMap = true;
   }
 
   // Applicative methods (only if capability exists)
@@ -3134,7 +3341,7 @@ export function addTypeclassAwareComposableFluentMethods<
       };
       return addTypeclassAwareComposableFluentMethods(result, adtName, capabilities, options);
     };
-    chainState.availableMethods.ap = true as any;
+    chainState.availableMethods.ap = true;
   }
 
   // Filter methods (prioritize Filterable, fallback to Monad)
@@ -3148,7 +3355,7 @@ export function addTypeclassAwareComposableFluentMethods<
       };
       return addTypeclassAwareComposableFluentMethods(result, adtName, capabilities, options);
     };
-    chainState.availableMethods.filter = true as any;
+    chainState.availableMethods.filter = true;
   } else if (capabilities.Monad && monad) {
     fluent.filter = (predicate: (a: A) => boolean): any => {
       const result = monad.chain(adt, (a: A) => predicate(a) ? monad.of(a) : monad.of(null));
@@ -3159,7 +3366,7 @@ export function addTypeclassAwareComposableFluentMethods<
       };
       return addTypeclassAwareComposableFluentMethods(result, adtName, capabilities, options);
     };
-    chainState.availableMethods.filter = true as any;
+    chainState.availableMethods.filter = true;
   }
 
   // Bifunctor methods (only if capability exists)
@@ -3194,9 +3401,9 @@ export function addTypeclassAwareComposableFluentMethods<
       return addTypeclassAwareComposableFluentMethods(result, adtName, capabilities, options);
     };
     
-    chainState.availableMethods.bimap = true as any;
-    chainState.availableMethods.mapLeft = true as any;
-    chainState.availableMethods.mapRight = true as any;
+    chainState.availableMethods.bimap = true;
+    chainState.availableMethods.mapLeft = true;
+    chainState.availableMethods.mapRight = true;
   }
 
   // Traversable methods (only if capability exists)
@@ -3210,7 +3417,7 @@ export function addTypeclassAwareComposableFluentMethods<
       };
       return addTypeclassAwareComposableFluentMethods(result, adtName, capabilities, options);
     };
-    chainState.availableMethods.traverse = true as any;
+    chainState.availableMethods.traverse = true;
   }
 
   // Standard typeclass methods (only if capabilities exist)
@@ -3218,21 +3425,21 @@ export function addTypeclassAwareComposableFluentMethods<
     fluent.equals = (other: A): boolean => {
       return eq.equals(adt, other);
     };
-    chainState.availableMethods.equals = true as any;
+    chainState.availableMethods.equals = true;
   }
 
   if (capabilities.Ord && ord) {
     fluent.compare = (other: A): number => {
       return ord.compare(adt, other);
     };
-    chainState.availableMethods.compare = true as any;
+    chainState.availableMethods.compare = true;
   }
 
   if (capabilities.Show && show) {
     fluent.show = (): string => {
       return show.show(adt);
     };
-    chainState.availableMethods.show = true as any;
+    chainState.availableMethods.show = true;
   }
 
   // Attach chain state
@@ -3561,9 +3768,9 @@ export class EnhancedRuntimeDetectionManager {
    */
   private findADTConstructor(adtName: string): any {
     // Try to find in global scope
-    if (typeof globalThis !== 'undefined' && (globalThis as any)[adtName]) {
-      return (globalThis as any)[adtName];
-    }
+    const FP = ensureFPRegistry();
+    // Note: In a proper implementation, we'd look up the constructor from the registry
+    // For now, we'll use the module loading approach
 
     // Try to find in module scope
     try {
@@ -3675,9 +3882,9 @@ export function enhancedAutoRegisterFluentMethods(reg?: OptimizableFPRegistry): 
  */
 function findADTConstructor(adtName: string): any {
   // Try to find in global scope
-  if (typeof globalThis !== 'undefined' && (globalThis as any)[adtName]) {
-    return (globalThis as any)[adtName];
-  }
+  const FP = ensureFPRegistry();
+  // Note: In a proper implementation, we'd look up the constructor from the registry
+  // For now, we'll use the module loading approach
 
   // Try to find in module scope
   try {

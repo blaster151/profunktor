@@ -1,7 +1,7 @@
 // Concrete P instance: minimal profunctor-like with id/compose supplied by caller
 // This serves as a ready-made hook to plug your existing profunctor dictionary.
 
-import { Kind2, Apply } from 'fp-hkt';
+import { Kind2, Apply } from '../../../fp-hkt';
 import { makeProfunctorBicategory, withMonoidal, NatP } from '../profunctor-bicategory';
 
 export function fromProfunctor<P extends Kind2>(ops: {

@@ -17,7 +17,7 @@
 import { Kind2, Apply, FunctionK, Either } from '../../../fp-hkt';
 import { makeProfunctorBicategory, withCoproductMonoidal, NatP } from '../profunctor-bicategory';
 import { FunctionKBicategoryMonoidal } from '../instances/function';
-import { runMonoidalTriangle, runMonoidalPentagon, runPentagonWithKit, runTriangleWithKit, CoherenceKitSum } from '../monoidal-laws';
+import { runMonoidalTriangle, runMonoidalPentagon, runTriangleWithKit, runPentagonWithKit, CoherenceKitSum } from '../monoidal-laws';
 
 import {
   ProfunctorChoiceOps,

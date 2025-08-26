@@ -314,13 +314,14 @@ export function moduleActionΞ<P extends Polynomial<any, any>, Q extends Polynom
     
     case 'Suspend':
       // Suspend pattern runs on matter by suspending the interaction
-      const suspendedMatter = matter.extend(m => m);
       return suspendPolynomial(
         { left: pattern.position, right: matter.extract },
         (direction) => {
           // This is a simplified version - in practice, we'd need to handle
           // the full polynomial product structure
-          return moduleActionΞ(pattern.continuation(direction as any), suspendedMatter);
+          const continuedPattern = pattern.continuation(direction as any);
+          // Use matter directly, not suspendedMatter, to avoid nested CofreeComonadPolynomial
+          return moduleActionΞ(continuedPattern, matter);
         }
       );
   }

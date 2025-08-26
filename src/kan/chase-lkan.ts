@@ -1,0 +1,245 @@
+// src/kan/chase-lkan.ts
+// Compute Σ_F(I) by chasing a cartesian theory presentation (fast LKE via chase).
+// Based on: reduce LKE to "free model of a cartesian theory", then standard/parallel chase. 
+// (See paper's contributions and completeness under fairness assumptions.)
+
+import type { CategoryPresentation, SmallCategory, Functor } from "./category-presentations";
+import { cographFromPresentations } from "./cograph";
+import { cartesianFromPresentation, type CartesianTheory, type Instance as CTInstance, type RegularTheory, mergeTheories } from "../logic/regular-cartesian";
+import { chaseRegular, chaseToColimit, canonicalFastParallelChase, freeReflect, weaklyFreeReflect, coreChase, semiNaiveFastParallelChase } from "../logic/chase";
+import type { PartialHornSpec } from "../logic/partial-horn";
+import { partialHornToCartesian } from "../logic/partial-horn";
+import { sigmaFiber_viaComma, type FiniteInstance as FI, unitComponents_eta_I_withLookup, type HomEnum, type PathEq } from "./explicit-colim";
+import { indexedFromChasedModel } from "./indexed-from-chased";
+import type { IndexedLKEState } from "./indexed-view";
+import { rowsPerMB } from "./indexed-view";
+import { reduceToCategoricalCoreUnder } from "../logic/core";
+import { Tter, Tcart, Tlccc, Sheaf, type FiniteDL } from "../logic/quasieq-cartesian-kits";
+
+export interface FinitePresentation {
+  C: unknown; D: unknown;                 // finitely-presented cats
+  F: unknown;                             // functor C → D (f.p.)
+  I: unknown;                             // finite C-instance
+}
+
+// NEW: chase mode & instance semantics toggles (paper's free/weakly-free/universal; constants vs. nulls)
+export type ChaseModelFlavor = "free" | "weakly-free" | "universal";
+export type InstanceSemantics = "labeled-nulls" | "constants";
+
+export interface ChaseOptions {
+  parallel?: boolean;                     // parallel chase
+  fairnessRounds?: number;                // fairness/termination knob
+  maxWitnessesPerStep?: number;           // performance guardrail
+  homC?: HomEnum;
+  homD?: HomEnum;
+  eqD?: PathEq;
+  flavor?: ChaseModelFlavor;         // default "free" for cartesian theories
+  instanceSemantics?: InstanceSemantics; // default "labeled-nulls"
+
+  // NEW: if true, compute Σ_F by **fair parallel chase to colimit** (Lemma 15).
+  // When false (default), we use the bounded parallel step you already had.
+  toColimit?: boolean;
+  canonicalCartesianFast?: boolean;  // use Fn = all active triggers per round (Prop. 3)
+  egdCheckEvery?: number;            // run EGD satisfaction check every k rounds
+  stopWhenFinite?: boolean;          // early stop when finite & EGDs hold
+  partialHorn?: PartialHornSpec;     // extra partial operations to include
+  useCoreChase?: "standard" | "categorical"; // opt-in core chase for finite cases
+  coreRounds?: number;                        // default 12
+  semiNaive?: boolean; // use Algorithm 3 (Semi-Naïve Fast Parallel Chase)
+}
+
+export interface LKE {
+  evaluate: (dObj: string) => readonly unknown[];   // Σ_F(I)(d)
+  unit?: Record<string, (x: unknown) => unknown>;    // η_I components when available
+  freedom?: "free" | "weakly-free";
+  indexed?: IndexedLKEState;              // NEW: skeleton-of-Set view
+  metrics?: { rowsPerMB?: number };       // quick memory-throughput signal
+}
+
+// Opaque handles for the internal cartesian theory + chase state.
+interface ChaseState { /* facts, skolem/labels, constraints */ }
+
+// Replace the previous presentAsCartesianTheory with a cog(F)-aware version:
+function presentAsCartesianTheory(fp: FinitePresentation): { theory: unknown; seed: unknown } {
+  return presentCogFAndSeed(fp) ?? { theory: {} as unknown, seed: {} as unknown };
+}
+
+// Helper: narrow to presentations
+function isPres(x: unknown): x is CategoryPresentation {
+  return !!x && typeof (x as any).Q === "object" && typeof (x as any).E === "object";
+}
+
+function isCategoryPresentation(x: unknown): x is CategoryPresentation {
+  return !!x && typeof (x as any).Q === "object" && typeof (x as any).E === "object";
+}
+
+// Build the cartesian theory of cog(F) and an instance seed from I (finite case)
+function presentCogFAndSeed(fp: FinitePresentation): { theory: CartesianTheory; seed: CTInstance } | undefined {
+  const { C, D, F, I } = fp;
+  const isPres = (x: unknown): x is CategoryPresentation => !!x && (x as any).Q && (x as any).E;
+  if (!(isPres(C) && isPres(D))) return undefined;
+
+  const cog = cographFromPresentations(C, D, F);
+  const theory = cartesianFromPresentation(cog);
+
+  const sorts: Record<string, readonly unknown[]> = {};
+  const rels: Record<string, readonly (readonly unknown[])[]> = {};
+
+  // Seed C-side carriers from I; D-side empty
+  C.Q.objects.forEach(o => { sorts[`C:${o.id}`] = (I as any).onObj[o.id] ?? []; });
+  D.Q.objects.forEach(o => { sorts[`D:${o.id}`] = []; });
+
+  // Seed C-side generators as graphs; D-side empty; α empty (to be generated by chase)
+  C.Q.arrows.forEach(a => {
+    const f = (I as any).onMor[a.id];
+    rels[`C:${a.id}`] = f ? ((I as any).onObj[a.src] ?? []).map((x: unknown) => [x, f(x)]) : [];
+  });
+  D.Q.arrows.forEach(a => { rels[`D:${a.id}`] = []; });
+  C.Q.objects.forEach(o => { rels[`α:${o.id}`] = []; });
+
+  return { theory, seed: { sorts, relations: rels } };
+}
+
+// --- Use chase to compute free model of the cartesian theory -----------------
+
+interface ChaseHooks { homC?: HomEnum; homD?: HomEnum; eqD?: PathEq; }
+
+// --- Use chase to compute free/weakly-free model of the cartesian theory -----
+function runChaseToModel(theory: CartesianTheory, seed: CTInstance, opts: ChaseOptions) {
+  const cartesian = theory.axioms.every(ed => !!ed.unique);
+
+  if (opts.canonicalCartesianFast && cartesian) {
+    const M = canonicalFastParallelChase(theory, seed, {
+      maxRounds: opts.fairnessRounds ?? 128,
+      egdCheckEvery: opts.egdCheckEvery ?? 4,
+      stopWhenFinite: opts.stopWhenFinite ?? true
+    });
+    return { M, freedom: "free" as const };
+  }
+
+  if (opts.toColimit) {
+    const { model, freedom } = chaseToColimit(theory, seed, { rounds: opts.fairnessRounds ?? 32, maxStepsPerRound: 1 });
+    return { M: model, freedom };
+  }
+
+  const M = chaseRegular(theory, seed, { parallel: true, fairnessRounds: opts.fairnessRounds ?? 8, maxSteps: 256 });
+  return { M, freedom: "free" as const };
+}
+
+function fiberAt(M: CTInstance, dObj: string): readonly unknown[] {
+  return M.sorts[`D:${dObj}`] ?? [];
+}
+
+function unitFromChasedModel(C: CategoryPresentation, F: Functor, M: CTInstance): Record<string, (x: unknown) => unknown> {
+  // α_c ⊆ (C:c) × (D:F c) is the chased graph; read it off to build η_I components
+  const out: Record<string, (x: unknown) => unknown> = {};
+  C.Q.objects.forEach(o => {
+    const rel = M.relations[`α:${o.id}`] ?? [];
+    const map = new Map<unknown, unknown>();
+    rel.forEach(([x, y]) => { if (!map.has(x)) map.set(x, y); });
+    out[o.id] = (x: unknown) => map.get(x) ?? x;
+  });
+  return out;
+}
+
+// --- Fully-faithful fast-path (∆FΣF I(c) ≅ I(c); unit an iso) ----------------
+// We can prove/assume full faithfulness when Hom-enumerators are supplied.
+function isFullyFaithful(F: Functor, homC: HomEnum, homD: HomEnum, eqD: PathEq): boolean {
+  const Cobj = F.src.objects.map(o => o.id);
+  for (const a of Cobj) for (const b of Cobj) {
+    const hC = homC(a, b);
+    const hD = homD(F.onObj(a), F.onObj(b));
+    // injective: F(u1)=F(u2) ⇒ u1=u2 (compare JSON paths; callers can refine)
+    const image = new Map<string, string>();
+    for (const u of hC) {
+      const Fu = F.onMor(u);
+      const key = JSON.stringify(Fu);
+      if (image.has(key) && JSON.stringify(u) !== image.get(key)) return false;
+      image.set(key, JSON.stringify(u));
+    }
+    // surjective: every v in Hom_D(Fa,Fb) hits some u with eqD(Fu, v)
+    for (const v of hD) {
+      const hit = hC.some(u => eqD(F.onMor(u), v));
+      if (!hit) return false;
+    }
+  }
+  return true;
+}
+
+export function leftKanViaChase(fp: FinitePresentation, opts: ChaseOptions = {}): LKE {
+  const pres = presentCogFAndSeed(fp);
+  // If available, enrich the cograph cartesian theory with partial ops
+  const enriched = pres
+    ? {
+        theory: (opts.partialHorn
+          ? (mergeTheories(pres.theory as unknown as RegularTheory, partialHornToCartesian(opts.partialHorn)))
+          : pres.theory),
+        seed: pres.seed
+      }
+    : undefined;
+
+  const chased = pres ? (() => {
+    if (opts.semiNaive) {
+      const { I: model } = semiNaiveFastParallelChase(enriched!.theory as any, enriched!.seed);
+      return { M: model, freedom: "free" as const }; // cog(F) is cartesian in our LKE flow
+    }
+    
+    // baseline: toColimit / canonical / regular as you already had
+    const base = runChaseToModel(enriched!.theory as any, enriched!.seed, opts);
+    if (!opts.useCoreChase) return base;
+
+    // core chase over the same theory/seed (finite-only)
+    const seedSorts = Object.keys(enriched!.seed.sorts).filter(s => s.startsWith("C:")); // image of i
+    const Icore = coreChase(enriched!.theory as any, enriched!.seed, opts.coreRounds ?? 12, opts.useCoreChase, seedSorts);
+    return { M: Icore, freedom: base.freedom as "free" | "weakly-free" };
+  })() : undefined;
+
+  // Build indexed state from chased model
+  const isPres = (x: unknown): x is CategoryPresentation => !!x && (x as any).Q && (x as any).E;
+  const indexed = (chased && isPres(fp.D))
+    ? indexedFromChasedModel(chased.M as any, fp.D as any, fp.F.onObj)
+    : undefined;
+
+  // After building `indexed`, also compute core savings (if we ran a core step)
+  let coreSavings: number | undefined = undefined;
+  if (pres && chased && opts.useCoreChase) {
+    const seedSorts = Object.keys(pres.seed.sorts).filter(s => s.startsWith("C:"));
+    const before = JSON.stringify(runChaseToModel(pres.theory, pres.seed, opts).M).length;
+    const after  = JSON.stringify(chased.M).length;
+    coreSavings = before > 0 ? Math.max(0, 1 - after / before) : undefined;
+  }
+
+  // explicit finite-case fallback & fully-faithful fast path remain available via opts.homC/homD/eqD
+  const explicit = (opts.homC && opts.homD && opts.eqD)
+    ? {
+        evalFiber: (d: string) =>
+          sigmaFiber_viaComma(fp.C as any, fp.D as any, fp.F, fp.I as FI, opts.homC!, opts.homD!, opts.eqD!, d),
+        unit: unitComponents_eta_I_withLookup(fp.C as any, fp.D as any, fp.F, fp.I as FI, opts.homC!, opts.homD!, opts.eqD!)
+      }
+    : undefined;
+
+  return {
+    evaluate: (d: string) => chased ? fiberAt(chased.M, d) : explicit ? explicit.evalFiber(d) : [],
+    ...(chased ? { unit: unitFromChasedModel(fp.C as any, fp.F, chased.M) } : explicit?.unit && { unit: explicit.unit }),
+    ...(chased?.freedom && { freedom: chased.freedom }),
+    ...(indexed && { indexed }),
+    metrics: {
+      ...(indexed ? { rowsPerMB: rowsPerMB(indexed) } : {}),
+      ...(coreSavings !== undefined ? { coreSavings } : {})
+    }
+  };
+}
+
+// === Expose reflectors for LKE users ===
+export { freeReflect, weaklyFreeReflect } from "../logic/chase";
+
+// === Cartesian Kits Convenience Factory ===
+export const Kits = {
+  Tter, Tcart, Tlccc, Sheaf
+};
+
+// Helper to "free-model" any of these theories on a small seed instance
+export function freeModel(theory: import("../logic/regular-cartesian").RegularTheory, seed:
+  import("../logic/regular-cartesian").Instance) {
+  return freeReflect(theory, seed);
+}

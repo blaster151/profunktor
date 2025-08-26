@@ -19,6 +19,15 @@ import {
   createKripkeJoyalSemantics 
 } from './fp-internal-logic';
 
+// Sheafifiable model structure imports
+import * as SM from "./src/homotopy/model/sheafifiable-model-structure";
+import { verifySheafifiableTransfer } from "./src/homotopy/tests/property-transfer-harness";
+import { sSetSheafifiableSpec } from "./src/homotopy/examples/sSet-in-topos";
+import { checkLocalWeakEquivalence } from "./src/homotopy/equivalences/local-weak-equivalence";
+import type { CategoryOps as SOACatOps } from "./src/homotopy/small-object/small-object-argument";
+import { buildJeffSmithModel, type WeakEqClass } from "./src/homotopy/model/jeff-smith-theorem";
+import type { GeneratingMap } from "./src/homotopy/small-object/small-object-argument";
+
 // ============================================================================
 // UNIFIED TOPOS SYSTEM
 // ============================================================================
@@ -465,7 +474,140 @@ export function exampleListPolynomialToposFramework(): void {
 }
 
 // ============================================================================
+// SHEAFIFIABLE MODEL STRUCTURE INTEGRATION
+// ============================================================================
+
+/**
+ * Toy presentability witness for sheaf categories
+ */
+const toyPresentable: import("./src/homotopy/model/sheafifiable-model-structure").LocallyPresentable = {
+  hasAllLimits: true, 
+  hasAllColimits: true, 
+  hasFilteredColimits: true, 
+  hasSmallGenerators: true
+};
+
+/**
+ * Toy category operations for small object argument
+ */
+const toyOps: SOACatOps<unknown> = {
+  lift: (_i, _p) => undefined,
+  pushout: (i, _along) => i,
+  coproduct: (ms) => (ms[0] ?? undefined) as unknown,
+  compose: (_g, f) => f,
+  idLike: (x) => x
+};
+
+/**
+ * Toy generating cofibrations for Jeff Smith demo
+ */
+const toyI: readonly GeneratingMap<unknown>[] = [{ map: "ι" as unknown, domainSmall: true }];
+
+/**
+ * Toy weak equivalence class for Jeff Smith demo
+ */
+const toyW: WeakEqClass<unknown> = {
+  isW: (_f) => true,
+  closedUnderRetracts: true,
+  twoOfThree: true,
+  cofWClosedUnderPushoutAndTransfinite: true,
+  solutionSetAtI: (_i) => ["w₀" as unknown]
+};
+
+/**
+ * Toy site/topology used for demos & tests
+ */
+export function makeToySite(): { site: SM.Site; topology: SM.GrothendieckTopology } {
+  // Single object U; covers(U) returns one trivial cover.
+  const site: SM.Site = { objects: ["U"] as const };
+  const topology: SM.GrothendieckTopology = {
+    covers: (_U: unknown) => [{ family: ["id_U"] as const }],
+    sieves: (_U: unknown) => []
+  };
+  return { site, topology };
+}
+
+/**
+ * Run the paper-inspired transfer harness on our toy site
+ */
+export function demoVerifySheafifiableTransfer() {
+  const { site, topology } = makeToySite();
+  return verifySheafifiableTransfer(site, topology, sSetSheafifiableSpec, toyPresentable);
+}
+
+/**
+ * Optional: expose the local weak-equivalence utility for ad-hoc checks
+ */
+export const demoCheckLocalWeq = checkLocalWeakEquivalence;
+
+/**
+ * Demo Jeff Smith model construction
+ */
+export function demoJeffSmithModel() {
+  const presentable = { hasAllLimits: true, hasAllColimits: true, hasFilteredColimits: true, hasSmallGenerators: true };
+  return buildJeffSmithModel({ presentable, ops: toyOps, I: toyI, W: toyW, injIncluded: { holds: true } });
+}
+
+// ============================================================================
+// SHEAFIFIABLE API RE-EXPORTS
+// ============================================================================
+
+/**
+ * Re-exports for Beke's "Sheafifiable Homotopy Model Categories"
+ * 
+ * These exports provide access to the sheafifiable model structure framework
+ * that lifts Quillen model categories from Sets to sheaf categories on any site.
+ */
+
+// Core sheafifiable model structure
+export * as Sheafifiable from "./src/homotopy/model/sheafifiable-model-structure";
+export * from "./src/homotopy/model/sheafifiable-model-structure";
+
+// Geometric to Quillen adjunctions
+export * from "./src/homotopy/adjunctions/geometric-to-quillen";
+
+// Local weak equivalence checking
+export * from "./src/homotopy/equivalences/local-weak-equivalence";
+
+// Simplicial sheaves homotopy
+export * from "./src/homotopy/simplicial/simplicial-sheaves-homotopy";
+
+// Property transfer testing harness
+export * from "./src/homotopy/tests/property-transfer-harness";
+
+// Simplicial sets in topoi example
+export * from "./src/homotopy/examples/sSet-in-topos";
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
 // All exports are already declared inline above
+
+// ============================================================================
+// ADDITIONAL SHEAFIFIABLE HELPERS
+// ============================================================================
+
+import { makeAccessibleW } from "./src/homotopy/accessible/detection-functor";
+import { generateIFromMonos, type MonoOps, type StrongGenerator } from "./src/homotopy/model/monos-as-cofibrations";
+
+// Toy detection functor (treat everything as SSet-weq for the demo)
+const toyDetect = { toSSet: (_f: unknown) => ({}), preservesKFilteredColimits: true };
+
+export function demoAccessibleW() {
+  return makeAccessibleW<unknown>(toyDetect);
+}
+
+// Monos-as-cofibrations demo hook
+export function demoGenerateMonosI() {
+  const presentable = { hasAllLimits: true, hasAllColimits: true, hasFilteredColimits: true, hasSmallGenerators: true };
+  const G: StrongGenerator[] = [{} as StrongGenerator];
+  const monoOps: MonoOps<unknown> = {
+    isMono: () => true,
+    regularQuotientsOf: (_g) => [{}],
+    subobjectsOf: (_Q) => [Symbol("mono") as unknown as unknown],
+    transfiniteClosureIsMono: true,
+    effectiveUnions: true
+  };
+  return generateIFromMonos(presentable, G, monoOps);
+}

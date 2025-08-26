@@ -710,5 +710,37 @@ export function examplePolynomialFunctorCharacterization(): void {
 }
 
 // ============================================================================
+// BEKE SHEAFIFIABLE MODEL STRUCTURE EXPORTS
+// ============================================================================
+
+/**
+ * Re-exports for Beke's "Sheafifiable Homotopy Model Categories"
+ * 
+ * These exports provide access to the sheafifiable model structure framework
+ * that lifts Quillen model categories from Sets to sheaf categories on any site.
+ */
+
+// Core sheafifiable model structure
+export * from './src/homotopy/model/sheafifiable-model-structure';
+
+// Geometric to Quillen adjunctions
+export * from './src/homotopy/adjunctions/geometric-to-quillen';
+
+// Local weak equivalence checking
+export * from './src/homotopy/equivalences/local-weak-equivalence';
+
+// Simplicial sheaves homotopy
+export * from './src/homotopy/simplicial/simplicial-sheaves-homotopy';
+
+// Property transfer testing harness
+export * from './src/homotopy/tests/property-transfer-harness';
+
+// Simplicial sets in topoi example
+export * from './src/homotopy/examples/sSet-in-topos';
+
+// Jeff Smith theorem implementation
+export * from './src/homotopy/model/jeff-smith-theorem';
+
+// ============================================================================
 // ALL EXPORTS ARE ALREADY EXPORTED INLINE ABOVE
 // ============================================================================

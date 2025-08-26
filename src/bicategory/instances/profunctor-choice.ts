@@ -5,8 +5,8 @@
 //   tensor1(f, g) = right(g) ∘ left(f)
 // yielding a morphism on the sum domain/codomain.
 
-import { Kind2, Apply } from 'fp-hkt';
-import type { Either } from 'fp-hkt'; // canonical Either type
+import { Kind2, Apply } from '../../../fp-hkt';
+import type { Either } from '../../../fp-hkt'; // canonical Either type
 import { makeProfunctorBicategory, NatP } from '../profunctor-bicategory';
 import { withCoproductMonoidal } from '../profunctor-bicategory';
 

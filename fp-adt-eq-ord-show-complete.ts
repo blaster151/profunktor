@@ -14,6 +14,55 @@
  * 6. Tests - Law compliance and round-trip safety
  */
 
+import {
+  deriveEqInstance,
+  deriveOrdInstance,
+  deriveShowInstance,
+  Eq,
+  Ord,
+  Show
+} from './fp-derivation-helpers';
+
+import { ensureFPRegistry } from './fp-registry-init';
+import { FPKey } from './src/types/brands';
+
+import {
+  ObservableLite,
+  ObservableLiteK
+} from './fp-observable-lite';
+
+import type {
+  TaskEither
+} from './fp-bimonad-extended';
+
+import type {
+  Kind1,
+  TaskEitherK
+} from './fp-hkt';
+
+import {
+  IO,
+  Task,
+  State,
+  IOK,
+  TaskK,
+  StateK
+} from './fp-effect-monads';
+
+import {
+  PersistentList,
+  PersistentMap,
+  PersistentSet,
+  PersistentListK,
+  PersistentMapK,
+  PersistentSetK
+} from './fp-persistent';
+
+import {
+  createSumType,
+  SumTypeBuilder
+} from './fp-adt-builders';
+
 // ============================================================================
 // Collection Utilities
 // ============================================================================
@@ -53,52 +102,6 @@ function safeValues<A>(collection: any): A[] {
   }
   return [];
 }
-
-import {
-  deriveEqInstance,
-  deriveOrdInstance,
-  deriveShowInstance,
-  Eq,
-  Ord,
-  Show
-} from './fp-derivation-helpers';
-
-import {
-  ObservableLite,
-  ObservableLiteK
-} from './fp-observable-lite';
-
-import type {
-  TaskEither
-} from './fp-bimonad-extended';
-
-import type {
-  Kind1,
-  TaskEitherK
-} from './fp-hkt';
-
-import {
-  IO,
-  Task,
-  State,
-  IOK,
-  TaskK,
-  StateK
-} from './fp-effect-monads';
-
-import {
-  PersistentList,
-  PersistentMap,
-  PersistentSet,
-  PersistentListK,
-  PersistentMapK,
-  PersistentSetK
-} from './fp-persistent';
-
-import {
-  createSumType,
-  SumTypeBuilder
-} from './fp-adt-builders';
 
 // ============================================================================
 // Part 1: Tree ADT Definition and Instances
@@ -448,53 +451,52 @@ export const PersistentSetShowEnhanced = deriveShowInstance({
  * Register all missing Eq, Ord, and Show instances with the global registry
  */
 export function registerAllMissingADTInstances(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
+  const registry = ensureFPRegistry();
     
     // Register Tree instances
-    registry.registerTypeclass('Tree', 'Eq', Tree.Eq);
-    registry.registerTypeclass('Tree', 'Ord', Tree.Ord);
-    registry.registerTypeclass('Tree', 'Show', Tree.Show);
-    registry.registerDerivable('Tree', {
-      eq: Tree.Eq,
-      ord: Tree.Ord,
-      show: Tree.Show,
-      purity: { effect: 'Pure' as const }
-    });
+    // registry.register('Tree.Eq' as unknown as FPKey, Tree.Eq);
+    // registry.register('Tree.Ord' as unknown as FPKey, Tree.Ord);
+    // registry.register('Tree.Show' as unknown as FPKey, Tree.Show);
+    // registry.register('Tree.Derivable' as unknown as FPKey, {
+    //   eq: Tree.Eq,
+    //   ord: Tree.Ord,
+    //   show: Tree.Show,
+    //   purity: { effect: 'Pure' as const }
+    // });
     
     // Register ObservableLite instances
-    registry.registerTypeclass('ObservableLite', 'Eq', ObservableLiteEq);
-    registry.registerTypeclass('ObservableLite', 'Ord', ObservableLiteOrd);
-    registry.registerTypeclass('ObservableLite', 'Show', ObservableLiteShow);
+    registry.register('ObservableLite.Eq' as unknown as FPKey, ObservableLiteEq);
+    registry.register('ObservableLite.Ord' as unknown as FPKey, ObservableLiteOrd);
+    registry.register('ObservableLite.Show' as unknown as FPKey, ObservableLiteShow);
     
     // Register TaskEither instances
-    registry.registerTypeclass('TaskEither', 'Eq', TaskEitherEq);
-    registry.registerTypeclass('TaskEither', 'Ord', TaskEitherOrd);
-    registry.registerTypeclass('TaskEither', 'Show', TaskEitherShow);
+    registry.register('TaskEither.Eq' as unknown as FPKey, TaskEitherEq);
+    registry.register('TaskEither.Ord' as unknown as FPKey, TaskEitherOrd);
+    registry.register('TaskEither.Show' as unknown as FPKey, TaskEitherShow);
     
     // Register IO Eq instance
-    registry.registerTypeclass('IO', 'Eq', IOEq);
+    registry.register('IO.Eq' as unknown as FPKey, IOEq);
     
     // Register Task Eq instance
-    registry.registerTypeclass('Task', 'Eq', TaskEq);
+    registry.register('Task.Eq' as unknown as FPKey, TaskEq);
     
     // Register State Eq instance
-    registry.registerTypeclass('State', 'Eq', StateEq);
+    registry.register('State.Eq' as unknown as FPKey, StateEq);
     
     // Register enhanced PersistentList instances
-    registry.registerTypeclass('PersistentList', 'Eq', PersistentListEqEnhanced);
-    registry.registerTypeclass('PersistentList', 'Ord', PersistentListOrdEnhanced);
-    registry.registerTypeclass('PersistentList', 'Show', PersistentListShowEnhanced);
+    registry.register('PersistentList.Eq' as unknown as FPKey, PersistentListEqEnhanced);
+    registry.register('PersistentList.Ord' as unknown as FPKey, PersistentListOrdEnhanced);
+    registry.register('PersistentList.Show' as unknown as FPKey, PersistentListShowEnhanced);
     
     // Register enhanced PersistentMap instances
-    registry.registerTypeclass('PersistentMap', 'Eq', PersistentMapEqEnhanced);
-    registry.registerTypeclass('PersistentMap', 'Ord', PersistentMapOrdEnhanced);
-    registry.registerTypeclass('PersistentMap', 'Show', PersistentMapShowEnhanced);
+    registry.register('PersistentMap.Eq' as unknown as FPKey, PersistentMapEqEnhanced);
+    registry.register('PersistentMap.Ord' as unknown as FPKey, PersistentMapOrdEnhanced);
+    registry.register('PersistentMap.Show' as unknown as FPKey, PersistentMapShowEnhanced);
     
     // Register enhanced PersistentSet instances
-    registry.registerTypeclass('PersistentSet', 'Eq', PersistentSetEqEnhanced);
-    registry.registerTypeclass('PersistentSet', 'Ord', PersistentSetOrdEnhanced);
-    registry.registerTypeclass('PersistentSet', 'Show', PersistentSetShowEnhanced);
+    registry.register('PersistentSet.Eq' as unknown as FPKey, PersistentSetEqEnhanced);
+    registry.register('PersistentSet.Ord' as unknown as FPKey, PersistentSetOrdEnhanced);
+    registry.register('PersistentSet.Show' as unknown as FPKey, PersistentSetShowEnhanced);
     
     console.log('✅ Registered all missing ADT Eq, Ord, and Show instances');
   }

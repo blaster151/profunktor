@@ -26,6 +26,7 @@ import {
   getTypeclassInstance, 
   getDerivableInstances 
 } from './fp-registry-init';
+import { FPKey } from './src/types/brands';
 
 // Re-export for compatibility
 export { getFPRegistry };
@@ -38,21 +39,21 @@ export { getFPRegistry };
  * Type guard to check if a value is an Eq instance
  */
 function isEq<A>(x: unknown): x is Eq<A> {
-  return !!x && typeof (x as any).equals === 'function';
+  return !!x && typeof (x as Record<string, unknown>).equals === 'function';
 }
 
 /**
  * Type guard to check if a value is an Ord instance
  */
 function isOrd<A>(x: unknown): x is Ord<A> {
-  return !!x && typeof (x as any).compare === 'function' && typeof (x as any).equals === 'function';
+  return !!x && typeof (x as Record<string, unknown>).compare === 'function' && typeof (x as Record<string, unknown>).equals === 'function';
 }
 
 /**
  * Type guard to check if a value is a Show instance
  */
 function isShow<A>(x: unknown): x is Show<A> {
-  return !!x && typeof (x as any).show === 'function';
+  return !!x && typeof (x as Record<string, unknown>).show === 'function';
 }
 
 // ============================================================================
@@ -112,7 +113,7 @@ export function autoDeriveEq<A>(adtName: string, config: DerivationConfig = {}):
   }
   
   // Check if instance already exists in registry
-  const existingInstance = registry?.get(`${adtName}.Eq`);
+  const existingInstance = registry?.get(`${adtName}.Eq` as unknown as FPKey);
   if (existingInstance && typeof existingInstance === 'object' && 'equals' in existingInstance) {
     console.log(`✅ Using existing Eq instance for ${adtName}`);
     return existingInstance as Eq<A>;
@@ -126,7 +127,7 @@ export function autoDeriveEq<A>(adtName: string, config: DerivationConfig = {}):
   
   // Register the derived instance
   if (registry) {
-    registry.register(`${adtName}.Eq`, derivedInstance);
+    registry.register(`${adtName}.Eq` as unknown as FPKey, derivedInstance);
     console.log(`✅ Auto-derived and registered Eq instance for ${adtName}`);
   }
   
@@ -197,7 +198,7 @@ export function autoDeriveShow<A>(adtName: string, config: DerivationConfig = {}
   
   // Register the derived instance
   if (registry) {
-    registry.register(`${adtName}.Show`, derivedInstance);
+    registry.register(`${adtName}.Show` as unknown as FPKey, derivedInstance);
     console.log(`✅ Auto-derived and registered Show instance for ${adtName}`);
   }
   
@@ -664,9 +665,9 @@ export function getDerivedInstances<A>(adtName: string): {
     throw new Error('FP Registry not initialized');
   }
   
-  const rawEq = registry.get(`${adtName}.Eq`);
-  const rawOrd = registry.get(`${adtName}.Ord`);
-  const rawShow = registry.get(`${adtName}.Show`);
+  const rawEq = registry.get(`${adtName}.Eq` as unknown as FPKey);
+  const rawOrd = registry.get(`${adtName}.Ord` as unknown as FPKey);
+  const rawShow = registry.get(`${adtName}.Show` as unknown as FPKey);
 
   const eq: Eq<A> = isEq<A>(rawEq) ? rawEq : autoDeriveEq<A>(adtName);
   const ord: Ord<A> = isOrd<A>(rawOrd) ? rawOrd : autoDeriveOrd<A>(adtName);

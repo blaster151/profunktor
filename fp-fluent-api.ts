@@ -20,6 +20,8 @@ import { Maybe, Just, Nothing, matchMaybe } from './fp-maybe-unified';
 import { Either, Left, Right, matchEither } from './fp-either-unified';
 import { Result, Ok, Err, matchResult } from './fp-result-unified';
 import { isOk, isErr } from './fp-result-unified';
+import { ensureFPRegistry } from './fp-registry-init';
+import { FPKey } from './src/types/brands';
 
 /** Narrowing helpers */
 function isObservableLite<A = unknown>(u: unknown): u is ObservableLite<A> {
@@ -622,13 +624,11 @@ export type AssertFluentAPI<T extends FluentOps<any>> = T;
  * Register unified typeclass instances
  */
 export function registerUnifiedInstances(): void {
-  if (typeof globalThis !== 'undefined' && (globalThis as any).__FP_REGISTRY) {
-    const registry = (globalThis as any).__FP_REGISTRY;
-    
-    registry.register('UnifiedFunctor', UnifiedFunctorInstance);
-    registry.register('UnifiedMonad', UnifiedMonadInstance);
-    registry.register('UnifiedBifunctor', UnifiedBifunctorInstance);
-  }
+  const registry = ensureFPRegistry();
+  
+  registry.register('UnifiedFunctor' as unknown as FPKey, UnifiedFunctorInstance);
+  registry.register('UnifiedMonad' as unknown as FPKey, UnifiedMonadInstance);
+  registry.register('UnifiedBifunctor' as unknown as FPKey, UnifiedBifunctorInstance);
 }
 
 /**

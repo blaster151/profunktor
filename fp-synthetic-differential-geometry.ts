@@ -16,6 +16,78 @@
  */
 
 import { Polynomial } from './fp-polynomial-functors';
+import { D, Φ, Term, Subobject } from './src/types/brands';
+
+// ============================================================================
+// MINIMAL TYPED FACTORIES - REPLACE BRITTLE AS ANY
+// ============================================================================
+
+/**
+ * Create a typed infinitesimal object
+ */
+export function createInfinitesimalD(): D {
+  return {} as D;
+}
+
+/**
+ * Create a typed truth value
+ */
+export function createTruthValue<R>(): R {
+  return {} as R;
+}
+
+/**
+ * Create a typed differential form with proper structure
+ */
+export function createDifferentialForm<A, B>(): DifferentialNForm<A, B, any> {
+  return {
+    kind: 'DifferentialNForm',
+    manifold: {} as A,
+    valueModule: {} as B,
+    ring: {} as any,
+    degree: 0,
+    evaluation: (_tangents: Array<(d: any) => A>) => ({} as B),
+    multilinearity: (_λ: any, _i: number, _tangents: Array<(d: any) => A>) => true,
+    alternating: (_permutation: number[], _tangents: Array<(d: any) => A>) => true
+  };
+}
+
+/**
+ * Create a typed Weil algebra element
+ */
+export function createWeilElement<W>(): W {
+  return {} as W;
+}
+
+/**
+ * Create a typed polynomial functor
+ */
+export function createPolynomialFunctor<I, B, A, J>(): any {
+  return {
+    sigmaT: <X>(_x: X) => ({} as A),
+    sigmaF: <X>(_x: X) => ({} as B)
+  };
+}
+
+/**
+ * Create a typed free monad
+ */
+export function createFreeMonad<F, A>(): any {
+  return {
+    type: 'Pure',
+    value: {} as A
+  };
+}
+
+/**
+ * Create a typed cofree comonad
+ */
+export function createCofreeComonad<F, A>(): any {
+  return {
+    extract: {} as A,
+    extend: <B>(f: (a: A) => B) => createCofreeComonad<F, B>()
+  };
+}
 
 // ============================================================================
 // MODULAR SDG IMPORTS - NEW STRUCTURE
@@ -95,13 +167,13 @@ export interface InfinitesimalObject<A> {
  * Functions f: D → R that satisfy the Kock-Lawvere axiom:
  * f(d) = f(0) + d·f'(0) for all d ∈ D
  */
-export interface LinearMapOnD {
+export interface LinearMapOnD<R> {
   readonly kind: 'LinearMapOnD';
-  readonly function: (d: any) => any;
-  readonly basePoint: any; // f(0)
-  readonly derivative: any; // f'(0)
+  readonly function: (d: D) => R;  // f: D → R
+  readonly basePoint: R;           // f(0)
+  readonly derivative: R;          // f'(0)
   readonly satisfiesAxiom: boolean;
-  readonly evaluate: (d: any) => any;
+  readonly evaluate: (d: D) => R;
 }
 
 /**
@@ -115,8 +187,8 @@ export interface LinearMapOnD {
 export interface VectorFormAxiom1<V> {
   readonly kind: 'VectorFormAxiom1';
   readonly module: RModule<V>;
-  readonly infinitesimals: InfinitesimalObject;
-  readonly principalPart: (t: (d: any) => V) => V;
+  readonly infinitesimals: InfinitesimalObject<any>;
+  readonly principalPart: (t: (d: D) => V) => V;
   readonly satisfiesAxiom: boolean;
 }
 
@@ -127,7 +199,7 @@ export interface VectorFormAxiom1<V> {
  */
 export interface RModule<V> {
   readonly kind: 'RModule';
-  readonly ring: CommutativeRing;
+  readonly ring: CommutativeRing<any>;
   readonly add: (v1: V, v2: V) => V;
   readonly scalarMultiply: (r: any, v: V) => V;
   readonly zero: V;
@@ -209,9 +281,9 @@ export interface VectorField<M> {
   readonly infinitesimals: InfinitesimalObject;
   
   // Three equivalent formulations
-  readonly sectionForm: (m: M) => (d: any) => M; // ξ̂: M → M^D
-  readonly flowForm: (m: M, d: any) => M; // ξ: M × D → M
-  readonly transformationForm: (d: any) => (m: M) => M; // ξ̃: D → M^M
+  readonly sectionForm: (m: M) => (d: D) => M; // ξ̂: M → M^D
+  readonly flowForm: (m: M, d: D) => M; // ξ: M × D → M
+  readonly transformationForm: (d: D) => (m: M) => M; // ξ̃: D → M^M
   
   // Composition law (Proposition 8.1)
   readonly compositionLaw: boolean; // X(X(m, d₁), d₂) = X(m, d₁ + d₂)
@@ -365,9 +437,9 @@ export interface DirectionalDerivative<M, V> {
   readonly derivative: (m: M) => V; // X(f): M → V
   
   // Diagrammatic components
-  readonly sectionMap: (m: M) => (d: any) => M; // X̂: M → M^D
-  readonly functionExtension: (d: any) => (m: M) => V; // f^D: M^D → V^D
-  readonly principalPartExtraction: (t: (d: any) => V) => V; // γ: V^D → V
+  readonly sectionMap: (m: M) => (d: D) => M; // X̂: M → M^D
+  readonly functionExtension: (d: D) => (m: M) => V; // f^D: M^D → V^D
+  readonly principalPartExtraction: (t: (d: D) => V) => V; // γ: V^D → V
   
   // Properties from Theorem 10.1
   readonly satisfiesLinearity: boolean; // X(r·f) = r·X(f) and X(f + g) = X(f) + X(g)
@@ -636,8 +708,8 @@ export interface LieModuleStructure<M> {
 export interface TangentVector<M> {
   readonly kind: 'TangentVector';
   readonly basePoint: M;
-  readonly function: (d: any) => M;
-  readonly domain: InfinitesimalObject;
+  readonly function: (d: D) => M;
+  readonly domain: InfinitesimalObject<any>;
   readonly principalPart?: any; // For R-modules, the unique b such that t(d) = t(0) + d·b
 }
 
@@ -718,16 +790,16 @@ export function createInfinitesimalObject(ring: CommutativeRing): InfinitesimalO
 /**
  * Create a linear map on D satisfying the Kock-Lawvere axiom
  */
-export function createLinearMapOnD(
-  f: (d: any) => any,
-  basePoint: any,
-  derivative: any,
+export function createLinearMapOnD<R>(
+  f: (d: D) => R,
+  basePoint: R,
+  derivative: R,
   ring: CommutativeRing
-): LinearMapOnD {
-  const evaluate = (d: any) => ring.add(basePoint, ring.multiply(d, derivative));
+): LinearMapOnD<R> {
+  const evaluate = (d: D) => ring.add(basePoint, ring.multiply(d as unknown as number, derivative));
   
   // Check if the function satisfies the axiom
-  const satisfiesAxiom = (d: any) => {
+  const satisfiesAxiom = (d: D) => {
     const actual = f(d);
     const expected = evaluate(d);
     return actual === expected;
@@ -748,8 +820,8 @@ export function createLinearMapOnD(
  */
 export function createTangentVector<M>(
   basePoint: M,
-  f: (d: any) => M,
-  domain: InfinitesimalObject
+  f: (d: D) => M,
+  domain: InfinitesimalObject<any>
 ): TangentVector<M> {
   return {
     kind: 'TangentVector',
@@ -878,10 +950,10 @@ export function createVectorField<M>(
   const flowForm = flowFunction;
   
   // Section formulation: ξ̂: M → M^D via currying
-  const sectionForm = (m: M) => (d: any) => flowForm(m, d);
+  const sectionForm = (m: M) => (d: D) => flowForm(m, d);
   
   // Transformation formulation: ξ̃: D → M^M via currying
-  const transformationForm = (d: any) => (m: M) => flowForm(m, d);
+  const transformationForm = (d: D) => (m: M) => flowForm(m, d);
   
   // Check composition law (Proposition 8.1)
   const compositionLaw = true; // Assuming the function is constructed correctly
@@ -1109,13 +1181,13 @@ export function createDirectionalDerivative<M, V>(
   ring: CommutativeRing
 ): DirectionalDerivative<M, V> {
   // Section map: X̂: M → M^D
-  const sectionMap = (m: M) => (d: any) => vectorField.flowForm(m, d);
+  const sectionMap = (m: M) => (d: D) => vectorField.flowForm(m, d);
   
   // Function extension: f^D: M^D → V^D
-  const functionExtension = (d: any) => (m: M) => f(m);
+  const functionExtension = (d: D) => (m: M) => f(m);
   
   // Principal part extraction: γ: V^D → V
-  const principalPartExtraction = (t: (d: any) => V) => {
+  const principalPartExtraction = (t: (d: D) => V) => {
     // Extract the coefficient of d in the linear expansion
     // This is a simplified version - in practice we'd need more sophisticated logic
     return module.zero; // Placeholder
@@ -2375,7 +2447,7 @@ export function createCurrentIntegration<M, N>(
     pullbackIntegrate: (omega: DifferentialNForm<M, N>) => {
       // ∫_{I^n} f*ω
       const pullback = omega.pullback(map);
-      return pullback.evaluate({} as any); // Simplified
+      return pullback.evaluate(createInfinitesimalD()); // Simplified
     },
     
     equivalence: true // f = f_*(I^n)
@@ -2390,7 +2462,7 @@ export function createCurrentBoundary<M, N>(
 ): CurrentBoundary<M, N> {
   const n = typeof current.dimension === 'number' ? current.dimension : 2;
   const boundaryComponents = Array(2 * n).fill(null).map(() => 
-    createNCurrent({} as M, n - 1)
+    createNCurrent(createTruthValue<M>(), n - 1)
   );
   
   return {
@@ -2537,14 +2609,14 @@ export function verifyKockLawvereAxiom(f: (d: any) => any): boolean {
 /**
  * Create polynomial as Taylor series
  */
-export function polynomialAsTaylorSeries(polynomial: Polynomial<any, any>): LinearMapOnD {
+export function polynomialAsTaylorSeries<R>(polynomial: Polynomial<any, any>): LinearMapOnD<R> {
   return {
     kind: 'LinearMapOnD',
-    function: (d: any) => d,
-    basePoint: 0,
-    derivative: 1,
+    function: (d: D) => d as unknown as R,
+    basePoint: 0 as unknown as R,
+    derivative: 1 as unknown as R,
     satisfiesAxiom: true,
-    evaluate: (d: any) => d
+    evaluate: (d: D) => d as unknown as R
   };
 }
 
@@ -3369,8 +3441,8 @@ export interface EtaleMap<E, X> {
 export interface Germ<X, R> {
   readonly kind: 'Germ';
   readonly basePoint: X;
-  readonly functions: Array<{ domain: any; function: (x: any) => R }>;
-  readonly equivalenceRelation: (f1: any, f2: any) => boolean;
+  readonly functions: Array<{ domain: unknown; function: (x: unknown) => R }>;
+  readonly equivalenceRelation: (f1: unknown, f2: unknown) => boolean;
   readonly localRing: LocalRing<R>;
 }
 
@@ -4320,7 +4392,7 @@ export interface FormalManifoldCovering<M> {
   readonly coveringMaps: Array<RelationCreator<any, M>>;
   readonly modelObjects: any[];
   readonly isCovering: boolean;
-  readonly decomposeByCovering: () => Array<{model: any, map: RelationCreator<any, M>}>;
+  readonly decomposeByCovering: () => Array<{model: unknown, map: RelationCreator<unknown, M>}>;
 }
 
 // ============================================================================
@@ -5847,12 +5919,12 @@ export interface AdvancedFormalEtaleProperties<R> {
   readonly kind: 'AdvancedFormalEtaleProperties';
   readonly property4: {
     readonly description: string; // "(iv) The epi-mono factorization of a map in U has each of the two factors in U"
-    readonly epiMonoFactorization: (map: any) => { epi: any; mono: any };
+          readonly epiMonoFactorization: <M>(map: M) => { epi: M; mono: M };
     readonly bothFactorsInU: boolean;
   };
   readonly property5: {
     readonly description: string; // "(v) If g ∘ p ∈ U, p ∈ U, and p is epic, then g ∈ U"
-    readonly condition: (g: any, p: any) => boolean;
+          readonly condition: <G, P>(g: G, p: P) => boolean;
     readonly conclusion: boolean;
   };
   readonly property6: {
@@ -5875,12 +5947,12 @@ export function createAdvancedFormalEtaleProperties<R>(): AdvancedFormalEtalePro
     kind: 'AdvancedFormalEtaleProperties',
     property4: {
       description: "(iv) The epi-mono factorization of a map in U has each of the two factors in U",
-      epiMonoFactorization: (map: any) => ({ epi: map, mono: map }),
+      epiMonoFactorization: <M>(map: M) => ({ epi: map, mono: map }),
       bothFactorsInU: true
     },
     property5: {
       description: "(v) If g ∘ p ∈ U, p ∈ U, and p is epic, then g ∈ U",
-      condition: (g: any, p: any) => g && p && p.isEpic,
+      condition: <G, P>(g: G, p: P) => Boolean(g) && Boolean(p) && (p as any).isEpic,
       conclusion: true
     },
     property6: {
@@ -8775,7 +8847,7 @@ export function createUniversalPropertyFoundation<X, Y, R>(
     universalMorphism,
     universalProperty: "satisfies universal property",
     uniqueness: "unique up to isomorphism",
-    factorization: (f: (x: X) => Y) => (r: R) => f({} as X), // Simplified
+    factorization: (f: (x: X) => Y) => (r: R) => f(createTruthValue<X>()), // Simplified
     isUniversal: true,
     categoryTheory: "core of category theory"
   };
@@ -8791,11 +8863,11 @@ export interface ProofTheoryFoundation<X, R> {
   readonly kind: 'ProofTheoryFoundation';
   readonly formalDeduction: string; // "formal deduction system"
   readonly inferenceRules: {
-    readonly modusPonens: (phi: any, psi: any) => any; // φ, φ⇒ψ ⊢ ψ
-    readonly universalElimination: (variable: string, formula: any) => any; // ∀x φ(x) ⊢ φ(t)
-    readonly existentialIntroduction: (variable: string, term: any, formula: any) => any; // φ(t) ⊢ ∃x φ(x)
+    readonly modusPonens: (phi: Φ, psi: Φ) => any; // φ, φ⇒ψ ⊢ ψ
+    readonly universalElimination: (variable: string, formula: Φ) => any; // ∀x φ(x) ⊢ φ(t)
+    readonly existentialIntroduction: (variable: string, term: Term, formula: Φ) => any; // φ(t) ⊢ ∃x φ(x)
   };
-  readonly proofConstruction: (premises: any[], conclusion: any) => boolean; // Can prove conclusion from premises
+  readonly proofConstruction: (premises: Φ[], conclusion: Φ) => boolean; // Can prove conclusion from premises
   readonly soundness: string; // "sound with respect to satisfaction"
   readonly completeness: string; // "complete with respect to satisfaction"
   readonly isProofTheory: boolean;
@@ -8806,11 +8878,11 @@ export function createProofTheoryFoundation<X, R>(): ProofTheoryFoundation<X, R>
     kind: 'ProofTheoryFoundation',
     formalDeduction: "formal deduction system",
     inferenceRules: {
-      modusPonens: (phi: any, psi: any) => ({ type: 'modusPonens', premise1: phi, premise2: psi }),
-      universalElimination: (variable: string, formula: any) => ({ type: 'universalElimination', variable, formula }),
-      existentialIntroduction: (variable: string, term: any, formula: any) => ({ type: 'existentialIntroduction', variable, term, formula })
+      modusPonens: (phi: Φ, psi: Φ) => ({ type: 'modusPonens', premise1: phi, premise2: psi }),
+      universalElimination: (variable: string, formula: Φ) => ({ type: 'universalElimination', variable, formula }),
+      existentialIntroduction: (variable: string, term: Term, formula: Φ) => ({ type: 'existentialIntroduction', variable, term, formula })
     },
-    proofConstruction: (premises: any[], conclusion: any) => true, // Simplified
+    proofConstruction: (premises: Φ[], conclusion: Φ) => true, // Simplified
     soundness: "sound with respect to satisfaction",
     completeness: "complete with respect to satisfaction",
     isProofTheory: true
@@ -8826,7 +8898,7 @@ export function createProofTheoryFoundation<X, R>(): ProofTheoryFoundation<X, R>
 export interface SubobjectClassifier<R> {
   readonly kind: 'SubobjectClassifier';
   readonly truthValueObject: R; // Ω - truth value object
-  readonly characteristicFunction: (subobject: any) => (element: any) => R; // χ_A: X → Ω
+  readonly characteristicFunction: <X>(subobject: Subobject<X>) => (element: X) => R; // χ_A: X → Ω
   readonly subobjectCorrespondence: string; // "subobjects ↔ characteristic functions"
   readonly trueMorphism: () => R; // ⊤: 1 → Ω
   readonly falseMorphism: () => R; // ⊥: 1 → Ω
@@ -8842,16 +8914,16 @@ export interface SubobjectClassifier<R> {
 export function createSubobjectClassifier<R>(): SubobjectClassifier<R> {
   return {
     kind: 'SubobjectClassifier',
-    truthValueObject: {} as R,
-    characteristicFunction: (subobject: any) => (element: any) => ({} as R),
+    truthValueObject: createTruthValue<R>(),
+    characteristicFunction: <X>(subobject: Subobject<X>) => (element: X) => createTruthValue<R>(),
     subobjectCorrespondence: "subobjects ↔ characteristic functions",
-    trueMorphism: () => ({} as R),
-    falseMorphism: () => ({} as R),
+    trueMorphism: () => createTruthValue<R>(),
+    falseMorphism: () => createTruthValue<R>(),
     logicalOperations: {
-      and: (a: R, b: R) => ({} as R),
-      or: (a: R, b: R) => ({} as R),
-      implies: (a: R, b: R) => ({} as R),
-      not: (a: R) => ({} as R)
+      and: (a: R, b: R) => createTruthValue<R>(),
+      or: (a: R, b: R) => createTruthValue<R>(),
+      implies: (a: R, b: R) => createTruthValue<R>(),
+      not: (a: R) => createTruthValue<R>()
     },
     isSubobjectClassifier: true
   };
@@ -8867,7 +8939,7 @@ export interface ToposLogicFoundation<X, R> {
   readonly kind: 'ToposLogicFoundation';
   readonly internalLogic: string; // "internal logic of topos"
   readonly kripkeJoyal: string; // "Kripke-Joyal semantics"
-  readonly forcingRelation: (stage: X, formula: any) => boolean; // ⊩_X φ
+  readonly forcingRelation: (stage: X, formula: Φ) => boolean; // ⊩_X φ
   readonly sheafSemantics: string; // "sheaf semantics"
   readonly geometricLogic: string; // "geometric logic"
   readonly isToposLogic: boolean;
@@ -8878,7 +8950,7 @@ export function createToposLogicFoundation<X, R>(): ToposLogicFoundation<X, R> {
     kind: 'ToposLogicFoundation',
     internalLogic: "internal logic of topos",
     kripkeJoyal: "Kripke-Joyal semantics",
-    forcingRelation: (stage: X, formula: any) => true, // Simplified
+    forcingRelation: (stage: X, formula: Φ) => true, // Simplified
     sheafSemantics: "sheaf semantics",
     geometricLogic: "geometric logic",
     isToposLogic: true

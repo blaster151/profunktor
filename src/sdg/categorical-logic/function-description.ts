@@ -394,7 +394,7 @@ export interface FunctionDescriptionAndHomomorphismSystem<X, D, R, A, B> {
   ) => {
     functionDescriptionValid: boolean;
     conversionDiagramValid: boolean;
-    equationsValid: boolean;
+    conversionLawsValid: boolean;
     groupHomomorphismValid: boolean;
     summary: string;
   };
@@ -420,7 +420,7 @@ export function createFunctionDescriptionAndHomomorphismSystem<X, D, R, A, B>():
     
     functionDescription: functionDesc,
     conversionDiagram: conversion,
-    equations: eqs,
+    conversionLaws: eqs,
     groupHomomorphism: groupHom,
     rModuleHomomorphism: rModuleHom,
     
@@ -435,15 +435,15 @@ export function createFunctionDescriptionAndHomomorphismSystem<X, D, R, A, B>():
     ) => {
       const functionDescriptionValid = functionDesc.verifyDescription(phi, x, d);
       const conversionDiagramValid = conversion.verifyCommutativity((pair: [X, D]) => phi(pair[0], pair[1]), x, d);
-      const equationsValid = eqs.verifyEquations(phi, x, d);
+      const conversionLawsValid = eqs.verifyEquations(phi, x, d);
       const groupHomomorphismValid = groupHom.isGroupHomomorphism(f, multiply, multiplyB, domainA);
       
       return {
         functionDescriptionValid,
         conversionDiagramValid,
-        equationsValid,
+        conversionLawsValid,
         groupHomomorphismValid,
-        summary: `Page 110 Integration: FunctionDesc=${functionDescriptionValid}, Conversion=${conversionDiagramValid}, Equations=${equationsValid}, GroupHom=${groupHomomorphismValid}`
+        summary: `Page 110 Integration: FunctionDesc=${functionDescriptionValid}, Conversion=${conversionDiagramValid}, ConversionLaws=${conversionLawsValid}, GroupHom=${groupHomomorphismValid}`
       };
     }
   };

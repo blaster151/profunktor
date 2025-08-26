@@ -1,39 +1,48 @@
 // Minimal FP Registry (side-effect free, no eager imports)
 
-export interface FPRegistry {
-  readonly store: Map<string, any>;
-  readonly derivable: Map<string, any>;
-  register: (key: string, value: any) => void;
-  get: <T = unknown>(key: string) => T | undefined;
-  has: (key: string) => boolean;
+import { Brand, FPKey } from './src/types/brands';
+
+export interface FPRegistry<V = unknown> {
+  readonly store: Map<FPKey, V>;
+  readonly derivable: Map<FPKey, V>;
+  register: <T extends V = V>(key: FPKey, value: T) => void;
+  get: <T extends V = V>(key: FPKey) => T | undefined;
+  has: (key: FPKey) => boolean;
 }
 
-function createRegistry(): FPRegistry {
-  const store = new Map<string, any>();
-  const derivable = new Map<string, any>();
+function createRegistry<V = unknown>(): FPRegistry<V> {
+  const store = new Map<FPKey, V>();
+  const derivable = new Map<FPKey, V>();
   return {
     store,
     derivable,
     register: (key, value) => { store.set(key, value); },
-    get: (key) => store.get(key),
-    has: (key) => store.has(key),
+    get: <T extends V = V>(key) => store.get(key) as T | undefined,
+    has: (key) => store.has(key)
   };
 }
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __FP_REGISTRY: FPRegistry | undefined;
+}
+
 export function ensureFPRegistry(): FPRegistry {
-  const g = globalThis as any;
-  if (!g.__FP_REGISTRY) {
-    g.__FP_REGISTRY = createRegistry();
+  if (!globalThis.__FP_REGISTRY) {
+    globalThis.__FP_REGISTRY = createRegistry();
   }
-  return g.__FP_REGISTRY as FPRegistry;
+  return globalThis.__FP_REGISTRY;
 }
 
 // Export quick helpers for convenience
-export function register(name: string, value: any): void {
-  ensureFPRegistry().register(name, value);
+export function register<T = unknown>(name: string, value: T): void {
+  ensureFPRegistry().register(name as unknown as FPKey, value);
 }
 export function get<T = unknown>(name: string): T | undefined {
-  return ensureFPRegistry().get<T>(name);
+  return ensureFPRegistry().get<T>(name as unknown as FPKey);
+}
+export function has(name: string): boolean {
+  return ensureFPRegistry().has(name as unknown as FPKey);
 }
 
 // Minimal FP Registry stub to keep registrations optional and non-failing
@@ -66,11 +75,11 @@ export function get<T = unknown>(name: string): T | undefined {
  * Global FP Registry implementation
  */
 class GlobalFPRegistry implements FPRegistry {
-  public store = new Map<string, any>();
-  public derivable = new Map<string, any>();
-  register = (key: string, value: any) => { this.store.set(key, value); };
-  get = <T = unknown>(key: string) => this.store.get(key) as T | undefined;
-  has = (key: string) => this.store.has(key);
+  public store = new Map<FPKey, unknown>();
+  public derivable = new Map<FPKey, unknown>();
+  register = (key: FPKey, value: unknown) => { this.store.set(key, value); };
+  get = <T = unknown>(key: FPKey) => this.store.get(key) as T | undefined;
+  has = (key: FPKey) => this.store.has(key);
 }
 
 // ============================================================================
@@ -83,7 +92,7 @@ class GlobalFPRegistry implements FPRegistry {
 export function initializeFPRegistry(): FPRegistry {
   const registry = new GlobalFPRegistry();
   if (typeof globalThis !== 'undefined') {
-    (globalThis as any).__FP_REGISTRY = registry;
+    globalThis.__FP_REGISTRY = registry;
   }
   return registry;
 }
@@ -105,27 +114,27 @@ export function getFPRegistry(): FPRegistry {
 /**
  * Get derivable instances from the registry
  */
-export function getDerivableInstances(name: string): any { 
-  return getFPRegistry().derivable.get(name); 
+export function getDerivableInstances(name: string): unknown { 
+  return getFPRegistry().derivable.get(name as unknown as FPKey); 
 }
 
 /**
  * Get a typeclass instance from the registry
  */
-export function getTypeclassInstance(name: string, tc: string): any {
+export function getTypeclassInstance(name: string, tc: string): unknown {
   const instances = getDerivableInstances(name);
   if (!instances) return undefined;
   
   // Switch on typeclass name and return from derivable map
   switch (tc) {
-    case 'Functor': return instances.Functor;
-    case 'Applicative': return instances.Applicative;
-    case 'Monad': return instances.Monad;
-    case 'Traversable': return instances.Traversable;
-    case 'Bifunctor': return instances.Bifunctor;
-    case 'Alternative': return instances.Alternative;
-    case 'MonadError': return instances.MonadError;
-    default: return instances[tc];
+    case 'Functor': return (instances as Record<string, unknown>).Functor;
+    case 'Applicative': return (instances as Record<string, unknown>).Applicative;
+    case 'Monad': return (instances as Record<string, unknown>).Monad;
+    case 'Traversable': return (instances as Record<string, unknown>).Traversable;
+    case 'Bifunctor': return (instances as Record<string, unknown>).Bifunctor;
+    case 'Alternative': return (instances as Record<string, unknown>).Alternative;
+    case 'MonadError': return (instances as Record<string, unknown>).MonadError;
+    default: return (instances as Record<string, unknown>)[tc];
   }
 }
 
@@ -139,12 +148,12 @@ export function getPurityEffect(_name: string): string | undefined {
 /**
  * Get usage bound for a type from the global registry
  */
-export function getUsageBound(_name: string): any { return undefined; }
+export function getUsageBound(_name: string): unknown { return undefined; }
 
 /**
  * Register usage for a type in the global registry
  */
-export function registerUsageBound(_name: string, _usage: any): void { /* no-op */ }
+export function registerUsageBound(_name: string, _usage: unknown): void { /* no-op */ }
 
 // ============================================================================
 // Part 5: Auto-Initialization

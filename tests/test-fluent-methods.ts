@@ -2,7 +2,7 @@
  * Test file to verify fp-fluent-methods functionality
  */
 
-import { fluent } from './src/fp-fluent-methods';
+import { fluent } from './fp-fluent-methods';
 
 // Test 1: fluent({ tag:'Just', value: 1 }).map(x=>x+1).value() returns { tag:'Just', value:2 }
 const result1 = fluent({ tag: 'Just', value: 1 }).map(x => x + 1).value();

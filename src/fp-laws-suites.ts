@@ -2,6 +2,16 @@
 import type { Suite } from "./fp-laws-core";
 import { forAll, forAll2 } from "./fp-laws-core";
 import { need } from "./fp-witness-registry";
+import { OpName } from "./types/brands";
+
+// Helper functions for creating typed ops
+export function unary<I, O>(name: string, run: (i: I) => O) {
+  return { name: name as unknown as OpName, arity: 1, run };
+}
+
+export function binary<A, B, O>(name: string, run: (a: A, b: B) => O) {
+  return { name: name as unknown as OpName, arity: 2, run: ([a, b]: [A, B]) => run(a, b) };
+}
 
 // =========== Functor ===========
 export function functorSuite(rec: any): Suite {

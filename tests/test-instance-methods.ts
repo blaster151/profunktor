@@ -2,7 +2,7 @@
  * Test the fluent instance methods installation
  */
 
-import { installFluent, unavailableInstallReason } from './src/fp-fluent-instance-methods';
+import { installFluent, unavailableInstallReason } from './fp-fluent-instance-methods';
 
 // Test 1: Calling installFluent() without options should be a no-op
 console.log('Before installation:', unavailableInstallReason);

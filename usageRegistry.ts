@@ -6,6 +6,8 @@
  * and compile-time safety.
  */
 
+import { FPKey } from './src/types/brands';
+
 import { 
   Usage, 
   Multiplicity, 
@@ -63,7 +65,7 @@ export interface UsageRegistry {
   /**
    * Get all registered usages
    */
-  getAllUsages(): Map<unknown, Usage<unknown>>;
+  getAllUsages(): Map<FPKey, unknown>;
   
   /**
    * Clear all usages
@@ -79,21 +81,21 @@ export interface UsageRegistry {
  * Global usage registry implementation
  */
 class GlobalUsageRegistry implements UsageRegistry {
-  private usages = new Map<unknown, Usage<unknown>>();
+  private usages = new Map<FPKey, unknown>();
 
   register<K, T>(typeKey: K, usage: Usage<T>): void {
-    this.usages.set(typeKey, usage as Usage<unknown>);
+    this.usages.set(typeKey as unknown as FPKey, usage);
   }
 
   getUsage<K, T>(typeKey: K): Usage<T> | undefined {
-    return this.usages.get(typeKey) as Usage<T> | undefined;
+    return this.usages.get(typeKey as unknown as FPKey) as Usage<T> | undefined;
   }
 
   hasUsage<K>(typeKey: K): boolean {
-    return this.usages.has(typeKey);
+    return this.usages.has(typeKey as unknown as FPKey);
   }
 
-  getAllUsages(): Map<unknown, Usage<unknown>> {
+  getAllUsages(): Map<FPKey, unknown> {
     return new Map(this.usages);
   }
 
@@ -120,6 +122,20 @@ export function getUsageBound<T>(typeKey: string): UsageBound<T> | undefined {
  */
 export function registerUsage<T>(typeKey: string, usage: Usage<T>): void {
   usageRegistry.register(typeKey, usage);
+}
+
+/**
+ * Set usage for a type with branded key
+ */
+export function setUsage<T = unknown>(typeName: string, usage: T): void {
+  usageRegistry.register(typeName, usage as Usage<T>);
+}
+
+/**
+ * Get usage for a type with branded key
+ */
+export function getUsage<T = unknown>(typeName: string): T | undefined {
+  return usageRegistry.getUsage(typeName) as T | undefined;
 }
 
 //   getAllUsages(): Map<any, Usage<any>> {

@@ -796,7 +796,7 @@ export function optimizePipeline(
   // Optional reachability tracing
   try {
     // Defer import to avoid module cycles and keep optional
-    if ((context as any).enableTracing && (context as any).traceToConsole) {
+    if ((context as OptimizationContext & { enableTracing?: boolean; traceToConsole?: boolean }).enableTracing && (context as OptimizationContext & { enableTracing?: boolean; traceToConsole?: boolean }).traceToConsole) {
       const { operators, reachablePairs } = fusibilityStats();
       // eslint-disable-next-line no-console
       console.log(`🧭 Fusibility reachability: ${reachablePairs} reachable pairs across ${operators} operators`);
@@ -1136,7 +1136,7 @@ export function benchmarkOptimization(
   
   // Benchmark unoptimized pipeline
   const unoptimizedStart = performance.now();
-  const unoptimizedMemory = ((globalThis as any).performance?.memory?.usedJSHeapSize) || 0;
+  const unoptimizedMemory = ((globalThis as { performance?: { memory?: { usedJSHeapSize?: number } } }).performance?.memory?.usedJSHeapSize) || 0;
   
   for (let i = 0; i < iterations; i++) {
     // Simulate pipeline execution
@@ -1148,14 +1148,14 @@ export function benchmarkOptimization(
   
   const unoptimizedEnd = performance.now();
   const unoptimizedTime = unoptimizedEnd - unoptimizedStart;
-  const unoptimizedMemoryUsed = (((globalThis as any).performance?.memory?.usedJSHeapSize) || 0) - unoptimizedMemory;
+  const unoptimizedMemoryUsed = (((globalThis as { performance?: { memory?: { usedJSHeapSize?: number } } }).performance?.memory?.usedJSHeapSize) || 0) - unoptimizedMemory;
   
   // Optimize pipeline
   const optimizationResult = optimizePipeline(adtName, typeclass, pipeline, context);
   
   // Benchmark optimized pipeline
   const optimizedStart = performance.now();
-  const optimizedMemory = (((globalThis as any).performance?.memory?.usedJSHeapSize) || 0);
+  const optimizedMemory = (((globalThis as { performance?: { memory?: { usedJSHeapSize?: number } } }).performance?.memory?.usedJSHeapSize) || 0);
   
   for (let i = 0; i < iterations; i++) {
     // Simulate optimized pipeline execution
@@ -1167,7 +1167,7 @@ export function benchmarkOptimization(
   
   const optimizedEnd = performance.now();
   const optimizedTime = optimizedEnd - optimizedStart;
-  const optimizedMemoryUsed = ((((globalThis as any).performance?.memory?.usedJSHeapSize) || 0) - optimizedMemory);
+  const optimizedMemoryUsed = ((((globalThis as { performance?: { memory?: { usedJSHeapSize?: number } } }).performance?.memory?.usedJSHeapSize) || 0) - optimizedMemory);
   
   return {
     unoptimized: { time: unoptimizedTime, memory: unoptimizedMemoryUsed },

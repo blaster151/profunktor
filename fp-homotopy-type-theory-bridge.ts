@@ -47,6 +47,10 @@ import {
   createTermJudgment
 } from './fp-dependent-types';
 
+// Sheafifiable model structure imports
+import { makeToySite, Sheafifiable, demoVerifySheafifiableTransfer } from "./fp-computational-topos-framework";
+import { toQuillenPair, GeometricMorphism, QuillenAdjunction } from "./src/homotopy/adjunctions/geometric-to-quillen";
+
 // ============================================================================
 // PART 1: HOMOTOPY-AWARE TYPE THEORY
 // ============================================================================
@@ -611,4 +615,26 @@ export function createExampleIdentityType<A>(): IdentityType<A> {
  */
 export function createExampleUnivalence<A>(): UnivalenceAxiom<A, A> {
   return createUnivalenceAxiom<A, A>();
+}
+
+// ============================================================================
+// PART 9: SHEAFIFIABLE MODEL STRUCTURE INTEGRATION
+// ============================================================================
+
+/**
+ * Build two identical model structures over the same toy site/topology (for demo)
+ */
+export function demoQuillenPairFromToyGeometricMorphism(): QuillenAdjunction<unknown, unknown> {
+  const { site, topology } = makeToySite();
+
+  // Build models on A and B (identical for now; different sites would also work)
+  const A = demoVerifySheafifiableTransfer().built as Sheafifiable.ModelCategory<unknown>;
+  const B = demoVerifySheafifiableTransfer().built as Sheafifiable.ModelCategory<unknown>;
+
+  // Placeholder geometric morphism f: Sh(B) -> Sh(A) with identity-ish semantics
+  const f: GeometricMorphism<unknown, unknown> = {
+    leftExactPullback: (b) => b,       // f^*  (identity on this demo)
+    rightAdjointPushforward: (a) => a  // f_*  (identity on this demo)
+  };
+  return toQuillenPair(f, A, B);
 }

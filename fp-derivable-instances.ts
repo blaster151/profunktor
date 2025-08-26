@@ -15,7 +15,7 @@
  */
 
 import {
-  Kind, Kind1, Kind2, Kind3,
+  Kind1, Kind2, Kind3,
   Apply
 } from './fp-hkt';
 
@@ -77,7 +77,7 @@ export const TYPECLASS_OPERATIONS = {
 /**
  * Configuration for dual API generation
  */
-export interface DualAPIConfig<F extends Kind<any[]>> {
+export interface DualAPIConfig<F extends Kind1 | Kind2 | Kind3> {
   /** The typeclass instance */
   instance: any;
   /** The type constructor name */
@@ -91,7 +91,7 @@ export interface DualAPIConfig<F extends Kind<any[]>> {
 /**
  * Dual API result containing both instance and standalone functions
  */
-export interface DualAPI<F extends Kind<any[]>> {
+export interface DualAPI<F extends Kind1 | Kind2 | Kind3> {
   /** The original typeclass instance */
   instance: any;
   /** Data-last standalone functions */
@@ -103,7 +103,7 @@ export interface DualAPI<F extends Kind<any[]>> {
 /**
  * Generates both fluent instance methods and data-last standalone functions
  */
-export function createDualAPI<F extends Kind<any[]>>(config: DualAPIConfig<F>): DualAPI<F> {
+export function createDualAPI<F extends Kind1 | Kind2 | Kind3>(config: DualAPIConfig<F>): DualAPI<F> {
   const { instance, name, operations, customOperations = {} } = config;
   
   const standaloneFunctions: Record<string, any> = {};
@@ -285,8 +285,8 @@ export interface BifunctorAPI<K, V> {
 /**
  * Check if a value has a specific method
  */
-export function hasMethod<T>(value: any, method: keyof T): value is T {
-  return typeof (value as any)[method] === 'function';
+export function hasMethod<T>(value: unknown, method: keyof T): value is T {
+  return typeof (value as Record<string, unknown>)[method] === 'function';
 }
 
 /**
@@ -510,8 +510,8 @@ export const globalRegistry = new DerivableInstanceRegistry();
  */
 export function createFunctorInstance<T>(value: FunctorAPI<T>): Functor<any> {
   return {
-    map: <A, B>(fa: any, f: (a: A) => B): any => {
-      return (fa as any).map(f);
+    map: <A, B>(fa: FunctorAPI<A>, f: (a: A) => B): FunctorAPI<B> => {
+      return fa.map(f);
     }
   };
 }
@@ -522,11 +522,11 @@ export function createFunctorInstance<T>(value: FunctorAPI<T>): Functor<any> {
 export function createApplicativeInstance<T>(value: ApplicativeAPI<T>): Applicative<any> {
   return {
     ...createFunctorInstance(value),
-    of: <A>(a: A): any => {
-      return (value as any).of(a);
+    of: <A>(a: A): ApplicativeAPI<A> => {
+      return value.of(a);
     },
-    ap: <A, B>(fab: any, fa: any): any => {
-      return (value as any).ap(fab, fa);
+    ap: <A, B>(fab: ApplicativeAPI<(a: A) => B>, fa: ApplicativeAPI<A>): ApplicativeAPI<B> => {
+      return value.ap(fab, fa);
     }
   };
 }
@@ -537,8 +537,8 @@ export function createApplicativeInstance<T>(value: ApplicativeAPI<T>): Applicat
 export function createMonadInstance<T>(value: MonadAPI<T>): Monad<any> {
   return {
     ...createApplicativeInstance(value),
-    chain: <A, B>(fa: any, f: (a: A) => any): any => {
-      return (fa as any).chain(f);
+    chain: <A, B>(fa: MonadAPI<A>, f: (a: A) => MonadAPI<B>): MonadAPI<B> => {
+      return fa.chain(f);
     }
   };
 }
@@ -550,21 +550,21 @@ export function createFoldableInstance<T>(value: FoldableAPI<T>): Foldable<any> 
   return {
     foldr: <A, B>(fa: any, f: (a: A, b: B) => B, z: B): B => {
       if (hasMethod(fa, 'reduce')) {
-        return (fa as any).reduce((acc: B, val: A) => f(val, acc), z);
+        return (fa as FoldableAPI<A>).reduce((acc: B, val: A) => f(val, acc), z);
       } else if (hasMethod(fa, 'foldLeft')) {
-        return (fa as any).foldLeft((acc: B, val: A) => f(val, acc), z);
+        return (fa as FoldableAPI<A>).foldLeft((acc: B, val: A) => f(val, acc), z);
       } else if (hasMethod(fa, 'foldRight')) {
-        return (fa as any).foldRight(f, z);
+        return (fa as FoldableAPI<A>).foldRight(f, z);
       }
       throw new Error('No foldable method found');
     },
     foldl: <A, B>(fa: any, f: (b: B, a: A) => B, z: B): B => {
       if (hasMethod(fa, 'reduce')) {
-        return (fa as any).reduce(f, z);
+        return (fa as FoldableAPI<A>).reduce(f, z);
       } else if (hasMethod(fa, 'foldLeft')) {
-        return (fa as any).foldLeft(f, z);
+        return (fa as FoldableAPI<A>).foldLeft(f, z);
       } else if (hasMethod(fa, 'foldRight')) {
-        return (fa as any).foldRight((a: A, b: B) => f(b, a), z);
+        return (fa as FoldableAPI<A>).foldRight((a: A, b: B) => f(b, a), z);
       }
       throw new Error('No foldable method found');
     }
@@ -579,7 +579,7 @@ export function createTraversableInstance<T>(value: TraversableAPI<T>): Traversa
     ...createFunctorInstance(value),
     traverse: <G extends Kind1, A, B>(fa: any, f: (a: A) => Apply<G, [B]>): Apply<G, [any]> => {
       if (hasMethod(fa, 'traverse')) {
-        return (fa as any).traverse(f);
+        return (fa as TraversableAPI<A>).traverse(f);
       }
       throw new Error('No traverse method found');
     }
@@ -593,21 +593,21 @@ export function createBifunctorInstance<K, V>(value: BifunctorAPI<K, V>): Bifunc
   return {
     bimap: <A, B, C, D>(fab: any, f: (a: A) => C, g: (b: B) => D): any => {
       if (hasMethod(fab, 'bimap')) {
-        return (fab as any).bimap(f, g);
+        return (fab as BifunctorAPI<A, B>).bimap(f, g);
       }
       throw new Error('No bimap method found');
     },
     mapLeft: <A, B, C>(fab: any, f: (a: A) => C): any => {
       if (hasMethod(fab, 'mapLeft')) {
-        return (fab as any).mapLeft(f);
+        return (fab as BifunctorAPI<A, B>).mapLeft(f);
       }
-      return (fab as any).bimap(f, (x: any) => x);
+      return (fab as BifunctorAPI<A, B>).bimap(f, (x: B) => x);
     },
     mapRight: <A, B, D>(fab: any, g: (b: B) => D): any => {
       if (hasMethod(fab, 'mapRight')) {
-        return (fab as any).mapRight(g);
+        return (fab as BifunctorAPI<A, B>).mapRight(g);
       }
-      return (fab as any).bimap((x: any) => x, g);
+      return (fab as BifunctorAPI<A, B>).bimap((x: A) => x, g);
     }
   };
 }
@@ -950,7 +950,7 @@ export function createInstanceFromMethods(value: any, methods: Record<string, st
   
   for (const [instanceMethod, valueMethod] of Object.entries(methods)) {
     if (hasMethod(value, valueMethod)) {
-      instance[instanceMethod] = (value as any)[valueMethod].bind(value);
+      instance[instanceMethod] = (value as Record<string, unknown>)[valueMethod].bind(value);
     }
   }
   
