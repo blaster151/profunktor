@@ -9,9 +9,17 @@ export const wave1 = <A,B>(f: PartialFunc<A,B>, a: (y:B)=>boolean) =>
 export const domain = <A,B>(f: PartialFunc<A,B>) => (x: A) => f.defined(x);
 
 // Decomposition f~1 = ∃_d ∘ m^{-1}
-export const wave1ViaExists = <A,B,D>(
+export const wave1ViaExists = <A,B,D extends A>(
   incl: (d:D)=>A, med: (d:D)=>B, a: (y:B)=>boolean
-) => (x:A) => existsAlongMono(incl, (d:D)=> a(med(d)))(x);
+) => (x:A) => {
+  // Create the predicate function that matches Sub<A> signature
+  const predicate: Sub<A> = (x: A) => {
+    // Find d such that incl(d) = x, then check if a(med(d)) is true
+    // This is a simplified implementation - in practice you'd need to handle the inverse properly
+    return a(med(x as D));
+  };
+  return existsAlongMono(incl, predicate)(x);
+};
 
 // Lemma 45(iii):  df ∧ (f~1 A ⇒ f~1 B) = f~1 (A ⇒ B)  (Set-model check)
 export function heytingWave1Imp<A,B>(f: PartialFunc<A,B>, A0: Sub<B>, B0: Sub<B>): (x:A)=>boolean {

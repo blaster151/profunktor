@@ -22,6 +22,8 @@ import {
   createPurityInfo, attachPurityMarker, extractPurityMarker, hasPurityMarker
 } from './fp-purity';
 
+import { assertDefined, isDefined } from './src/util/assert';
+
 // ============================================================================
 // Part 1: Monoid Typeclass Definition
 // ============================================================================
@@ -238,7 +240,7 @@ export function monoidFromSemigroup<A>(empty: A, concat: (a: A, b: A) => A): Mon
  */
 export function FirstMonoid<A>(): MonoidWithEffect<A, 'Pure'> {
   return {
-    empty: undefined as any,
+    empty: undefined as any, // First monoid doesn't have a meaningful empty value
     concat: (a: A, b: A) => a,
     __effect: 'Pure'
   };
@@ -249,7 +251,7 @@ export function FirstMonoid<A>(): MonoidWithEffect<A, 'Pure'> {
  */
 export function LastMonoid<A>(): MonoidWithEffect<A, 'Pure'> {
   return {
-    empty: undefined as any,
+    empty: undefined as any, // Last monoid doesn't have a meaningful empty value
     concat: (a: A, b: A) => b,
     __effect: 'Pure'
   };

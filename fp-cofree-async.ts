@@ -8,6 +8,7 @@ import { Kind1, Apply } from './fp-hkt';
 import { Functor, Foldable, Traversable, Applicative } from './fp-typeclasses-hkt';
 import { LazyCofree } from './fp-cofree-lazy';
 import { Cofree, cofree } from './fp-free';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // ------------------------------
 // Async Lazy Cofree
@@ -66,7 +67,7 @@ export async function* dfsAsync<F extends Kind1, A>(
   const stack: AsyncLazyCofree<F, A>[] = [root];
 
   while (stack.length) {
-    const node = stack.pop()!;
+    const node = assertDefined(stack.pop(), "dfsAsync: node must be defined");
     yield node.head;
 
     const kidsF = await node.tail();
@@ -86,7 +87,7 @@ export async function* bfsAsync<F extends Kind1, A>(
   const q: AsyncLazyCofree<F, A>[] = [root];
 
   while (q.length) {
-    const node = q.shift()!;
+    const node = assertDefined(q.shift(), "bfsAsync: node must be defined");
     yield node.head;
 
     const kidsF = await node.tail();

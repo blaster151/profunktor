@@ -37,5 +37,10 @@ export {
 
 // Re-export RBazaar helpers
 export { reifyBazaar, lowerRBazaar, composeRBazaar } from './fp-bazaar-reified';
+export { Dialens, dialensH1, dialensH2, composeDialens, fromLens } from './fp-optics-dialens';
+export { ClovenFibration, VCMor, composeVC, dualOf } from './fp-optics-fib-vertcart';
+export { PLens, composePLens, plensFromDialens } from './fp-optics-plens';
+export { Preoptic, StrictAction, toDialens as preopticToDialens } from './fp-optics-preoptic';
+export { TernaryFactorization, Ambifibration, dualTernary } from './fp-optics-ambifibration';
 
 

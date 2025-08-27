@@ -26,7 +26,7 @@ import {
   getTypeclassInstance, 
   getDerivableInstances 
 } from './fp-registry-init';
-import { FPKey } from './src/types/brands';
+import { FPKey, toFPKey } from './src/types/brands';
 
 // Re-export for compatibility
 export { getFPRegistry };
@@ -39,21 +39,21 @@ export { getFPRegistry };
  * Type guard to check if a value is an Eq instance
  */
 function isEq<A>(x: unknown): x is Eq<A> {
-  return !!x && typeof (x as Record<string, unknown>).equals === 'function';
+  return !!x && typeof (x as Record<string, unknown>)["equals"] === 'function';
 }
 
 /**
  * Type guard to check if a value is an Ord instance
  */
 function isOrd<A>(x: unknown): x is Ord<A> {
-  return !!x && typeof (x as Record<string, unknown>).compare === 'function' && typeof (x as Record<string, unknown>).equals === 'function';
+  return !!x && typeof (x as Record<string, unknown>)["compare"] === 'function' && typeof (x as Record<string, unknown>)["equals"] === 'function';
 }
 
 /**
  * Type guard to check if a value is a Show instance
  */
 function isShow<A>(x: unknown): x is Show<A> {
-  return !!x && typeof (x as Record<string, unknown>).show === 'function';
+  return !!x && typeof (x as Record<string, unknown>)["show"] === 'function';
 }
 
 // ============================================================================
@@ -70,7 +70,7 @@ export interface ADTMetadata {
   isProductType: boolean;
   hasMatch: boolean;
   hasTag: boolean;
-  fieldTypes: Record<string, any[]>;
+  fieldTypes: Record<string, unknown[]>;
   customEq?: (a: any, b: any) => boolean;
   customOrd?: (a: any, b: any) => number;
   customShow?: (a: any) => string;
@@ -122,12 +122,12 @@ export function autoDeriveEq<A>(adtName: string, config: DerivationConfig = {}):
   // Derive new instance
   const derivedInstance = deriveEqInstance<A>({
     ...config,
-    customEq: metadata.customEq || config.customEq
+    ...(metadata.customEq || config.customEq ? { customEq: metadata.customEq || config.customEq } : {})
   });
   
   // Register the derived instance
   if (registry) {
-    registry.register(`${adtName}.Eq` as unknown as FPKey, derivedInstance);
+    registry.register(toFPKey(`${adtName}.Eq`), derivedInstance);
     console.log(`✅ Auto-derived and registered Eq instance for ${adtName}`);
   }
   
@@ -157,7 +157,7 @@ export function autoDeriveOrd<A>(adtName: string, config: DerivationConfig = {})
   // Derive new instance
   const derivedInstance = deriveOrdInstance<A>({
     ...config,
-    customOrd: metadata.customOrd || config.customOrd
+    ...(metadata.customOrd || config.customOrd ? { customOrd: metadata.customOrd || config.customOrd } : {})
   });
   
   // Register the derived instance
@@ -193,12 +193,12 @@ export function autoDeriveShow<A>(adtName: string, config: DerivationConfig = {}
   // Derive new instance
   const derivedInstance = deriveShowInstance<A>({
     ...config,
-    customShow: metadata.customShow || config.customShow
+    ...(metadata.customShow || config.customShow ? { customShow: metadata.customShow || config.customShow } : {})
   });
   
   // Register the derived instance
   if (registry) {
-    registry.register(`${adtName}.Show` as unknown as FPKey, derivedInstance);
+    registry.register(toFPKey(`${adtName}.Show`), derivedInstance);
     console.log(`✅ Auto-derived and registered Show instance for ${adtName}`);
   }
   
@@ -640,9 +640,9 @@ export function registerCustomADT(
     hasMatch: true,
     hasTag: true,
     fieldTypes: options.fieldTypes ?? {},
-    customEq: options.customEq,
-    customOrd: options.customOrd,
-    customShow: options.customShow
+    ...(options.customEq ? { customEq: options.customEq } : {}),
+    ...(options.customOrd ? { customOrd: options.customOrd } : {}),
+    ...(options.customShow ? { customShow: options.customShow } : {})
   };
   
   registerADTMetadata(name, metadata);

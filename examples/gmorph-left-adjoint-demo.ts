@@ -28,3 +28,4 @@ const UMN = U_M(spec, N);
 console.log("U_M(N).S size:", UMN.carriers["S"].length);
 
 // Left adjoint on a tiny X:T-model (sketch; needs SeedSynthesizer wired to your Σ′-cartesian encoding)
+

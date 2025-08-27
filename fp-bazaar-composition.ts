@@ -12,6 +12,7 @@
 import { Kind1, Apply } from './fp-hkt';
 import { Applicative, Monad } from './fp-typeclasses-hkt';
 import { Bazaar } from './fp-optics-iso-helpers';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // ============================================================================
 // Part 1: Core Bazaar Composition
@@ -332,7 +333,10 @@ function testBazaarMonoidLaws<S, T>(
   return {
     // (a . b) . c = a . (b . c)
     associativity: bazaars.length >= 3 ? testData.every(s => {
-      const [a, b, c] = bazaars.slice(0, 3);
+      const firstThree = bazaars.slice(0, 3);
+      const a = assertDefined(firstThree[0], "verifyCompositionLaws: first bazaar must be defined");
+      const b = assertDefined(firstThree[1], "verifyCompositionLaws: second bazaar must be defined");
+      const c = assertDefined(firstThree[2], "verifyCompositionLaws: third bazaar must be defined");
       const left = monoid.concat(monoid.concat(a, b), c);
       const right = monoid.concat(a, monoid.concat(b, c));
       const k = (x: any) => F.of(x.toString());
@@ -345,7 +349,7 @@ function testBazaarMonoidLaws<S, T>(
     
     // empty . a = a . empty = a
     identity: testData.every(s => {
-      const a = bazaars[0];
+      const a = assertDefined(bazaars[0], "verifyCompositionLaws: first bazaar must be defined");
       const empty = monoid.empty();
       const k = (x: any) => F.of(x.toString());
       

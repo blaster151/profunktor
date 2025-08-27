@@ -16,6 +16,12 @@ import {
   infinite as infiniteBound
 } from './src/stream/multiplicity/types';
 
+// Helper function to create UsageBound objects with optional maxUsage
+const mkUsageBound = <T>(
+  usage: (input: T) => Multiplicity,
+  maxUsage: Multiplicity | undefined
+): UsageBound<T> => (maxUsage === undefined ? { usage } : { usage, maxUsage });
+
 import { 
   getUsageBound, 
   registerUsage 
@@ -194,8 +200,8 @@ export function minUsageBounds<A>(
   bound1: UsageBound<A>,
   bound2: UsageBound<A>
 ): UsageBound<A> {
-  return {
-    usage: (input: A): Multiplicity => {
+  return mkUsageBound(
+    (input: A): Multiplicity => {
       const usage1 = bound1.usage(input);
       const usage2 = bound2.usage(input);
       
@@ -203,11 +209,11 @@ export function minUsageBounds<A>(
       if (usage2 === "∞") return usage1;
       return Math.min(usage1, usage2);
     },
-    maxUsage: bound1.maxUsage === "∞" ? bound2.maxUsage :
-              bound2.maxUsage === "∞" ? bound1.maxUsage :
-              bound1.maxUsage !== undefined && bound2.maxUsage !== undefined ?
-              Math.min(bound1.maxUsage, bound2.maxUsage) : undefined
-  };
+    bound1.maxUsage === "∞" ? bound2.maxUsage :
+    bound2.maxUsage === "∞" ? bound1.maxUsage :
+    bound1.maxUsage !== undefined && bound2.maxUsage !== undefined ?
+    Math.min(bound1.maxUsage, bound2.maxUsage) : undefined
+  );
 }
 
 /**
@@ -218,14 +224,14 @@ export function filterUsageBound<A>(
   original: UsageBound<A>,
   predicate: (a: A) => boolean
 ): UsageBound<A> {
-  return {
-    usage: (input: A): Multiplicity => {
+  return mkUsageBound(
+    (input: A): Multiplicity => {
       const originalUsage = original.usage(input);
       // Filter can only decrease usage, never increase
       return originalUsage;
     },
-    maxUsage: original.maxUsage
-  };
+    original.maxUsage
+  );
 }
 
 /**
@@ -235,14 +241,14 @@ export function filterUsageBound<A>(
 export function scanUsageBound<A, B>(
   original: UsageBound<A>
 ): UsageBound<B> {
-  return {
-    usage: (input: B): Multiplicity => {
+  return mkUsageBound(
+    (input: B): Multiplicity => {
       // For scan operations, we use a constant multiplicity based on the original bound's maxUsage
       // since scan transforms the type but preserves cardinality
       return original.maxUsage || 1;
     },
-    maxUsage: original.maxUsage
-  };
+    original.maxUsage
+  );
 }
 
 /**
@@ -253,15 +259,15 @@ export function takeUsageBound<A>(
   original: UsageBound<A>,
   n: number
 ): UsageBound<A> {
-  return {
-    usage: (input: A): Multiplicity => {
+  return mkUsageBound(
+    (input: A): Multiplicity => {
       const originalUsage = original.usage(input);
       if (originalUsage === "∞") return n;
       return Math.min(originalUsage, n);
     },
-    maxUsage: original.maxUsage === "∞" ? n :
-              original.maxUsage !== undefined ? Math.min(original.maxUsage, n) : n
-  };
+    original.maxUsage === "∞" ? n :
+    original.maxUsage !== undefined ? Math.min(original.maxUsage, n) : n
+  );
 }
 
 // ============================================================================
@@ -275,19 +281,19 @@ export function getUsageBoundForType<T>(typeKey: string): UsageBound<T> {
   // Try usage registry first
   const usageRegistry = getUsageBound(typeKey);
   if (usageRegistry) {
-    return {
-      usage: usageRegistry.usage as Usage<T>,
-      maxUsage: usageRegistry.maxUsage
-    };
+    return mkUsageBound(
+      usageRegistry.usage as Usage<T>,
+      usageRegistry.maxUsage
+    );
   }
   
   // Try global registry
   const globalRegistry = getGlobalUsageBound(typeKey);
   if (globalRegistry) {
-    return {
-      usage: globalRegistry.usage as Usage<T>,
-      maxUsage: globalRegistry.maxUsage
-    };
+    return mkUsageBound(
+      globalRegistry.usage as Usage<T>,
+      globalRegistry.maxUsage
+    );
   }
   
   // Default to infinite usage
@@ -303,7 +309,7 @@ export function createFluentWrapper<T>(
   customUsage?: Usage<T>
 ): FluentOps<T, UsageBound<T>> {
   const usageBound = customUsage ? 
-    { usage: customUsage, maxUsage: undefined } :
+    mkUsageBound(customUsage, undefined) :
     getUsageBoundForType<T>(typeKey);
   
   return new GenericFluentWrapper(value, usageBound);
@@ -321,23 +327,20 @@ class GenericFluentWrapper<T> extends FluentOpsImpl<T, T, UsageBound<T>> {
     super(value, usageBound);
   }
 
-  map<B>(f: (a: InnerType<T>) => B): FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>> {
+  override map<B>(f: (a: InnerType<T>) => B): FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>> {
     const mappedValue = f(this.value as InnerType<T>);
-    const mappedUsageBound: UsageBound<ContainerOf<T, B>> = {
-      usage: (input: ContainerOf<T, B>): Multiplicity => this.__usageBound.usage(input as T),
-      maxUsage: this.__usageBound.maxUsage
-    };
+    const mappedUsageBound: UsageBound<ContainerOf<T, B>> = mkUsageBound(
+      (input: ContainerOf<T, B>): Multiplicity => this.__usageBound.usage(input as T),
+      this.__usageBound.maxUsage
+    );
     
     return new GenericFluentWrapper(mappedValue as ContainerOf<T, B>, mappedUsageBound) as FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>>;
   }
 
-  filter(predicate: (a: InnerType<T>) => boolean): FluentOps<T, UsageBound<T>> {
+  override filter(predicate: (a: InnerType<T>) => boolean): FluentOps<T, UsageBound<T>> {
     if (!predicate(this.value as InnerType<T>)) {
       // If filtered out, return empty wrapper
-      const emptyUsageBound: UsageBound<T> = {
-        usage: () => 0,
-        maxUsage: 0
-      };
+      const emptyUsageBound: UsageBound<T> = mkUsageBound(() => 0, 0);
       return new GenericFluentWrapper(this.value, emptyUsageBound) as FluentOps<T, UsageBound<T>>;
     }
     
@@ -345,14 +348,14 @@ class GenericFluentWrapper<T> extends FluentOpsImpl<T, T, UsageBound<T>> {
     return new GenericFluentWrapper(this.value, filteredUsageBound) as FluentOps<T, UsageBound<T>>;
   }
 
-  scan<B>(initial: B, f: (acc: B, a: InnerType<T>) => B): FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>> {
+  override scan<B>(initial: B, f: (acc: B, a: InnerType<T>) => B): FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>> {
     const scannedValue = f(initial, this.value as InnerType<T>);
     const scannedUsageBound = scanUsageBound<T, ContainerOf<T, B>>(this.__usageBound);
     
     return new GenericFluentWrapper(scannedValue as ContainerOf<T, B>, scannedUsageBound) as FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>>;
   }
 
-  chain<B>(f: (a: InnerType<T>) => FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>>): FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>> {
+  override chain<B>(f: (a: InnerType<T>) => FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>>): FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>> {
     const innerWrapper = f(this.value as InnerType<T>);
     const chainedUsageBound = multiplyUsageBounds<ContainerOf<T, B>>(
       this.__usageBound as UsageBound<ContainerOf<T, B>>,
@@ -367,13 +370,13 @@ class GenericFluentWrapper<T> extends FluentOpsImpl<T, T, UsageBound<T>> {
     ) as FluentOps<ContainerOf<T, B>, UsageBound<ContainerOf<T, B>>>;
   }
 
-  take(n: number): FluentOps<T, UsageBound<T>> {
+  override take(n: number): FluentOps<T, UsageBound<T>> {
     const takeUsageBoundResult = takeUsageBound(this.__usageBound, n);
     return new GenericFluentWrapper(this.value, takeUsageBoundResult) as FluentOps<T, UsageBound<T>>;
   }
 
   // Expose the wrapped value
-  getValue(): T {
+  override getValue(): T {
     return this.value;
   }
 }
@@ -419,7 +422,7 @@ export function fluent<T>(
   usage: Usage<T>,
   maxUsage?: Multiplicity
 ): FluentOps<T, UsageBound<T>> {
-  const usageBound: UsageBound<T> = { usage, maxUsage };
+  const usageBound: UsageBound<T> = mkUsageBound(usage, maxUsage);
   return new GenericFluentWrapper(value, usageBound) as FluentOps<T, UsageBound<T>>;
 }
 

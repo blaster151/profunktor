@@ -1,10 +1,12 @@
 // Minimal optics adapter aligned with fp-optics-core and fp-optics-traversal
 // Safe surface to progressively enable optics without conflicting symbols.
 
-import {
+import type {
 	Lens,
 	Prism,
-	Optional,
+	Optional
+} from './fp-optics-core';
+import {
 	lens as coreLens,
 	prism as corePrism,
 	optional as coreOptional,

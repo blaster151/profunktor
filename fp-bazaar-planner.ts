@@ -14,6 +14,7 @@
 import type { Kind1, Apply } from './fp-hkt';
 import type { Applicative } from './fp-typeclasses-hkt';
 import type { Bazaar } from './fp-bazaar-traversable-bridge';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // ------------------------- 
 // Plan model
@@ -38,14 +39,14 @@ export type GenericPlan =
   | SeqPlan
   | FilterAStep<any, any, any>
   | TraverseStep<any, any, any, any>;
-export type ParTraverseIfPlan<A, B, S, T> = {
-  tag: 'ParTraverseIf';
+export interface ParTraverseIfPlan<A, B, S, T> {
+  tag: "ParTraverseIf";
   baz: Bazaar<A, B, S, T>;
   s: S;
   predAsync: (a: A) => Promise<boolean>;
   kAsync: (a: A) => Promise<B>;
   options?: { concurrency?: number; preserveOrder?: boolean };
-};
+}
 
 
 
@@ -65,7 +66,7 @@ export function makeParTraverseIf<A, B, S, T>(
   kAsync: (a: A) => Promise<B>,
   options?: { concurrency?: number; preserveOrder?: boolean }
 ): ParTraverseIfPlan<A, B, S, T> {
-  return { tag: 'ParTraverseIf', baz, s, predAsync, kAsync, options };
+  return { tag: 'ParTraverseIf', baz, s, predAsync, kAsync, ...(options ? { options } : {}) };
 }
 
 export function optimizePlan<P extends GenericPlan>(plan: P, _opts?: OptimizeOptions): P {
@@ -135,7 +136,7 @@ async function pMapLimit<T, R>(
   const launch = () => {
     while (active < limit && i < items.length) {
       const idx = i++;
-      const it = items[idx];
+      const it = assertDefined(items[idx], `pMapLimit: item at index ${idx} must be defined`);
       active++;
       Promise.resolve(fn(it, idx))
         .then((r) => {
@@ -185,7 +186,7 @@ async function runSeq(plan: SeqPlan): Promise<any[]> {
     } else if (step.tag === 'Traverse') {
       const { baz, s, k } = step as TraverseStep<any, any, any, any>;
       // If a previous FilterA produced 'working', traverse that; else enumerate fresh.
-      const as = working ?? enumerateA(baz, s);
+      const as = working !== undefined ? working : enumerateA(baz, s);
       for (const a of as) {
         out.push(await Promise.resolve(k(a)));
       }

@@ -20,7 +20,12 @@ export type Eq<A> = (x: A, y: A) => boolean;
 export type Gen<A> = () => A;
 
 function evidence(name: string, samples: number, fails: Array<string>): LawEvidence {
-  return { name, samples, failures: fails.length, firstFailure: fails[0] };
+  return { 
+    name, 
+    samples, 
+    failures: fails.length, 
+    ...(fails.length > 0 ? { firstFailure: fails[0] } : {})
+  };
 }
 
 export function mkEqP<P extends Kind2, A, B>(

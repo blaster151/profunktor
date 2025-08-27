@@ -1,4 +1,5 @@
 import { Kind1, Apply, ArrayK, MaybeK, Maybe } from './fp-hkt';
+import { assertDefined, isDefined } from './src/util/assert';
 
 /**
  * Align (a.k.a. Zippable) — pointwise combine two F-layers.
@@ -18,7 +19,11 @@ export const AlignArray: Align<ArrayK> = {
   align<A, B, C>(as: A[], bs: B[], f: (a: A, b: B) => C): C[] {
     const n = Math.min(as.length, bs.length);
     const out = new Array<C>(n);
-    for (let i = 0; i < n; i++) out[i] = f(as[i], bs[i]);
+    for (let i = 0; i < n; i++) {
+      const a = assertDefined(as[i], `AlignArray: as[${i}] must be defined`);
+      const b = assertDefined(bs[i], `AlignArray: bs[${i}] must be defined`);
+      out[i] = f(a, b);
+    }
     return out;
   },
 };

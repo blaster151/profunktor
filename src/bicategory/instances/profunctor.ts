@@ -18,8 +18,8 @@ export function fromProfunctor<P extends Kind2>(ops: {
   const base = makeProfunctorBicategory<P>({
     id: ops.id,
     compose: ops.compose,
-    id2: ops.id2,
-    horiz: ops.horiz,
+    ...(ops.id2 ? { id2: ops.id2 } : {}),
+    ...(ops.horiz ? { horiz: ops.horiz } : {}),
   });
 
   if (ops.tensor1) {

@@ -181,7 +181,11 @@ function createStubGroup(isAbelian: boolean): Group {
   if (isAbelian) {
     return {
       kind: 'Group',
-      op: (a: unknown, b: unknown) => ({ ...a, ...b }),
+      op: (a: unknown, b: unknown) => {
+        const safeA = (a && typeof a === "object") ? a : {};
+        const safeB = (b && typeof b === "object") ? b : {};
+        return { ...safeA, ...safeB };
+      },
       unit: {},
       inverse: (a: unknown) => a,
       isAbelian: true,
@@ -190,7 +194,11 @@ function createStubGroup(isAbelian: boolean): Group {
   } else {
     return {
       kind: 'Group',
-      op: (a: unknown, b: unknown) => ({ ...a, ...b }),
+      op: (a: unknown, b: unknown) => {
+        const safeA = (a && typeof a === "object") ? a : {};
+        const safeB = (b && typeof b === "object") ? b : {};
+        return { ...safeA, ...safeB };
+      },
       unit: {},
       inverse: (a: unknown) => a,
       isAbelian: false,

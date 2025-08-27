@@ -263,8 +263,8 @@ export function bichain<E, A, E2, B>(error: (e: E) => Result<E2, B>, success: (a
  */
 export function filter<E, A>(predicate: (a: A) => boolean, error: E, result: Result<E, A>): Result<E, A> {
   return result.match({
-    Ok: ({ value }) => predicate(value) ? result : err(error),
-    Err: ({ error: err }) => result
+    Ok: ({ value }: { value: A }) => predicate(value) ? result : err(error),
+    Err: ({ error: err }: { error: E }) => result
   });
 }
 
@@ -273,8 +273,8 @@ export function filter<E, A>(predicate: (a: A) => boolean, error: E, result: Res
  */
 export function swap<E, A>(result: Result<E, A>): Result<A, E> {
   return result.match({
-    Ok: ({ value }) => err(value),
-    Err: ({ error }) => ok(error)
+    Ok: ({ value }: { value: A }) => err(value),
+    Err: ({ error }: { error: E }) => ok(error)
   }) as Result<A, E>;
 }
 
@@ -283,7 +283,7 @@ export function swap<E, A>(result: Result<E, A>): Result<A, E> {
  */
 export function getOrElse<E, A>(defaultValue: A, result: Result<E, A>): A {
   return result.match({
-    Ok: ({ value }) => value,
+    Ok: ({ value }: { value: A }) => value,
     Err: () => defaultValue
   });
 }
@@ -304,7 +304,7 @@ export function orElse<E, A>(alternative: Result<E, A>, result: Result<E, A>): R
 export function recover<E, A>(f: (e: E) => A, result: Result<E, A>): Result<E, A> {
   return result.match({
     Ok: () => result,
-    Err: ({ error }) => ok(f(error))
+    Err: ({ error }: { error: E }) => ok(f(error))
   });
 }
 
@@ -327,8 +327,8 @@ export const ResultApplicativeInstance = {
   of: <E, A>(a: A): Result<E, A> => ok(a),
   ap: <E, A, B>(fab: Result<E, (a: A) => B>, fa: Result<E, A>): Result<E, B> => {
     return fab.match({
-      Ok: ({ value: f }) => map(f, fa),
-      Err: ({ error }) => err(error)
+      Ok: ({ value: f }: { value: (a: A) => B }) => map(f, fa),
+      Err: ({ error }: { error: E }) => err(error)
     });
   }
 };
@@ -357,38 +357,38 @@ export const ResultBifunctorInstance = {
  */
 const ResultFluentImpl: FluentImpl<any> = {
   map: (self, f) => self.match({
-    Ok: ({ value }) => ok(f(value)),
-    Err: ({ error }) => err(error)
+    Ok: ({ value }: { value: unknown }) => ok(f(value as any)),
+    Err: ({ error }: { error: unknown }) => err(error)
   }),
   chain: (self, f) => self.match({
-    Ok: ({ value }) => f(value),
-    Err: ({ error }) => err(error)
+    Ok: ({ value }: { value: unknown }) => f(value as any),
+    Err: ({ error }: { error: unknown }) => err(error)
   }),
   flatMap: (self, f) => self.match({
-    Ok: ({ value }) => f(value),
-    Err: ({ error }) => err(error)
+    Ok: ({ value }: { value: unknown }) => f(value as any),
+    Err: ({ error }: { error: unknown }) => err(error)
   }),
   filter: (self, pred) => self.match({
-    Ok: ({ value }) => pred(value) ? self : err(new Error('Filter predicate failed')),
-    Err: ({ error }) => self
+    Ok: ({ value }: { value: unknown }) => pred(value as any) ? self : err(new Error('Filter predicate failed')),
+    Err: ({ error }: { error: unknown }) => self
   }),
   filterMap: (self, f) => self.match({
-    Ok: ({ value }) => f(value),
-    Err: ({ error }) => err(error)
+    Ok: ({ value }: { value: unknown }) => f(value as any),
+    Err: ({ error }: { error: unknown }) => err(error)
   }),
   bimap: (self, left, right) => self.match({
-    Ok: ({ value }) => ok(right(value)),
-    Err: ({ error }) => err(left(error))
+    Ok: ({ value }: { value: unknown }) => ok(right(value as any)),
+    Err: ({ error }: { error: unknown }) => err(left(error as any))
   }),
   bichain: (self, left, right) => self.match({
-    Ok: ({ value }) => right(value),
-    Err: ({ error }) => left(error)
+    Ok: ({ value }: { value: unknown }) => right(value as any),
+    Err: ({ error }: { error: unknown }) => left(error as any)
   }),
   pipe: (self, ...fns) =>
     fns.reduce((acc, fn) =>
       acc.match({
-        Ok: ({ value }) => ok(fn(value)),
-        Err: ({ error }) => err(error)
+        Ok: ({ value }: { value: unknown }) => ok(fn(value as any)),
+        Err: ({ error }: { error: unknown }) => err(error)
       }),
       self
     )

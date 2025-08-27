@@ -42,6 +42,7 @@ export type Usage<I> = (input: I) => Multiplicity;
  */
 export interface UsageBound<T> {
   readonly usage: Usage<T>;
+  /** optional by design; omit the key entirely when unknown */
   readonly maxUsage?: Multiplicity;
 }
 

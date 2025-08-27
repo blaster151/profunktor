@@ -440,7 +440,7 @@ export interface PurityAwareDerivableOptions {
  * Purity-aware derivable instance result
  */
 export interface PurityAwareDerivableResult<F> {
-  readonly instance: any;
+  readonly instance: unknown;
   readonly purity: Purity<F>;
   readonly runtimeMarker?: RuntimePurityInfo;
 }

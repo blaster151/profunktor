@@ -38,6 +38,7 @@ import {
   deriveOrdInstance, 
   deriveShowInstance 
 } from './fp-derivation-helpers';
+import { assertDefined, isDefined } from './src/util/assert';
 
 /** Unary HKT for readonly arrays (Immutable arrays) */
 export interface ImmutableArrayK extends Kind1 {
@@ -559,19 +560,19 @@ export interface ImmutableArrayK extends Kind1 {
 }
 
 // 2) Primitive ops (no mutation; always return frozen copies)
-const imap = <A, B>(fa: ReadonlyArray<A>, f: (a: A) => B): ReadonlyArray<B> =>
+const imap = <A = unknown, B = unknown>(fa: ReadonlyArray<A>, f: (a: A) => B): ReadonlyArray<B> =>
   Object.freeze(fa.map(f));
 
-const iof = <A>(a: A): ReadonlyArray<A> =>
+const iof = <A = unknown>(a: A): ReadonlyArray<A> =>
   Object.freeze([a]);
 
-const iap = <A, B>(ff: ReadonlyArray<(a: A) => B>, fa: ReadonlyArray<A>): ReadonlyArray<B> => {
+const iap = <A = unknown, B = unknown>(ff: ReadonlyArray<(a: A) => B>, fa: ReadonlyArray<A>): ReadonlyArray<B> => {
   const out: B[] = [];
   for (const f of ff) for (const a of fa) out.push(f(a));
   return Object.freeze(out);
 };
 
-const ichain = <A, B>(fa: ReadonlyArray<A>, f: (a: A) => ReadonlyArray<B>): ReadonlyArray<B> => {
+const ichain = <A = unknown, B = unknown>(fa: ReadonlyArray<A>, f: (a: A) => ReadonlyArray<B>): ReadonlyArray<B> => {
   const out: B[] = [];
   for (const a of fa) for (const b of f(a)) out.push(b);
   return Object.freeze(out);
@@ -588,25 +589,27 @@ export const ImmutableArrayMonad = deriveMonad<ImmutableArrayK>(iof, ichain);
  * ImmutableArray standard typeclass instances
  */
 export const ImmutableArrayEq = deriveEqInstance({
-  customEq: <A>(a: Immutable<A[]>, b: Immutable<A[]>): boolean => {
+  customEq: <A = unknown>(a: Immutable<A[]>, b: Immutable<A[]>): boolean => {
     if (a.length !== b.length) return false;
     return a.every((val, idx) => val === b[idx]);
   }
 });
 
 export const ImmutableArrayOrd = deriveOrdInstance({
-  customOrd: <A>(a: Immutable<A[]>, b: Immutable<A[]>): number => {
+  customOrd: <A = unknown>(a: Immutable<A[]>, b: Immutable<A[]>): number => {
     const minLength = Math.min(a.length, b.length);
     for (let i = 0; i < minLength; i++) {
-      if (a[i] < b[i]) return -1;
-      if (a[i] > b[i]) return 1;
+      const aItem = assertDefined(a[i], `ImmutableArrayOrd: a[${i}] must be defined`);
+      const bItem = assertDefined(b[i], `ImmutableArrayOrd: b[${i}] must be defined`);
+      if (aItem < bItem) return -1;
+      if (aItem > bItem) return 1;
     }
     return a.length - b.length;
   }
 });
 
 export const ImmutableArrayShow = deriveShowInstance({
-  customShow: <A>(a: Immutable<A[]>): string => 
+  customShow: <A = unknown>(a: Immutable<A[]>): string => 
     `ImmutableArray(${JSON.stringify(a)})`
 });
 
@@ -700,7 +703,7 @@ export function matchImmutableArray<T, R>(
     return patterns.Empty();
   } else {
     const [head, ...tail] = arr;
-    return patterns.NonEmpty(head, Object.freeze(tail) as Immutable<T[]>);
+    return patterns.NonEmpty(assertDefined(head, "matchImmutableArray: head must be defined"), Object.freeze(tail) as Immutable<T[]>);
   }
 }
 

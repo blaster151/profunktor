@@ -23,6 +23,7 @@ import type {
   Bifunctor
 } from './fp-typeclasses';
 import type { Kind1 } from './fp-hkt';
+import { toFPKey } from './src/types/brands';
 
 // ============================================================================
 // Registration Configuration
@@ -83,38 +84,38 @@ export function autoRegisterADT<F extends Kind1>(
 
     // Register typeclass instances
     if (instances.functor) {
-      registry.register(`${config.typeName}.Functor`, instances.functor);
+      registry.register(toFPKey(`${config.typeName}.Functor`), instances.functor);
       result.registered.push('Functor');
     }
 
     if (instances.applicative) {
-      registry.register(`${config.typeName}.Applicative`, instances.applicative);
+      registry.register(toFPKey(`${config.typeName}.Applicative`), instances.applicative);
       result.registered.push('Applicative');
     }
 
     if (instances.monad) {
-      registry.register(`${config.typeName}.Monad`, instances.monad);
+      registry.register(toFPKey(`${config.typeName}.Monad`), instances.monad);
       result.registered.push('Monad');
     }
 
     if (instances.bifunctor) {
-      registry.register(`${config.typeName}.Bifunctor`, instances.bifunctor);
+      registry.register(toFPKey(`${config.typeName}.Bifunctor`), instances.bifunctor);
       result.registered.push('Bifunctor');
     }
 
     // Register Eq, Ord, Show instances
     if (instances.eq) {
-      registry.register(`${config.typeName}.Eq`, instances.eq);
+      registry.register(toFPKey(`${config.typeName}.Eq`), instances.eq);
       result.registered.push('Eq');
     }
 
     if (instances.ord) {
-      registry.register(`${config.typeName}.Ord`, instances.ord);
+      registry.register(toFPKey(`${config.typeName}.Ord`), instances.ord);
       result.registered.push('Ord');
     }
 
     if (instances.show) {
-      registry.register(`${config.typeName}.Show`, instances.show);
+      registry.register(toFPKey(`${config.typeName}.Show`), instances.show);
       result.registered.push('Show');
     }
 
@@ -133,16 +134,16 @@ export function autoRegisterADT<F extends Kind1>(
       effect: config.purity || 'Pure' 
     };
 
-    registry.register(`${config.typeName}.Derivable`, derivableInstances);
+    registry.register(toFPKey(`${config.typeName}.Derivable`), derivableInstances);
 
     // Register HKT if provided
     if (config.kindName) {
-      registry.register(`${config.typeName}.HKT`, config.kindName);
+      registry.register(toFPKey(`${config.typeName}.HKT`), config.kindName);
     }
 
     // Register purity
     if (config.purity) {
-      registry.register(`${config.typeName}.Purity`, config.purity);
+      registry.register(toFPKey(`${config.typeName}.Purity`), config.purity);
     }
 
     console.log(`✅ Auto-registered ${result.registered.length} instances for ${config.typeName}`);
@@ -318,10 +319,10 @@ export function validateRegisteredInstances(typeName: string): boolean {
     return false;
   }
 
-  const functor = registry.get(`${typeName}.Functor`);
-  const monad = registry.get(`${typeName}.Monad`);
-  const eq = registry.get(`${typeName}.Eq`);
-  const show = registry.get(`${typeName}.Show`);
+  const functor = registry.get(toFPKey(`${typeName}.Functor`));
+  const monad = registry.get(toFPKey(`${typeName}.Monad`));
+  const eq = registry.get(toFPKey(`${typeName}.Eq`));
+  const show = registry.get(toFPKey(`${typeName}.Show`));
 
   let valid = true;
 

@@ -69,7 +69,7 @@ export interface HomotopySheavesInput<X> extends LocalWeakEqInput<X> {
  */
 export interface SectionWiseInput<X> extends LocalWeakEqInput<X> {
   readonly strategy: 'section-wise';
-  readonly parameters: {
+  readonly sectionParams: {
     readonly checkGlobalSections: boolean;
     readonly checkLocalSections: boolean;
   };
@@ -299,7 +299,7 @@ function checkStalkwise<X>(
   
   return {
     isLocalWeakEquivalence,
-    witnessCover: isLocalWeakEquivalence ? cover : undefined,
+    ...(isLocalWeakEquivalence ? { witnessCover: cover } : {}),
     morphism: inp.f,
     strategy: 'stalkwise',
     coverIndex,
@@ -365,7 +365,7 @@ function checkHomotopySheaves<X>(
   
   return {
     isLocalWeakEquivalence,
-    witnessCover: isLocalWeakEquivalence ? cover : undefined,
+    ...(isLocalWeakEquivalence ? { witnessCover: cover } : {}),
     morphism: inp.f,
     strategy: 'homotopy-sheaves',
     coverIndex,
@@ -396,8 +396,8 @@ function checkSectionWise<X>(
 ): LocalWeakEqWitness<X> {
   try {
     // Stub: In a real implementation, we would compute global and local sections
-    const globalSections = inp.parameters.checkGlobalSections ? computeGlobalSections(inp.f) : null;
-    const localSections = inp.parameters.checkLocalSections ? computeLocalSections(inp.f, cover) : null;
+    const globalSections = inp.sectionParams.checkGlobalSections ? computeGlobalSections(inp.f) : null;
+    const localSections = inp.sectionParams.checkLocalSections ? computeLocalSections(inp.f, cover) : null;
     
     const globalIsomorphism = globalSections ? checkSectionIsomorphism(globalSections) : true;
     const localIsomorphism = localSections ? checkSectionIsomorphism(localSections) : true;
@@ -406,7 +406,7 @@ function checkSectionWise<X>(
     
     return {
       isLocalWeakEquivalence,
-      witnessCover: isLocalWeakEquivalence ? cover : undefined,
+      ...(isLocalWeakEquivalence ? { witnessCover: cover } : {}),
       morphism: inp.f,
       strategy: 'section-wise',
       coverIndex,
@@ -415,8 +415,8 @@ function checkSectionWise<X>(
         : `Section-wise check failed on cover ${coverIndex}`,
       witnessData: {
         sectionWise: {
-          globalSectionsChecked: inp.parameters.checkGlobalSections,
-          localSectionsChecked: inp.parameters.checkLocalSections,
+          globalSectionsChecked: inp.sectionParams.checkGlobalSections,
+          localSectionsChecked: inp.sectionParams.checkLocalSections,
           globalSectionsEquivalent: globalIsomorphism,
           localSectionsEquivalent: localIsomorphism,
           sectionDetails: {
@@ -437,8 +437,8 @@ function checkSectionWise<X>(
       notes: `Section-wise check failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       witnessData: {
         sectionWise: {
-          globalSectionsChecked: inp.parameters.checkGlobalSections,
-          localSectionsChecked: inp.parameters.checkLocalSections,
+          globalSectionsChecked: inp.sectionParams.checkGlobalSections,
+          localSectionsChecked: inp.sectionParams.checkLocalSections,
           globalSectionsEquivalent: false,
           localSectionsEquivalent: false,
           sectionDetails: {
@@ -475,7 +475,7 @@ function checkDescent<X>(
     
     return {
       isLocalWeakEquivalence,
-      witnessCover: isLocalWeakEquivalence ? cover : undefined,
+      ...(isLocalWeakEquivalence ? { witnessCover: cover } : {}),
       morphism: inp.f,
       strategy: 'descent',
       coverIndex,

@@ -273,7 +273,7 @@ export class FRPStreamPlanNode implements FRPStreamPlanNodeInterface {
     this.type = type;
     this.meta = meta;
     this.children = children;
-    this.purity = meta.purity || 'IO';
+    this.purity = meta["purity"] || 'IO';
   }
 
   addChild(node: FRPStreamPlanNode): FRPStreamPlanNode {
@@ -282,29 +282,29 @@ export class FRPStreamPlanNode implements FRPStreamPlanNodeInterface {
   }
 
   markOptimized(): FRPStreamPlanNode {
-    this.meta.optimized = true;
+    this.meta["optimized"] = true;
     return this;
   }
 
   markPurity(purity: 'Pure' | 'State' | 'IO' | 'Async'): FRPStreamPlanNode {
-    this.meta.purity = purity;
+    this.meta["purity"] = purity;
     return this;
   }
 
   getPurity(): 'Pure' | 'State' | 'IO' | 'Async' {
-    return this.meta.purity || 'IO';
+    return this.meta["purity"] || 'IO';
   }
 
   isOptimized(): boolean {
-    return this.meta.optimized || false;
+    return this.meta["optimized"] || false;
   }
 
   getSourceType(): string | undefined {
-    return this.meta.sourceType;
+    return this.meta["sourceType"];
   }
 
   getEventType(): string | undefined {
-    return this.meta.eventType;
+    return this.meta["eventType"];
   }
 
   clone(): FRPStreamPlanNode {
@@ -317,8 +317,8 @@ export class FRPStreamPlanNode implements FRPStreamPlanNodeInterface {
 
   toString(): string {
     const parts: string[] = [this.type];
-    if (this.meta.purity) parts.push('(' + this.meta.purity + ')');
-    if (this.meta.optimized) parts.push('[OPTIMIZED]');
+    if (this.meta["purity"]) parts.push('(' + this.meta["purity"] + ')');
+    if (this.meta["optimized"]) parts.push('[OPTIMIZED]');
     if (this.children.length > 0) {
       parts.push('-> [' + this.children.map(c => c.toString()).join(', ') + ']');
     }

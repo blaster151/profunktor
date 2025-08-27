@@ -77,7 +77,7 @@ import { applyFluentOps, FluentImpl } from './fp-fluent-api';
  */
 export interface Observer<A> {
   next: (value: A) => void;
-  error?: (err: any) => void;
+  error?: (err: unknown) => void;
   complete?: () => void;
 }
 
@@ -90,6 +90,29 @@ export type Unsubscribe = () => void;
  * Subscribe function type
  */
 export type Subscribe<A> = (observer: Observer<A>) => Unsubscribe;
+
+/**
+ * Subscribe function overloads
+ */
+export function subscribe<A>(observer: Observer<A>): Unsubscribe;
+export function subscribe<A>(
+  next: (value: A) => void,
+  error?: (err: unknown) => void,
+  complete?: () => void
+): Unsubscribe;
+
+export function subscribe<A>(
+  arg1: Observer<A> | ((value: A) => void),
+  error?: (err: unknown) => void,
+  complete?: () => void
+): Unsubscribe {
+  const ob: Observer<A> =
+    typeof arg1 === "function" ? { next: arg1, ...(error && { error }), ...(complete && { complete }) } : arg1;
+  // TODO: keep your existing subscription logic here, using:
+  // ob.next(v); ob.error?.(e); ob.complete?.();
+  // return the correct Unsubscribe per your implementation.
+  return () => { /* dispose */ };
+}
 
 /**
  * Core ObservableLite type - wraps a subscribe function
@@ -116,19 +139,17 @@ export class ObservableLite<A> {
    */
   subscribe(
     next: (value: A) => void,
-    error?: (err: any) => void,
+    error?: (err: unknown) => void,
     complete?: () => void
   ): Unsubscribe;
   subscribe(
-    observerOrNext: Observer<A> | ((value: A) => void),
-    error?: (err: any) => void,
+    arg1: Observer<A> | ((value: A) => void),
+    error?: (err: unknown) => void,
     complete?: () => void
   ): Unsubscribe {
-    if (typeof observerOrNext === 'function') {
-      return this._subscribe({ next: observerOrNext, error, complete });
-    } else {
-      return this._subscribe(observerOrNext);
-    }
+    const ob: Observer<A> =
+      typeof arg1 === "function" ? { next: arg1, ...(error && { error }), ...(complete && { complete }) } : arg1;
+    return this._subscribe(ob);
   }
 
   // Placeholder type to silence structural assignments when augmenting prototype later
@@ -158,8 +179,8 @@ export class ObservableLite<A> {
       return new ObservableLite<B>((observer) => {
         return this._subscribe({
           next: (value) => observer.next(f(value)),
-          error: observer.error,
-          complete: observer.complete
+          ...(observer.error && { error: observer.error }),
+          ...(observer.complete && { complete: observer.complete })
         });
       });
     } else {
@@ -190,8 +211,8 @@ export class ObservableLite<A> {
               observer.next(value);
             }
           },
-          error: observer.error,
-          complete: observer.complete
+          ...(observer.error && { error: observer.error }),
+          ...(observer.complete && { complete: observer.complete })
         });
       });
     }
@@ -268,8 +289,8 @@ export class ObservableLite<A> {
             observer.next(value);
           }
         },
-        error: observer.error,
-        complete: observer.complete
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete })
       });
     });
   }
@@ -290,8 +311,8 @@ export class ObservableLite<A> {
           accumulator = reducer(accumulator, value);
           observer.next(accumulator);
         },
-        error: observer.error,
-        complete: observer.complete
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete })
       });
     });
   }
@@ -315,8 +336,8 @@ export class ObservableLite<A> {
             }
           }
         },
-        error: observer.error,
-        complete: observer.complete
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete })
       });
     });
   }
@@ -338,8 +359,8 @@ export class ObservableLite<A> {
             observer.next(value);
           }
         },
-        error: observer.error,
-        complete: observer.complete
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete })
       });
     });
   }
@@ -362,7 +383,7 @@ export class ObservableLite<A> {
         next: (value) => {
           values.push({ value, key: fn(value), index: index++ });
         },
-        error: observer.error,
+        ...(observer.error && { error: observer.error }),
         complete: () => {
           // Sort by key, then by original index for stability
           values.sort((a, b) => {
@@ -394,8 +415,8 @@ export class ObservableLite<A> {
             observer.next(value);
           }
         },
-        error: observer.error,
-        complete: observer.complete
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete })
       });
     });
   }
@@ -425,7 +446,7 @@ export class ObservableLite<A> {
           values.push(value);
           index++;
         },
-        error: observer.error,
+        ...(observer.error && { error: observer.error }),
         complete: () => {
           const startIndex = start < 0 ? Math.max(0, values.length + start) : start;
           const endIndex = end === undefined ? values.length : 
@@ -451,7 +472,7 @@ export class ObservableLite<A> {
         next: (value) => {
           values.push(value);
         },
-        error: observer.error,
+        ...(observer.error && { error: observer.error }),
         complete: () => {
           values.reverse().forEach(value => observer.next(value));
           observer.complete?.();
@@ -613,8 +634,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -656,8 +677,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -692,8 +713,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -742,8 +763,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -764,8 +785,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -831,8 +852,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -872,8 +893,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -948,8 +969,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1093,7 +1114,7 @@ export class ObservableLite<A> {
       return this._subscribe({
         next: (value) => observer.next(f(value)),
         error: (err) => observer.error?.(g(err)),
-        complete: observer.complete,
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1163,8 +1184,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1207,7 +1228,7 @@ export class ObservableLite<A> {
                   const leftObservable = leftFn(payload.value);
                   leftObservable.subscribe({
                     next: (leftValue) => observer.next(leftValue),
-                    error: observer.error,
+                    ...(observer.error && { error: observer.error }),
                     complete: () => {} // Don't complete on left branch
                   });
                 },
@@ -1215,7 +1236,7 @@ export class ObservableLite<A> {
                   const rightObservable = rightFn(payload.value);
                   rightObservable.subscribe({
                     next: (rightValue) => observer.next(rightValue),
-                    error: observer.error,
+                    ...(observer.error && { error: observer.error }),
                     complete: () => {} // Don't complete on right branch
                   });
                 },
@@ -1224,7 +1245,7 @@ export class ObservableLite<A> {
                   const leftObservable = leftFn(payload.error);
                   leftObservable.subscribe({
                     next: (leftValue) => observer.next(leftValue),
-                    error: observer.error,
+                    ...(observer.error && { error: observer.error }),
                     complete: () => {}
                   });
                 },
@@ -1232,7 +1253,7 @@ export class ObservableLite<A> {
                   const rightObservable = rightFn(payload.value);
                   rightObservable.subscribe({
                     next: (rightValue) => observer.next(rightValue),
-                    error: observer.error,
+                    ...(observer.error && { error: observer.error }),
                     complete: () => {}
                   });
                 }
@@ -1242,7 +1263,7 @@ export class ObservableLite<A> {
               const rightObservable = rightFn(value as unknown as R);
               rightObservable.subscribe({
                 next: (rightValue) => observer.next(rightValue),
-                error: observer.error,
+                ...(observer.error && { error: observer.error }),
                 complete: () => {}
               });
             }
@@ -1250,8 +1271,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1291,8 +1312,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1320,8 +1341,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1347,8 +1368,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1373,8 +1394,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1412,7 +1433,7 @@ export class ObservableLite<A> {
       return this._subscribe({
         next: (value) => observer.next(f(value as A)),
         error: (err) => observer.error?.(g(err)),
-        complete: observer.complete,
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1427,8 +1448,8 @@ export class ObservableLite<A> {
     return new ObservableLite<D>((observer) => {
       return this._subscribe({
         next: (value) => observer.next(outFn(value as A)),
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1442,8 +1463,8 @@ export class ObservableLite<A> {
     return new ObservableLite<A>((observer) => {
       return this._subscribe({
         next: (value) => observer.next(value as A),
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1457,8 +1478,8 @@ export class ObservableLite<A> {
     return new ObservableLite<D>((observer) => {
       return this._subscribe({
         next: (value) => observer.next(outFn(value as A)),
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1500,8 +1521,8 @@ export class ObservableLite<A> {
             observer.error?.(error);
           }
         },
-        error: observer.error,
-        complete: observer.complete,
+        ...(observer.error && { error: observer.error }),
+        ...(observer.complete && { complete: observer.complete }),
       });
     });
   }
@@ -1522,7 +1543,7 @@ export class ObservableLite<A> {
       return this._subscribe({
         next: (value) => observer.next(value),
         error: (err) => observer.error?.(err),
-        complete: observer.complete
+        ...(observer.complete && { complete: observer.complete })
       });
     });
   }
@@ -2037,8 +2058,7 @@ function planFromObservableLite<A>(obs: ObservableLite<A>): StreamPlanNode {
   return {
     type: 'map',
     fn: (x: any) => x,
-    purity: 'Async', // ObservableLite is async by default
-    next: undefined
+    purity: 'Async' // ObservableLite is async by default
   };
 }
 

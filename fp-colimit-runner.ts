@@ -9,6 +9,7 @@
 
 import { CategoryOps, pushout } from './fp-pushout';
 import { SequentialColimitPlan } from './fp-colimit-sequentializer';
+import { assertDefined } from './src/util/assert';
 
 /**
  * Execute a sequential colimit plan, returning the chain P0, P1, ..., Pn.
@@ -28,7 +29,8 @@ export function executeSequentialColimit<Obj, Mor>(
 ): ReadonlyArray<Obj> {
   const acc: Obj[] = [seedP0];
   for (const step of plan.steps) {
-    const { A, f, g } = seedIn.fromA(acc[acc.length-1]);
+    const obj = assertDefined(acc[acc.length-1], "colimit: obj");
+    const { A, f, g } = seedIn.fromA(obj);
     const { P } = pushout(ops, A, step.Qk, step.Lk, step.glue, g);
     acc.push(P);
   }

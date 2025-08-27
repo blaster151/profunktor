@@ -216,6 +216,11 @@ export function runArrowChoiceLaws<P extends Kind2, A, B, C>(
   ]};
 }
 
+// Named guard function to avoid binding-pattern type predicate
+function hasA<P extends Kind2, A, B>(t: readonly [Apply<P, [A, B]>, A | undefined]): t is readonly [Apply<P, [A, B]>, A] {
+  return t[1] !== undefined;
+}
+
 // -----------------------------------------
 // ArrowApply laws (beta/eta-like)
 // -----------------------------------------
@@ -232,10 +237,12 @@ export function runArrowApplyLaws<P extends Kind2, A, B>(
   const N = cfg.samples ?? 50;
   const As = repeat(N).map(cfg.genA);
   const Fs = repeat(N).map(cfg.genF);
+  const rawPairs = Fs.map((f, i) => [AA.arr<A, B>(f), As[i % As.length]] as [Apply<P, [A, B]>, A | undefined]);
+  const pairs = rawPairs.filter(hasA<P, A, B>) as [Apply<P, [A, B]>, A][];
   const eq = eqArrow<P, [ Apply<P, [A, B]>, A ], B>(
     cfg.evalP,
     cfg.eqB,
-    Fs.map((f, i) => [AA.arr<A, B>(f), As[i % As.length]])
+    pairs
   );
 
   // Beta: app ∘ (arr (\(f,a) -> (f,a))) = arr (\(f,a) -> f a)

@@ -10,6 +10,7 @@ import type {
   PushoutStep, 
   Diagram 
 } from './fp-colimit-sequentializer';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // Stream coordination types
 export interface StreamState<Obj, Mor> {
@@ -98,7 +99,7 @@ export async function runSequentialColimit<Obj, Mor>(
     for (let i = 0; i < plan.steps.length; i++) {
       schedulingHooks.onStepStart?.(i);
 
-      const step = plan.steps[i];
+      const step = assertDefined(plan.steps[i], `runSequentialColimit: step at index ${i} must be defined`);
       const context: PushoutContext<Obj, Mor> = {
         Qk: step.Qk,
         Lk: step.Lk,
@@ -262,7 +263,7 @@ export async function runSequentialColimitInBatches<Obj, Mor>(
     
     // Process batch
     for (let i = 0; i < batchSteps.length; i++) {
-      const step = batchSteps[i];
+      const step = assertDefined(batchSteps[i], `runSequentialColimitInBatches: step at index ${i} must be defined`);
       const context: PushoutContext<Obj, Mor> = {
         Qk: step.Qk,
         Lk: step.Lk,

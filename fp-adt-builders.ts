@@ -41,7 +41,8 @@ import {
 } from './fp-derivation-helpers';
 
 import { ensureFPRegistry } from './fp-registry-init';
-import { FPKey } from './src/types/brands';
+import { FPKey, toFPKey } from './src/types/brands';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // ============================================================================
 // Type Definitions
@@ -362,14 +363,16 @@ export function createSumType<
     value: SumTypeInstance<Spec>,
     matcher: Matcher<Spec, R>
   ): R => {
-    const tag = value.tag as keyof Spec;
-    const handler = matcher[tag];
+    const instance = assertDefined(value, "match: value must be defined");
+    const matcherObj = assertDefined(matcher, "match: matcher must be defined");
+    const tag = instance.tag as keyof Spec;
+    const handler = matcherObj[tag];
     
     if (!handler) {
       throw new Error(`No handler found for tag: ${String(tag)}`);
     }
     
-    return handler(value as any);
+    return handler(instance as any);
   };
 
   // Value-oriented matcher that unwraps common single-field payloads
@@ -495,8 +498,8 @@ export function createSumType<
           
           // Compare values
           for (const key of aKeys) {
-            const aVal = a[key as keyof typeof a];
-            const bVal = b[key as keyof typeof b];
+            const aVal = assertDefined(a[key as keyof typeof a], `customOrd: a[${String(key)}] must be defined`);
+            const bVal = assertDefined(b[key as keyof typeof b], `customOrd: b[${String(key)}] must be defined`);
             
             if (aVal < bVal) return -1;
             if (aVal > bVal) return 1;
@@ -534,13 +537,13 @@ export function createSumType<
       const typeName = config.name || 'SumType';
       
       if (derivedInstances.Eq) {
-        registry.register(`${typeName}Eq` as unknown as FPKey, derivedInstances.Eq);
+        registry.register(toFPKey(`${typeName}Eq`), derivedInstances.Eq);
       }
       if (derivedInstances.Ord) {
-        registry.register(`${typeName}Ord` as unknown as FPKey, derivedInstances.Ord);
+        registry.register(toFPKey(`${typeName}Ord`), derivedInstances.Ord);
       }
       if (derivedInstances.Show) {
-        registry.register(`${typeName}Show` as unknown as FPKey, derivedInstances.Show);
+        registry.register(toFPKey(`${typeName}Show`), derivedInstances.Show);
       }
     }
   }
@@ -722,8 +725,8 @@ export function createProductType<
           if (aKeys.length > bKeys.length) return 1;
 
           for (const key of aKeys) {
-            const aVal = a[key as keyof typeof a];
-            const bVal = b[key as keyof typeof b];
+            const aVal = assertDefined(a[key as keyof typeof a], `customOrd: a[${String(key)}] must be defined`);
+            const bVal = assertDefined(b[key as keyof typeof b], `customOrd: b[${String(key)}] must be defined`);
 
             if (aVal < bVal) return -1;
             if (aVal > bVal) return 1;
@@ -759,13 +762,13 @@ export function createProductType<
       const typeName = config.name || 'ProductType';
       
       if (derivedInstances.Eq) {
-        registry.register(`${typeName}Eq` as unknown as FPKey, derivedInstances.Eq);
+        registry.register(toFPKey(`${typeName}Eq`), derivedInstances.Eq);
       }
       if (derivedInstances.Ord) {
-        registry.register(`${typeName}Ord` as unknown as FPKey, derivedInstances.Ord);
+        registry.register(toFPKey(`${typeName}Ord`), derivedInstances.Ord);
       }
       if (derivedInstances.Show) {
-        registry.register(`${typeName}Show` as unknown as FPKey, derivedInstances.Show);
+        registry.register(toFPKey(`${typeName}Show`), derivedInstances.Show);
       }
     }
   }
@@ -884,7 +887,7 @@ function registerSumTypeForDerivableInstances<Spec extends ConstructorSpec>(
   
   // Register with global registry
   const registry = ensureFPRegistry();
-  registry.register(`sum_${builder.effect}` as unknown as FPKey, {
+  registry.register(toFPKey(`sum_${builder.effect}`), {
     builder,
     instance: sumTypeInstance,
     effect: builder.effect
@@ -927,7 +930,7 @@ function registerProductTypeForDerivableInstances<Fields extends ProductFields>(
   
   // Register with global registry
   const registry = ensureFPRegistry();
-  registry.register(`product_${builder.effect}` as unknown as FPKey, {
+  registry.register(toFPKey(`product_${builder.effect}`), {
     builder,
     instance: productTypeInstance,
     effect: builder.effect

@@ -5,6 +5,8 @@
  * including foldLeft, foldRight, mapAccumL, mapAccumR, zipWith, groupAdjacentBy, partitionMap, chunkBySize, and intersect for various folding, mapping, combining, grouping, partitioning, chunking, and set operations.
  */
 
+import { assertDefined, isDefined } from './src/util/assert';
+
 // ============================================================================
 // Type Declarations
 // ============================================================================
@@ -155,7 +157,8 @@ function foldLeftImpl<T, B>(arr: T[], f: (acc: B, a: T) => B, initial: B): B {
   let accumulator = initial;
   
   for (let i = 0; i < arr.length; i++) {
-    accumulator = f(accumulator, arr[i]);
+    const item = assertDefined(arr[i], `foldLeftImpl: item at index ${i} must be defined`);
+    accumulator = f(accumulator, item);
   }
   
   return accumulator;
@@ -169,7 +172,8 @@ function foldRightImpl<T, B>(arr: T[], f: (a: T, acc: B) => B, initial: B): B {
   let accumulator = initial;
   
   for (let i = arr.length - 1; i >= 0; i--) {
-    accumulator = f(arr[i], accumulator);
+    const item = assertDefined(arr[i], `foldRightImpl: item at index ${i} must be defined`);
+    accumulator = f(item, accumulator);
   }
   
   return accumulator;
@@ -184,7 +188,8 @@ function mapAccumLImpl<T, B, S>(arr: T[], f: (acc: S, a: T) => [S, B], init: S):
   const result: B[] = [];
   
   for (let i = 0; i < arr.length; i++) {
-    const [newState, mappedValue] = f(state, arr[i]);
+    const item = assertDefined(arr[i], `mapAccumLImpl: item at index ${i} must be defined`);
+    const [newState, mappedValue] = f(state, item);
     state = newState;
     result.push(mappedValue);
   }
@@ -201,7 +206,8 @@ function mapAccumRImpl<T, B, S>(arr: T[], f: (acc: S, a: T) => [S, B], init: S):
   const result: B[] = [];
   
   for (let i = arr.length - 1; i >= 0; i--) {
-    const [newState, mappedValue] = f(state, arr[i]);
+    const item = assertDefined(arr[i], `mapAccumRImpl: item at index ${i} must be defined`);
+    const [newState, mappedValue] = f(state, item);
     state = newState;
     result.unshift(mappedValue); // Insert at beginning to maintain order
   }
@@ -218,7 +224,9 @@ function zipWithImpl<T, B, C>(arr1: T[], arr2: B[], f: (a: T, b: B) => C): C[] {
   const minLength = Math.min(arr1.length, arr2.length);
   
   for (let i = 0; i < minLength; i++) {
-    result.push(f(arr1[i], arr2[i]));
+    const item1 = assertDefined(arr1[i], `zipWithImpl: item1 at index ${i} must be defined`);
+    const item2 = assertDefined(arr2[i], `zipWithImpl: item2 at index ${i} must be defined`);
+    result.push(f(item1, item2));
   }
   
   return result;
@@ -234,11 +242,12 @@ function groupAdjacentByImpl<T, K>(arr: T[], keyFn: (item: T) => K): T[][] {
   }
   
   const result: T[][] = [];
-  let currentGroup: T[] = [arr[0]];
-  let currentKey = keyFn(arr[0]);
+  const firstItem = assertDefined(arr[0], "groupAdjacentByImpl: first item must be defined");
+  let currentGroup: T[] = [firstItem];
+  let currentKey = keyFn(firstItem);
   
   for (let i = 1; i < arr.length; i++) {
-    const item = arr[i];
+    const item = assertDefined(arr[i], `groupAdjacentByImpl: item at index ${i} must be defined`);
     const key = keyFn(item);
     
     if (key === currentKey) {
@@ -267,7 +276,8 @@ function partitionMapImpl<T, L, R>(arr: T[], f: (item: T) => Left<L> | Right<R>)
   const rights: R[] = [];
   
   for (let i = 0; i < arr.length; i++) {
-    const result = f(arr[i]);
+    const item = assertDefined(arr[i], `partitionMapImpl: item at index ${i} must be defined`);
+    const result = f(item);
     if (result._tag === 'Left') {
       lefts.push(result.left);
     } else {
@@ -315,7 +325,7 @@ function intersectImpl<T>(arr1: T[], arr2: T[]): T[] {
   
   // Iterate through the first array and check if each element exists in the second array
   for (let i = 0; i < arr1.length; i++) {
-    const item = arr1[i];
+    const item = assertDefined(arr1[i], `intersectImpl: item at index ${i} must be defined`);
     if (set2.has(item)) {
       result.push(item);
       // Remove from set to handle duplicates correctly

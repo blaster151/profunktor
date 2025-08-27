@@ -126,15 +126,15 @@ export const TupleMonad = <L>() : Monad<ApplyLeft<TupleK, L>> => ({
 
 // Function (Kind2) - Profunctor instance
 export const FunctionProfunctor = <L>() => ({
-  dimap: (p, f, g) => ((c: any) => g((p as any)(f(c)))) as any,
-  lmap: (p, f) => ((c: any) => (p as any)(f(c))) as any,
-  rmap: (p, g) => ((a: any) => g((p as any)(a))) as any,
+  dimap: <A, B, C, D>(p: (a: A) => B, f: (c: C) => A, g: (b: B) => D) => ((c: C) => g(p(f(c)))) as any,
+  lmap: <A, B, C>(p: (a: A) => B, f: (c: C) => A) => ((c: C) => p(f(c))) as any,
+  rmap: <A, B, D>(p: (a: A) => B, g: (b: B) => D) => ((a: A) => g(p(a))) as any,
   __arity: 1
 });
 
 // Function (Kind2) with left fixed: Functor/Applicative/Monad for ApplyLeft<FunctionK, L>
 export const FunctionFunctor = <L>() : Functor<ApplyLeft<FunctionK, L>> => ({
-  map: (fa, f) => ((x: any) => f((fa as (x: any) => any)(x))) as any
+  map: <A, B>(fa: (x: L) => A, f: (a: A) => B) => ((x: L) => f(fa(x))) as any
 });
 
 export const FunctionApplicative = <L>() : Applicative<ApplyLeft<FunctionK, L>> => ({
@@ -182,17 +182,17 @@ export const Right = <R, L = never>(r: R): Either<L, R> => ({ tag: 'Right', righ
 
 // Either (Kind2) - Bifunctor instance
 export const EitherBifunctor = <L>() => ({
-  bimap: (e, f, g) =>
-    (e as Either<any, any>).tag === 'Left'
-      ? Left(f((e as any).left))
-      : Right(g((e as any).right)),
-  mapLeft: (e, f) =>
-    (e as Either<any, any>).tag === 'Left'
-      ? Left(f((e as any).left))
+  bimap: <A, B, C, D>(e: Either<A, B>, f: (a: A) => C, g: (b: B) => D) =>
+    e.tag === 'Left'
+      ? Left(f(e.left))
+      : Right(g(e.right)),
+  mapLeft: <A, B, C>(e: Either<A, B>, f: (a: A) => C) =>
+    e.tag === 'Left'
+      ? Left(f(e.left))
       : e as any,
-  mapRight: (e, g) =>
-    (e as Either<any, any>).tag === 'Right'
-      ? Right(g((e as any).right))
+  mapRight: <A, B, D>(e: Either<A, B>, g: (b: B) => D) =>
+    e.tag === 'Right'
+      ? Right(g(e.right))
       : e as any,
   __arity: 1
 });

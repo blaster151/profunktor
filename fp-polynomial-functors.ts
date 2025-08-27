@@ -94,6 +94,17 @@ export const unitPolynomial: Polynomial<{ unit: true }, never> = {
  * Tea Interview Polynomial from the paper
  * p = {Tea?}y^{yes,no} + {Kind?}y^{green,black,herbal}
  */
+type QuestionKey = "Tea?" | "Kind?";
+const mk = (pos: QuestionKey) => ({
+  "Tea?": pos === "Tea?" ? "yes" : "no",
+  "Kind?": pos === "Kind?" ? "green" : "black"
+} as const);
+
+// Example usage with proper parameter passing
+const m = mk("Tea?" as QuestionKey);
+const tea = m["Tea?"];
+const kind = m["Kind?"];
+
 export const teaInterviewPolynomial: Polynomial<
   'Tea?' | 'Kind?',
   { 'Tea?': 'yes' | 'no'; 'Kind?': 'green' | 'black' | 'herbal' }

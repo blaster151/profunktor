@@ -85,9 +85,9 @@ export interface ReaderK<E> extends Kind1 {
 // Practical Reader cochoice by pinning an environment value e0
 export function CochoiceReaderAt<E>(e0: E): Cochoice<ReaderK<E>> {
   return {
-    map: (wa, f) => (env: E) => f(wa(env)),
-    extract: (wa) => wa(e0),
-    extend: (wa, f) => (_: E) => f((env: E) => wa(env)),
+    map: (wa: (env: E) => unknown, f: (a: unknown) => unknown) => (env: E) => f(wa(env)),
+    extract: (wa: (env: E) => unknown) => wa(e0),
+    extend: (wa: (env: E) => unknown, f: (w: (env: E) => unknown) => unknown) => (_: E) => f((env: E) => wa(env)),
     distEither: <A, C>(wac: (env: E) => Either<A, C>) => {
       const at = wac(e0);
       return 'left' in at

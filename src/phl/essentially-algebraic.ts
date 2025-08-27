@@ -57,3 +57,4 @@ export function toEssentiallyAlgebraic(T: QETheoryEA): QETheoryEA {
   // Best-effort: nothing destructive here—return input; caller can inspect `check.reason`.
   return out;
 }
+

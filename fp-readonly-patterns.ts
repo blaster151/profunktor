@@ -33,6 +33,7 @@ import {
 import {
   Immutable, immutableArray
 } from './fp-immutable';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // ============================================================================
 // Part 1: Type Utilities for Readonly Pattern Matching
@@ -127,7 +128,8 @@ export function matchPersistentMap<K, V, R>(
   }
   
   const entries = Array.from(map.entries());
-  const [firstKey, firstValue] = entries[0];
+  const firstEntry = assertDefined(entries[0], "matchPersistentMap: first entry must be defined");
+  const [firstKey, firstValue] = firstEntry;
   const rest = PersistentMap.fromEntries(entries.slice(1));
   
   return patterns.nonEmpty(firstKey, firstValue, rest);
@@ -148,7 +150,7 @@ export function matchPersistentSet<T, R>(
   }
   
   const values = Array.from(set);
-  const first = values[0];
+  const first = assertDefined(values[0], "matchPersistentSet: first value must be defined");
   const rest = PersistentSet.fromArray(values.slice(1));
   
   return patterns.nonEmpty(first, rest);
@@ -530,8 +532,13 @@ export function matchReadonlyObject<T extends Record<string, any>, R>(
     throw new Error('Cannot match empty object');
   }
   
-  const key = keys[0];
-  return patterns[key]((obj as any)[key] as any);
+  const key = assertDefined(keys[0], "key required") as keyof T;
+  const value = obj[key as string];
+  const handler = patterns[key];
+  if (handler) {
+    return handler(value as Immutable<T[typeof key]>);
+  }
+  throw new Error(`No handler for key: ${String(key)}`);
 }
 
 /**
@@ -549,8 +556,13 @@ export function matchReadonlyUnion<T extends object, R>(
     throw new Error('Cannot match empty union');
   }
   
-  const key = keys[0];
-  return patterns[key](value[key]);
+  const key = assertDefined(keys[0], "key required") as keyof T;
+  const valueForKey = value[key];
+  const handler = patterns[key];
+  if (handler) {
+    return handler(valueForKey);
+  }
+  throw new Error(`No handler for key: ${String(key)}`);
 }
 
 /**
@@ -569,9 +581,10 @@ export function matchWithWildcard<T extends object, R>(
     return patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
   }
   
-  const key = keys[0];
-  const pattern = patterns[key as string];
-  return pattern?.(value[key] as any) ?? patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
+  const key = assertDefined(keys[0], "key required") as keyof T;
+  const valueForKey = value[key as string];
+  const pattern = patterns[key];
+  return pattern?.(valueForKey) ?? patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
 }
 
 // ============================================================================

@@ -243,7 +243,7 @@ export function doMLoose<A>(
     const r = it.next(last);
     if (r.done) {
       // Best effort: if lastYield has .of, use it; if it's a Promise-like, wrap; else return as-is
-      if (lastYield?.constructor?.of) return lastYield.constructor.of(r.value);
+      if (lastYield && lastYield.constructor && lastYield.constructor.of) return lastYield.constructor.of(r.value);
       if (typeof Promise !== 'undefined') return Promise.resolve(r.value);
       return r.value;
     }

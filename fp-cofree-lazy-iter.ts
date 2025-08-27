@@ -6,6 +6,7 @@
 import { Kind1, Apply } from './fp-hkt';
 import { Foldable } from './fp-typeclasses-hkt';
 import { LazyCofree } from './fp-cofree-lazy';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // Turn F<X> into an array for iteration (left-to-right per your Foldable)
 export function toArrayF<F extends Kind1, A>(Fold: Foldable<F>, fx: Apply<F, [A]>): A[] {
@@ -24,7 +25,7 @@ export function* dfsLazy<F extends Kind1, A>(
   const stack: LazyCofree<F, A>[] = [root];
 
   while (stack.length) {
-    const node = stack.pop()!;
+    const node = assertDefined(stack.pop(), "dfsLazy: node must be defined");
     yield node.head;
 
     const kids = toArrayF(Fold, node.tail());
@@ -41,7 +42,7 @@ export function* bfsLazy<F extends Kind1, A>(
   const q: LazyCofree<F, A>[] = [root];
 
   while (q.length) {
-    const node = q.shift()!;
+    const node = assertDefined(q.shift(), "bfsLazy: node must be defined");
     yield node.head;
 
     const kids = toArrayF(Fold, node.tail());

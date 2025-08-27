@@ -327,6 +327,8 @@ export const mapMapFusion: FusionRule = {
   },
   fuse: (ops: Operation[]) => {
     const [map1, map2] = ops;
+    if (!map1 || !map2) return ops[0] || ops[1] || { type: 'identity', fn: (x: any) => x, metadata: { isPure: true, hasSideEffects: false, complexity: 1, allocationCost: 0 }, dependencies: [], outputType: 'unknown' };
+    
     const composedFn = (x: any) => map2.fn(map1.fn(x));
     
     return {
@@ -358,6 +360,8 @@ export const mapFilterFusion: FusionRule = {
   },
   fuse: (ops: Operation[]) => {
     const [mapOp, filterOp] = ops;
+    if (!mapOp || !filterOp) return ops[0] || ops[1] || { type: 'identity', fn: (x: any) => x, metadata: { isPure: true, hasSideEffects: false, complexity: 1, allocationCost: 0 }, dependencies: [], outputType: 'unknown' };
+    
     const filterMapFn = (x: any) => {
       const mapped = mapOp.fn(x);
       return filterOp.fn(mapped) ? mapped : undefined;
@@ -392,6 +396,8 @@ export const filterFilterFusion: FusionRule = {
   },
   fuse: (ops: Operation[]) => {
     const [filter1, filter2] = ops;
+    if (!filter1 || !filter2) return ops[0] || ops[1] || { type: 'identity', fn: (x: any) => x, metadata: { isPure: true, hasSideEffects: false, complexity: 1, allocationCost: 0 }, dependencies: [], outputType: 'unknown' };
+    
     const combinedPredicate = (x: any) => filter1.fn(x) && filter2.fn(x);
     
     return {
@@ -866,8 +872,9 @@ export function optimizePipeline(
   
   // Apply built-in optimization hooks
   const instance = getTypeclassInstance(adtName, typeclass);
-  if (instance?.getOptimizationMetadata) {
-    const metadata = instance.getOptimizationMetadata();
+  const meta = (instance as { getOptimizationMetadata?: () => OptimizationMetadata }).getOptimizationMetadata?.();
+  if (meta) {
+    const metadata = meta;
     
     for (const hook of metadata.optimizationHooks) {
       if (hook.condition(optimizedPipeline, context)) {
@@ -930,8 +937,9 @@ export function canOptimizePipeline(
   
   // Check built-in optimization hooks
   const instance = getTypeclassInstance(adtName, typeclass);
-  if (instance?.getOptimizationMetadata) {
-    const metadata = instance.getOptimizationMetadata();
+  const meta = (instance as { getOptimizationMetadata?: () => OptimizationMetadata }).getOptimizationMetadata?.();
+  if (meta) {
+    const metadata = meta;
     return metadata.optimizationHooks.some(hook => hook.condition(pipeline, {} as OptimizationContext));
   }
   
@@ -943,8 +951,9 @@ export function canOptimizePipeline(
  */
 export function getEvaluationMode(adtName: string, typeclass: string): EvaluationMode {
   const instance = getTypeclassInstance(adtName, typeclass);
-  if (instance?.getOptimizationMetadata) {
-    return instance.getOptimizationMetadata().evaluationMode;
+  const meta = (instance as { getOptimizationMetadata?: () => OptimizationMetadata }).getOptimizationMetadata?.();
+  if (meta) {
+    return meta.evaluationMode;
   }
   
   // Fallback to heuristic detection

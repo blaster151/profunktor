@@ -58,6 +58,8 @@ import {
 
 import { lens as __mkLens, optional as __mkOptional, prism as __mkPrism } from './fp-optics-core';
 
+import { FPKey, toFPKey } from './src/types/brands';
+
 // ============================================================================
 // Part 1: Unified ADT Definition Types
 // ============================================================================
@@ -443,11 +445,14 @@ function defineADT<Spec extends Record<string, (...args: any[]) => any>>(
     of<A>(value: A): UnifiedADTInstance<Spec> {
       // Try to find a suitable constructor
       const tags = Object.keys(spec);
+      if (tags.length === 0) {
+        throw new Error(`No constructors found for ADT ${name}`);
+      }
       if (tags.length === 1) {
-        return constructors[tags[0]](value);
+        return constructors[tags[0]!](value);
       }
       // Default to first constructor
-      return constructors[tags[0]](value);
+      return constructors[tags[0]!](value);
     },
     
     from<A>(value: A): UnifiedADTInstance<Spec> {
@@ -598,17 +603,17 @@ function registerADTInRegistry(name: string, metadata: ADTMetadata, instances: a
   if (!registry) return;
 
   // One flat keyspace is simplest and avoids API-mismatch errors
-  registry.register(`${name}.metadata`, metadata);
-  if (instances.functor)     registry.register(`${name}.Functor`, instances.functor);
-  if (instances.applicative) registry.register(`${name}.Applicative`, instances.applicative);
-  if (instances.monad)       registry.register(`${name}.Monad`, instances.monad);
-  if (instances.bifunctor)   registry.register(`${name}.Bifunctor`, instances.bifunctor);
-  if (instances.eq)          registry.register(`${name}.Eq`, instances.eq);
-  if (instances.ord)         registry.register(`${name}.Ord`, instances.ord);
-  if (instances.show)        registry.register(`${name}.Show`, instances.show);
+  registry.register(toFPKey(`${name}.metadata`), metadata);
+  if (instances.functor)     registry.register(toFPKey(`${name}.Functor`), instances.functor);
+  if (instances.applicative) registry.register(toFPKey(`${name}.Applicative`), instances.applicative);
+  if (instances.monad)       registry.register(toFPKey(`${name}.Monad`), instances.monad);
+  if (instances.bifunctor)   registry.register(toFPKey(`${name}.Bifunctor`), instances.bifunctor);
+  if (instances.eq)          registry.register(toFPKey(`${name}.Eq`), instances.eq);
+  if (instances.ord)         registry.register(toFPKey(`${name}.Ord`), instances.ord);
+  if (instances.show)        registry.register(toFPKey(`${name}.Show`), instances.show);
 
   // keep metadata in auto-derivation side too
-  registerADTMetadata(name, metadata);
+  registerADTMetadata(toFPKey(name), metadata);
 }
 
 // ============================================================================

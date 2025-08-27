@@ -149,13 +149,13 @@ export function deriveFunctor<F extends Kind1>(
       // Default implementation for tagged unions
       if (typeof fa === 'object' && fa !== null && 'tag' in (fa as any)) {
         return (fa as any).match({
-          Just: ({ value }: { value: any }) => ({ tag: 'Just', value: f(value) }),
+          Just: ({ value }: { value: unknown }) => ({ tag: 'Just', value: f(value as any) }),
           Nothing: () => ({ tag: 'Nothing' }),
-          Left: ({ value }: { value: any }) => ({ tag: 'Left', value }),
-          Right: ({ value }: { value: any }) => ({ tag: 'Right', value: f(value) }),
-          Ok: ({ value }: { value: any }) => ({ tag: 'Ok', value: f(value) }),
-          Err: ({ error }: { error: any }) => ({ tag: 'Err', error }),
-          _: (tag: string, payload: any) => ({ tag, ...payload })
+          Left: ({ value }: { value: unknown }) => ({ tag: 'Left', value }),
+          Right: ({ value }: { value: unknown }) => ({ tag: 'Right', value: f(value as any) }),
+          Ok: ({ value }: { value: unknown }) => ({ tag: 'Ok', value: f(value as any) }),
+          Err: ({ error }: { error: unknown }) => ({ tag: 'Err', error }),
+          _: (tag: string, payload: unknown) => ({ tag, ...(payload as Record<string, unknown>) })
         });
       }
 
@@ -190,7 +190,7 @@ export function deriveApplicative<F extends Kind1>(
     ap: <A, B>(fab: Apply<F, [(a: A) => B]>, fa: Apply<F, [A]>): Apply<F, [B]> => {
       // Default implementation for Maybe
       return (fab as any).match({
-        Just: ({ value: f }: { value: any }) => functor.map(fa, f),
+        Just: ({ value: f }: { value: unknown }) => functor.map(fa, f as any),
         Nothing: () => ({ tag: 'Nothing' }),
         _: () => functor.map(fa, (a: A) => (fab as any).value(a))
       });
@@ -219,13 +219,13 @@ export function deriveMonad<F extends Kind1>(
 
       // Default implementation for Maybe
       return (fa as any).match({
-        Just: ({ value }: { value: any }) => f(value),
+        Just: ({ value }: { value: unknown }) => f(value as any),
         Nothing: () => ({ tag: 'Nothing' }),
-        Left: ({ value }: { value: any }) => ({ tag: 'Left', value }),
-        Right: ({ value }: { value: any }) => f(value),
-        Ok: ({ value }: { value: any }) => f(value),
-        Err: ({ error }: { error: any }) => ({ tag: 'Err', error }),
-        _: (tag: string, payload: any) => ({ tag, ...payload })
+        Left: ({ value }: { value: unknown }) => ({ tag: 'Left', value }),
+        Right: ({ value }: { value: unknown }) => f(value as any),
+        Ok: ({ value }: { value: unknown }) => f(value as any),
+        Err: ({ error }: { error: unknown }) => ({ tag: 'Err', error }),
+        _: (tag: string, payload: unknown) => ({ tag, ...(payload as Record<string, unknown>) })
       });
     }
   };
@@ -253,11 +253,11 @@ export function deriveBifunctor<F extends Kind2>(
 
       // Default implementation for Either/Result
       return (fab as any).match({
-        Left: ({ value }) => ({ tag: 'Left', value: f(value) }),
-        Right: ({ value }) => ({ tag: 'Right', value: g(value) }),
-        Ok: ({ value }) => ({ tag: 'Ok', value: g(value) }),
-        Err: ({ error }) => ({ tag: 'Err', error: f(error) }),
-        _: (tag: string, payload: any) => ({ tag, ...payload })
+        Left: ({ value }: { value: unknown }) => ({ tag: 'Left', value: f(value as any) }),
+        Right: ({ value }: { value: unknown }) => ({ tag: 'Right', value: g(value as any) }),
+        Ok: ({ value }: { value: unknown }) => ({ tag: 'Ok', value: g(value as any) }),
+        Err: ({ error }: { error: unknown }) => ({ tag: 'Err', error: f(error as any) }),
+        _: (tag: string, payload: unknown) => ({ tag, ...(payload as Record<string, unknown>) })
       });
     },
     mapLeft: <A, B, C>(fab: Apply<F, [A, B]>, f: (a: A) => C): Apply<F, [C, B]> => {
@@ -290,31 +290,46 @@ export function deriveEq<A>(config: DerivationConfig = {}): Eq<A> {
         if ((a as any).tag !== (b as any).tag) return false;
 
         return (a as any).match({
-          Just: ({ value: aValue }) => (b as any).match({
-            Just: ({ value: bValue }) => aValue === bValue,
+          Just: ({ value: aValue }: { value: unknown }) => (b as any).match({
+            Just: ({ value: bValue }: { value: unknown }) => {
+              // Safe comparison with type assertion
+              return (aValue as any) === (bValue as any);
+            },
             Nothing: () => false
           }),
           Nothing: () => (b as any).match({
             Just: () => false,
             Nothing: () => true
           }),
-          Left: ({ value: aValue }) => (b as any).match({
-            Left: ({ value: bValue }) => aValue === bValue,
+          Left: ({ value: aValue }: { value: unknown }) => (b as any).match({
+            Left: ({ value: bValue }: { value: unknown }) => {
+              // Safe comparison with type assertion
+              return (aValue as any) === (bValue as any);
+            },
             Right: () => false
           }),
-          Right: ({ value: aValue }) => (b as any).match({
+          Right: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Left: () => false,
-            Right: ({ value: bValue }) => aValue === bValue
+            Right: ({ value: bValue }: { value: unknown }) => {
+              // Safe comparison with type assertion
+              return (aValue as any) === (bValue as any);
+            }
           }),
-          Ok: ({ value: aValue }) => (b as any).match({
-            Ok: ({ value: bValue }) => aValue === bValue,
+          Ok: ({ value: aValue }: { value: unknown }) => (b as any).match({
+            Ok: ({ value: bValue }: { value: unknown }) => {
+              // Safe comparison with type assertion
+              return (aValue as any) === (bValue as any);
+            },
             Err: () => false
           }),
-          Err: ({ error: aError }) => (b as any).match({
+          Err: ({ error: aError }: { error: unknown }) => (b as any).match({
             Ok: () => false,
-            Err: ({ error: bError }) => aError === bError
+            Err: ({ error: bError }: { error: unknown }) => {
+              // Safe comparison with type assertion
+              return (aError as any) === (bError as any);
+            }
           }),
-          _: (tag: string, payload: any) => {
+          _: (tag: string, payload: unknown) => {
             // Deep equality for other fields
             return JSON.stringify(payload) === JSON.stringify((b as any)[tag]);
           }
@@ -354,8 +369,8 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
 
         // Then compare values
         return (a as any).match({
-          Just: ({ value: aValue }) => (b as any).match({
-            Just: ({ value: bValue }) => {
+          Just: ({ value: aValue }: { value: unknown }) => (b as any).match({
+            Just: ({ value: bValue }: { value: unknown }) => {
               if (aValue < bValue) return -1;
               if (aValue > bValue) return 1;
               return 0;
@@ -366,17 +381,17 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
             Just: () => -1, // Nothing < Just
             Nothing: () => 0
           }),
-          Left: ({ value: aValue }) => (b as any).match({
-            Left: ({ value: bValue }) => {
+          Left: ({ value: aValue }: { value: unknown }) => (b as any).match({
+            Left: ({ value: bValue }: { value: unknown }) => {
               if (aValue < bValue) return -1;
               if (aValue > bValue) return 1;
               return 0;
             },
             Right: () => -1 // Left < Right
           }),
-          Right: ({ value: aValue }) => (b as any).match({
+          Right: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Left: () => 1, // Right > Left
-            Right: ({ value: bValue }) => {
+            Right: ({ value: bValue }: { value: unknown }) => {
               if (aValue < bValue) return -1;
               if (aValue > bValue) return 1;
               return 0;
@@ -411,11 +426,11 @@ export function deriveShow<A>(config: DerivationConfig = {}): Show<A> {
       // Default string representation for tagged unions
       if (typeof a === 'object' && a !== null && 'tag' in (a as any)) {
         return (a as any).match({
-          Just: ({ value }) => `Just(${JSON.stringify(value)})`,
+          Just: ({ value }: { value: unknown }) => `Just(${JSON.stringify(value)})`,
           Nothing: () => 'Nothing',
-          Left: ({ value }) => `Left(${JSON.stringify(value)})`,
-          Right: ({ value }) => `Right(${JSON.stringify(value)})`,
-          Ok: ({ value }) => `Ok(${JSON.stringify(value)})`,
+          Left: ({ value }: { value: unknown }) => `Left(${JSON.stringify(value)})`,
+          Right: ({ value }: { value: unknown }) => `Right(${JSON.stringify(value)})`,
+          Ok: ({ value }: { value: unknown }) => `Ok(${JSON.stringify(value)})`,
           Err: ({ error }: { error: unknown }) => `Err(${JSON.stringify(error)})`,
           _: (tag: string, payload: any) => `${tag}(${JSON.stringify(payload)})`
         });

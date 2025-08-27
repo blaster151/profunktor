@@ -39,6 +39,7 @@ import {
 } from './fp-derivation-helpers';
 
 import { applyFluentOps, FluentImpl } from './fp-fluent-api';
+import { assertDefined, isDefined } from './src/util/assert';
 
 // ============================================================================
 // Part 1: Internal Data Structures
@@ -299,7 +300,8 @@ export class PersistentList<T> {
     
     // Process elements in reverse order
     for (let i = elements.length - 1; i >= 0; i--) {
-      acc = fn(acc, elements[i], i);
+      const element = assertDefined(elements[i], `foldRight: element at index ${i} must be defined`);
+      acc = fn(acc, element, i);
     }
     
     return acc;
@@ -382,7 +384,7 @@ export class PersistentList<T> {
         if (index >= values.length) {
           return { done: true, value: undefined };
         }
-        const value = values[index];
+        const value = assertDefined(values[index], `iterator: value at index ${index} must be defined`);
         index++;
         return { done: false, value };
       }
@@ -467,7 +469,8 @@ export class PersistentList<T> {
     if (height === 0) {
       // Leaf node
       for (let i = 0; i < Math.min(arr.length, BRANCH_FACTOR); i++) {
-        elements.push(arr[i]);
+        const element = assertDefined(arr[i], `createNode: element at index ${i} must be defined`);
+        elements.push(element);
       }
     } else {
       // Internal node
@@ -488,7 +491,8 @@ export class PersistentList<T> {
     
     if (height === 0) {
       // Leaf case: index should be modulo BRANCH_FACTOR since leaf can contain multiple leaves' worth of data
-      return node.elements[index % BRANCH_FACTOR];
+      const element = node.elements[index % BRANCH_FACTOR];
+      return element;
     }
     
     const childIndex = Math.floor(index / Math.pow(BRANCH_FACTOR, height));
@@ -498,7 +502,7 @@ export class PersistentList<T> {
       return undefined;
     }
     
-    const child = node.children[childIndex];
+    const child = assertDefined(node.children[childIndex], `getAt: child at index ${childIndex} must be defined`);
     return PersistentList.getAt(child, childOffset, height - 1);
   }
   
@@ -515,7 +519,7 @@ export class PersistentList<T> {
       const child = PersistentList.createNode([value], height - 1);
       newChildren.push(child);
     } else {
-      const lastChild = newChildren[newChildren.length - 1];
+      const lastChild = assertDefined(newChildren[newChildren.length - 1], "appendTo: lastChild must be defined");
       const newLastChild = PersistentList.appendTo(lastChild, value, height - 1);
       newChildren[newChildren.length - 1] = newLastChild;
     }
@@ -536,7 +540,7 @@ export class PersistentList<T> {
       const child = PersistentList.createNode([value], height - 1);
       newChildren.unshift(child);
     } else {
-      const firstChild = newChildren[0];
+      const firstChild = assertDefined(newChildren[0], "prependTo: firstChild must be defined");
       const newFirstChild = PersistentList.prependTo(firstChild, value, height - 1);
       newChildren[0] = newFirstChild;
     }
@@ -562,7 +566,7 @@ export class PersistentList<T> {
       const child = PersistentList.createNode([value], height - 1);
       newChildren.push(child);
     } else {
-      const child = newChildren[childIndex];
+      const child = assertDefined(newChildren[childIndex], `insertAt: child at index ${childIndex} must be defined`);
       const newChild = PersistentList.insertAt(child, childOffset, value, height - 1);
       newChildren[childIndex] = newChild;
     }
@@ -584,7 +588,7 @@ export class PersistentList<T> {
     const childOffset = index % Math.pow(BRANCH_FACTOR, height);
     
     const newChildren = [...node.children];
-    const child = newChildren[childIndex];
+    const child = assertDefined(newChildren[childIndex], `removeAt: child at index ${childIndex} must be defined`);
     const newChild = PersistentList.removeAt(child, childOffset, height - 1);
     newChildren[childIndex] = newChild;
     
@@ -605,7 +609,7 @@ export class PersistentList<T> {
     const childOffset = index % Math.pow(BRANCH_FACTOR, height);
     
     const newChildren = [...node.children];
-    const child = newChildren[childIndex];
+    const child = assertDefined(newChildren[childIndex], `setAt: child at index ${childIndex} must be defined`);
     const newChild = PersistentList.setAt(child, childOffset, value, height - 1);
     newChildren[childIndex] = newChild;
     
@@ -897,7 +901,7 @@ export class PersistentMap<K, V> {
     }
     
     const childIndex = PersistentMap.popCount(node.bitmap & (bit - 1));
-    const child = node.children[childIndex];
+    const child = assertDefined(node.children[childIndex], `getFrom: child at index ${childIndex} must be defined`);
     
     if (Array.isArray(child)) {
       const [childKey, childValue] = child;
@@ -923,7 +927,7 @@ export class PersistentMap<K, V> {
     
     // Key exists, update it
     const childIndex = PersistentMap.popCount(node.bitmap & (bit - 1));
-    const child = node.children[childIndex];
+    const child = assertDefined(node.children[childIndex], `setIn: child at index ${childIndex} must be defined`);
     const newChildren = [...node.children];
     
     if (Array.isArray(child)) {
@@ -954,7 +958,7 @@ export class PersistentMap<K, V> {
     }
     
     const childIndex = PersistentMap.popCount(node.bitmap & (bit - 1));
-    const child = node.children[childIndex];
+    const child = assertDefined(node.children[childIndex], `deleteFrom: child at index ${childIndex} must be defined`);
     const newChildren = [...node.children];
     
     if (Array.isArray(child)) {
@@ -1772,7 +1776,7 @@ const PersistentListFluentImpl: FluentImpl<any> = {
   },
   scan: (self, reducer, seed) => {
     let acc = seed;
-    return self.map(v => { 
+    return self.map((v: unknown) => { 
       acc = reducer(acc, v); 
       return acc; 
     });
@@ -1829,7 +1833,7 @@ const PersistentMapFluentImpl: FluentImpl<any> = {
   filter: (self, pred) => self.filter(pred),
   scan: (self, reducer, seed) => {
     let acc = seed;
-    return self.map(v => { 
+    return self.map((v: unknown) => { 
       acc = reducer(acc, v); 
       return acc; 
     });
@@ -1884,7 +1888,7 @@ const PersistentSetFluentImpl: FluentImpl<any> = {
   filter: (self, pred) => self.filter(pred),
   scan: (self, reducer, seed) => {
     let acc = seed;
-    return self.map(v => { 
+    return self.map((v: unknown) => { 
       acc = reducer(acc, v); 
       return acc; 
     });
