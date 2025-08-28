@@ -361,9 +361,8 @@ export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPol
  */
 export function createTeaPerson(): CofreeComonadPolynomial<typeof teaInterviewPolynomial, string> {
   return cofreePolynomial('Alice', (question) => {
-    // Use the factory function instead of the function type
-    const m = mk(question as QuestionKey);
-    return m;
+    // Return the directions function from the polynomial
+    return teaInterviewPolynomial.directions;
   });
 }
 

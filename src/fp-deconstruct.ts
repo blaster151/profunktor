@@ -20,6 +20,7 @@ import {
   PersistentSet,
   destructureList as _destructureList
 } from '../fp-persistent';
+import { assertDefined } from './util/assert';
 
 // ============================================================================
 // Part 1: Shared tuple helpers for arrays

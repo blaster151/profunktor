@@ -211,13 +211,13 @@ export function createUnifiedSatisfactionSystem<X, R, Ω>(
       switch (property.type) {
         case 'nilpotency':
           // Check nilpotency using internal logic
-          return kripkeJoyal.satisfies(stage, () => true, () => ({} as R));
+          return kripkeJoyal.satisfies(stage, () => truthValueObject, () => ({} as R));
         case 'linearity':
           // Check linearity using internal logic
-          return kripkeJoyal.satisfies(stage, () => true, () => ({} as R));
+          return kripkeJoyal.satisfies(stage, () => truthValueObject, () => ({} as R));
         case 'derivative':
           // Check derivative property using internal logic
-          return kripkeJoyal.satisfies(stage, () => true, () => ({} as R));
+          return kripkeJoyal.satisfies(stage, () => truthValueObject, () => ({} as R));
       }
     },
     
@@ -414,8 +414,8 @@ export function createUnifiedSDGSystem<X, R, Ω>(
   truthValueObject: Ω
 ): UnifiedSDGSystem<X, R, Ω> {
   const stageBasedAxiom = createStageBasedKockLawvereAxiom(stage, ring, infinitesimals);
-  const satisfactionSystem = createUnifiedSatisfactionSystem(baseCategory, truthValueObject);
-  const infinitesimalLogic = createInfinitesimalInternalLogic(baseCategory, truthValueObject);
+  const satisfactionSystem = createUnifiedSatisfactionSystem<X, R, Ω>(baseCategory, truthValueObject);
+  const infinitesimalLogic = createInfinitesimalInternalLogic<X, R, Ω>(baseCategory, truthValueObject);
   
   return {
     kind: 'UnifiedSDGSystem',
