@@ -40,7 +40,8 @@ export function joinsOf(necklace: Necklace): number[] {
   const joins: number[] = [];
   let acc = 0;
   for (let i = 0; i < necklace.beads.length - 1; i++) {
-    acc += necklace.beads[i];
+    const bead = necklace.beads[i];
+    if (bead !== undefined) acc += bead;
     joins.push(acc);
   }
   // vertices are 0..m-1; joins are internal vertices

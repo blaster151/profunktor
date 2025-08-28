@@ -1270,7 +1270,7 @@ export const PersistentListOrd = deriveOrdInstance({
     for (let i = 0; i < minLength; i++) {
       const aItem = arrA[i];
       const bItem = arrB[i];
-      if (aItem === undefined || bItem === undefined) continue;
+      if (aItem == null || bItem == null) continue;
       if (aItem < bItem) return -1;
       if (aItem > bItem) return 1;
     }
@@ -1381,7 +1381,7 @@ export const PersistentSetOrd = deriveOrdInstance({
     for (let i = 0; i < arrA.length; i++) {
       const aItem = arrA[i];
       const bItem = arrB[i];
-      if (aItem === undefined || bItem === undefined) continue;
+      if (aItem == null || bItem == null) continue;
       if (aItem < bItem) return -1;
       if (aItem > bItem) return 1;
     }

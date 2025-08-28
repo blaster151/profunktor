@@ -36,8 +36,11 @@ function elementProfiles(I: Instance): Record<string, Map<unknown, string>> {
         // (Enough to detect duplicates with identical participation.)
         const s = Object.keys(I.sorts).find(ss => I.sorts[ss]?.includes(x));
         if (!s) return;
-        const prev = profiles[s].get(x) ?? "";
-        profiles[s].set(x, prev + `|${r}@${i}#${k}`);
+        const profileMap = profiles[s];
+        if (profileMap !== undefined) {
+          const prev = profileMap.get(x) ?? "";
+          profileMap.set(x, prev + `|${r}@${i}#${k}`);
+        }
       });
     });
   }
@@ -56,7 +59,8 @@ export function reduceToCore(I0: Instance, protected_: Protected = {}): { I: Ins
     // Group by profile
     const bySig = new Map<string, unknown[]>();
     xs.forEach(x => {
-      const sig = (profiles[s].get(x) ?? "") + (prot.has(x) ? "|P" : "");
+      const profileMap = profiles[s];
+      const sig = (profileMap?.get(x) ?? "") + (prot.has(x) ? "|P" : "");
       const arr = bySig.get(sig) ?? []; arr.push(x); bySig.set(sig, arr);
     });
     // Select representative (prefer a protected element)
@@ -75,8 +79,12 @@ export function reduceToCore(I0: Instance, protected_: Protected = {}): { I: Ins
   // Rewrite relations
   for (const [r, tuples] of Object.entries(I.relations)) {
     const rewritten = tuples.map(t => t.map(x => {
-      const s = Object.keys(repMap).find(ss => repMap[ss].has(x));
-      return s ? repMap[s].get(x)! : x;
+      const s = Object.keys(repMap).find(ss => repMap[ss]?.has(x));
+      if (s) {
+        const map = repMap[s];
+        return map ? map.get(x) ?? x : x;
+      }
+      return x;
     }));
     // Deduplicate tuples
     const uniq = Array.from(new Set(rewritten.map(t => JSON.stringify(t)))).map(s => JSON.parse(s));

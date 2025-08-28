@@ -53,11 +53,15 @@ export function equivPArrow(lhs: PArrowRep, rhs: PArrowRep): boolean {
       // find bead index i for v
       let acc = 0;
       for (let i = 0; i <= k; i++) {
-        const start = acc, end = acc + beadsN[i];
-        if (v >= start && v <= end) return pieceMaps[i](v);
-        acc += beadsN[i];
+        const bead = beadsN[i];
+        if (bead === undefined) continue;
+        const start = acc, end = acc + bead;
+        const pieceMap = pieceMaps[i];
+        if (v >= start && v <= end && pieceMap !== undefined) return pieceMap(v);
+        acc += bead;
       }
-      return pieceMaps[k](v);
+      const lastMap = pieceMaps[k];
+      return lastMap !== undefined ? lastMap(v) : v;
     };
     // endpoints must be fixed
     if (rho(0) !== 0) { ok = false; }

@@ -248,13 +248,21 @@ export function chaseRegular(theory: RegularTheory, seed: Instance, opts: ChaseO
     if (opts.parallel) {
       // Parallel copairing pushout: apply all at once
       const prev = JSON.stringify(I);
-      triggers.forEach(t => { I = chaseStep(I, sig, theory.axioms[t.edIndex], t.map, t.env); });
+      triggers.forEach(t => { 
+        const axiom = theory.axioms[t.edIndex];
+        if (axiom !== undefined) {
+          I = chaseStep(I, sig, axiom, t.map, t.env); 
+        }
+      });
       return { changed: JSON.stringify(I) !== prev };
     } else {
       // Standard: one trigger
       const t = triggers[0];
+      if (t === undefined) return { changed: false };
+      const axiom = theory.axioms[t.edIndex];
+      if (axiom === undefined) return { changed: false };
       const prev = JSON.stringify(I);
-      I = chaseStep(I, sig, theory.axioms[t.edIndex], t.map, t.env);
+      I = chaseStep(I, sig, axiom, t.map, t.env);
       return { changed: JSON.stringify(I) !== prev };
     }
   };
@@ -475,7 +483,7 @@ function parallelStepFor(
   // Build a "restricted theory" with only the chosen EDs
   const sub: RegularTheory = {
     sigma: theory.sigma,
-    axioms: edIdxs.map(i => theory.axioms[i])
+    axioms: edIdxs.map(i => theory.axioms[i]).filter((ax): ax is ED => ax !== undefined)
   };
   const J = chaseRegular(sub, I, { parallel: true, fairnessRounds: 1, maxSteps: 1 });
   return { J, edit: editFromParallelStep(I, J) };
@@ -491,7 +499,10 @@ export function semiNaiveFastParallelChase(
   let { J: I } = parallelStepFor(
     theory,
     I0,
-    theory.axioms.map((_, i) => i).filter(i => hasEmptyFront(theory.axioms[i]))
+    theory.axioms.map((_, i) => i).filter(i => {
+      const axiom = theory.axioms[i];
+      return axiom !== undefined && hasEmptyFront(axiom);
+    })
   );
 
   // 2) Initialize edits and state variables

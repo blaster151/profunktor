@@ -189,7 +189,7 @@ export const ArrayOrd = deriveOrdInstance({
     for (let i = 0; i < minLength; i++) {
       const aItem = a[i];
       const bItem = b[i];
-      if (aItem === undefined || bItem === undefined) continue;
+      if (aItem == null || bItem == null) continue;
       if (aItem < bItem) return -1;
       if (aItem > bItem) return 1;
     }

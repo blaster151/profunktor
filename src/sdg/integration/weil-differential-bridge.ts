@@ -382,13 +382,14 @@ export function exampleWeilDifferentialIntegration() {
   const jetForm = unified.jetDifferentialForm(unified.jetBundle);
   
   // Test nilpotent to differential form
-  const nilpotentForm = unified.nilpotentDifferentialForm(unified.nilpotentElements[0]);
+  const firstNilpotent = unified.nilpotentElements[0];
+  const nilpotentForm = firstNilpotent !== undefined ? unified.nilpotentDifferentialForm(firstNilpotent) : null;
   
   return {
     algebraicToDifferential: differentialForm.degree,
     differentialToAlgebraic: typeof backToAlgebraic,
     jetToDifferential: jetForm.degree,
-    nilpotentToDifferential: nilpotentForm.degree,
+    nilpotentToDifferential: nilpotentForm?.degree ?? 0,
     weilAlgebra: unified.weilAlgebra,
     differentialForms: unified.differentialForms.length,
     bridgeSuccess: true
@@ -409,7 +410,7 @@ export function exampleJetDifferentialBridge() {
   
   return {
     bridgeCondition: bridge.bridgeCondition(jetBundle),
-    calculusCorrespondence: bridge.calculusCorrespondence(bridge.differentialForms[0]),
+    calculusCorrespondence: bridge.differentialForms[0] !== undefined ? bridge.calculusCorrespondence(bridge.differentialForms[0]) : null,
     jetDifferentialForm: bridge.jetDifferentialForm(jetBundle),
     differentialForms: bridge.differentialForms.length,
     jetBundle: bridge.jetBundle

@@ -36,6 +36,7 @@ export function mkEqP<P extends Kind2, A, B>(
   return (p1, p2) => {
     for (let i = 0; i < samples.length; i++) {
       const a = samples[i];
+      if (a === undefined) continue;
       const b1 = evalP(p1)(a);
       const b2 = evalP(p2)(a);
       if (!eqB(b1, b2)) return false;

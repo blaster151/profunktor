@@ -237,6 +237,7 @@ export function createGroupHomomorphism<A, B>(): GroupHomomorphism<A, B> {
         for (let j = 0; j < domain.length; j++) {
           const a1 = domain[i];
           const a2 = domain[j];
+          if (a1 === undefined || a2 === undefined) continue;
           const product = multiply(a1, a2);
           
           const left = f(product);

@@ -43,7 +43,10 @@ export function indexedFromChasedModel(
       const dstIdx = assertDefined(idxOf[e.dst], `idxOf for ${e.dst} not found`);
       const i = srcIdx.get(x);
       const j = dstIdx.get(y);
-      if (i !== undefined && j !== undefined && i < arr.length) arr[i].add(j);
+      if (i !== undefined && j !== undefined && i < arr.length) {
+        const set = arr[i];
+        if (set !== undefined) set.add(j);
+      }
     });
     edges[key] = arr;
   }

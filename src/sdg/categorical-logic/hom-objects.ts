@@ -147,6 +147,7 @@ export function createAdditionOfHomomorphisms<A, B>(): AdditionOfHomomorphisms<A
         for (let j = 0; j < domain.length; j++) {
           const a1 = domain[i];
           const a2 = domain[j];
+          if (a1 === undefined || a2 === undefined) continue;
           const sum = addA(a1, a2);
           
           const left = addB(f1(sum), f2(sum));

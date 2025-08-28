@@ -37,7 +37,10 @@ export const and = (...atoms: Atom[]): Horn => ({ all: atoms.filter(Boolean) });
 export function ctxSorts(ctx: Context): readonly Sort[] { return ctx.map(v => v.sort); }
 
 export function sortCompatible(ctx: Context, terms: readonly Term[]): boolean {
-  return ctx.length === terms.length && ctx.every((v, i) => v.sort === terms[i].sort);
+  return ctx.length === terms.length && ctx.every((v, i) => {
+    const term = terms[i];
+    return term !== undefined && v.sort === term.sort;
+  });
 }
 
 // Capture-avoiding substitution on atoms (variables only, to keep this light).
