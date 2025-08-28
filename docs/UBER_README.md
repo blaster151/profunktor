@@ -31,6 +31,48 @@ Best practices:
 
 ---
 
+## 2.1 Fluent ADT System (Doc 8)
+- Automatic derivation for core typeclasses (Functor, Applicative, Monad; plus Eq/Ord/Show where applicable).
+- Prototype augmentation adds fluent methods consistently across ADTs and collections.
+- Global auto-registration hooks bind instances to the central registry.
+
+Snippet:
+```typescript
+const result = Just(42)
+  .map(x => x * 2)
+  .chain(x => Just(x.toString()));
+```
+
+Key modules: `fp-fluent-adt.ts` (fluent), `fp-derivation-helpers.ts` (derive*), `fp-auto-registration.ts`.
+
+---
+
+## 2.2 Unified Fluent API (Doc 9)
+- Single, unified fluent surface for Maybe/Either/Result, ObservableLite/StatefulStream, and PersistentList/Map/Set.
+- Lossless, type-safe conversions across domains (ADT ↔ Streams ↔ Persistent collections), preserving purity metadata.
+- Stream/collection-specific operators coexist with shared core operations.
+
+Shared ops:
+```typescript
+.map(f)
+.chain(f)
+.filter(pred)
+.pipe(...fns)
+```
+
+Conversions (examples):
+```typescript
+const obs = list.toObservableLite();
+const stream = obs.toStatefulStream({ count: 0 });
+const maybe = stream.toPersistentList().toMaybe();
+```
+
+Guidelines:
+- Prefer direct ops; convert only when switching models.
+- Use transient/batch modes for performance in persistent collections.
+
+---
+
 ## 3. Implementation Complete Summary (Eq/Ord/Show)
 The ADT Eq, Ord, and Show rollout is complete across core types. See `IMPLEMENTATION_COMPLETE_SUMMARY.md`.
 
