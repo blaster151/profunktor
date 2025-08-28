@@ -1,0 +1,1862 @@
+# Source Restructure Plan
+
+## Folder rationales
+- **src/arrow**: Arrow/Kleisli/CoKleisli abstractions and SF/Mealy related laws and implementations.
+- **src/category**: General category-theoretic bridges and utilities that are not specific to bicategories or homotopy.
+- **src/core**: Core kinds, typeclasses, natural transformations, small algebraic utilities. These are foundational and imported broadly.
+- **src/data/either**: Either data type and related helpers live under data/either for discoverability and cohesion.
+- **src/data/maybe**: Maybe/Option and their unified builders go under data/maybe as algebraic data types.
+- **src/data/result**: Result/Ok/Err and their unified interfaces are grouped together under data/result.
+- **src/effects**: Effect monads and IO/Task/State variants grouped as effect systems.
+- **src/fluent**: Fluent API and related runtime installation kept in a dedicated namespace.
+- **src/free**: Free/Cofree modules and related constructions clustered for recursion schemes and categorical encodings.
+- **src/homotopy**: Homotopy/type-theory bridges and synthetic differential geometry under dedicated research domains.
+- **src/lawvere**: Lawvere theories and comodel formulations co-located for algebraic effects work.
+- **src/legacy**: Items not recognized by rules go to legacy for manual triage with minimal disruption.
+- **src/math**: General math helpers and rational arithmetic grouped under math.
+- **src/optics**: Profunctor optics core, instances, laws, and utilities belong under optics for a single entry point.
+- **src/polynomial**: Polynomial functors, their algebras, monads, and categorical characterizations.
+- **src/stream**: Stream core, fusion, state, and coordination modules unified under a dedicated stream namespace.
+- **src/trees**: Tree utilities and canonical trees maintained under a trees namespace.
+- **src/util**: Small utilities that don’t fit elsewhere. These provide glue code and helpers used across modules. Keeping them in one place reduces incidental dependencies.
+
+## New structure (text diagram)
+- src/arrow/
+  - arrow-laws-glue.ts
+  - arrowchoice-cokleisli.ts
+  - arrows-cokleisli-choice-cofree.ts
+  - arrows-cokleisli-choice.ts
+  - arrows-cokleisli.ts
+  - arrows-function.ts
+  - arrows-kleisli-star.ts
+  - arrows-kleisli.ts
+  - mealy-cofree.ts
+  - mealy.ts
+  - sf-arrowchoice.ts
+- src/category/
+  - adjunction-core.ts
+  - adjunction-framework.ts
+  - adjunction-free.ts
+  - adjunction-registry.ts
+  - adjunction.ts
+  - algebra.ts
+  - algebras-forgetful.ts
+  - anamorphisms.ts
+  - catamorphisms-demo.ts
+  - catamorphisms.ts
+  - coalgebra.ts
+  - commutative-applicative.ts
+  - compact-closed-bicategories.ts
+  - dense-class-yoneda-polynomial-bridge.ts
+  - derived-category-infinity-bridge.ts
+  - double-category.ts
+  - hoffnung-spans-tricategory-refactored.ts
+  - hoffnung-spans-tricategory.ts
+  - hylomorphisms.ts
+  - model-category-infinity-bridge.ts
+  - monoidal-bridge.ts
+  - monoidal.ts
+  - morphisms.ts
+  - weil-algebras.ts
+- src/core/
+  - hkt.ts
+  - immutable.ts
+  - monoids.ts
+  - nat.ts
+  - partial.ts
+  - readonly.ts
+  - semiring.ts
+  - trampoline.ts
+  - typeclasses.ts
+  - yoneda.ts
+- src/data/either/
+  - either-classes.ts
+  - either-derivation.ts
+  - either-hkt.ts
+  - either-ops-table.ts
+  - either-register.ts
+  - either-traversable.ts
+  - either-unified.ts
+  - either.ts
+- src/data/maybe/
+  - maybe-fluent.ts
+  - maybe-hkt.ts
+  - maybe-unified-enhanced.ts
+  - maybe-unified.ts
+  - maybe.ts
+  - option.ts
+- src/data/result/
+  - result-unified.ts
+  - result.ts
+- src/effects/
+  - derivable-purity.ts
+  - effect-monads-complete.ts
+  - effect-monads.ts
+  - effects-interop.ts
+  - purity-combinators.ts
+  - purity-pattern-matching.ts
+  - purity.ts
+- src/fluent/
+  - fluent-adt-complete.ts
+  - fluent-adt-complete.ts
+  - fluent-adt.ts
+  - fluent-api.ts
+  - fluent-core.ts
+  - fluent-instance-methods.ts
+  - fluent-instance-methods.ts
+  - fluent-methods.ts
+  - fluent-traverse.ts
+  - fluent.ts
+- src/free/
+  - cofree-async.ts
+  - cofree-choice-uniform.ts
+  - cofree-comonad.ts
+  - cofree-compose-lift.ts
+  - cofree-lazy-bfs-build.ts
+  - cofree-lazy-iter.ts
+  - cofree-lazy-para.ts
+  - cofree-lazy.ts
+  - cofree-lift.ts
+  - cofree-tensor.ts
+  - cokleisli-arrow-choice.ts
+  - cokleisli-cofree.ts
+  - cokleisli.ts
+  - free-applicative.ts
+  - free-cofree-pairing.ts
+  - free-monad-module.ts
+  - free.ts
+  - freedman-topological-quantum-computation.ts
+- src/homotopy/
+  - advanced-homotopy-type-theory.ts
+  - homotopy-ergonomics.examples.ts
+  - homotopy-ergonomics.ts
+  - homotopy-type-theory-bridge.ts
+  - infinity-simplicial-operators.ts
+  - infinity-simplicial-polynomial-unification.ts
+  - infinity-simplicial-sets.ts
+  - khavkine-schreiber-categorical-foundations.ts
+  - khavkine-schreiber-formal-smooth-sets.ts
+  - khavkine-schreiber-jet-comonad.ts
+  - khavkine-schreiber-pde-theory.ts
+  - khavkine-schreiber-synthetic-topos.ts
+  - khavkine-schreiber-topos-completion.ts
+  - kripke-joyal-satisfaction-polynomial-bridge.ts
+  - nishimura-synthetic-differential-homotopy.ts
+  - tangent-categories.ts
+  - topological-quantum-field-theory.ts
+- src/lawvere/
+  - comodel-lawvere-theory.ts
+  - global-state-lawvere-theory.ts
+  - tambara-lawvere.ts
+- src/legacy/
+  - adt-builders-enhanced.ts
+  - adt-builders-with-guards.ts
+  - adt-builders.ts
+  - adt-eq-ord-show-complete.ts
+  - adt-optics-simple.ts
+  - adt-optics.ts
+  - advanced-applications.ts
+  - advanced-dot-composition.ts
+  - advanced-type-system-examples.ts
+  - align.ts
+  - array-comodel-equivalence.ts
+  - array-extensions.ts
+  - auto-derivation-complete.ts
+  - auto-registration.ts
+  - batanin-berger-tame-polynomial-monads.ts
+  - beck-chevalley.ts
+  - bimonad-extended.ts
+  - cartesian-2-cells.ts
+  - classify-sets.ts
+  - closure.ts
+  - coalagra.ts
+  - cochoice.ts
+  - colimit-distribution.ts
+  - colimit-optimizations.ts
+  - colimit-runner.ts
+  - colimit-sequentializer.ts
+  - comonad-instances.ts
+  - comonadic-arrays-complete.ts
+  - comprehension-integration-polynomial-bridge.ts
+  - computational-topos-framework.ts
+  - cooperad-dg.examples.ts
+  - cooperad-dg.test.ts
+  - cooperad-dg.ts
+  - cooperad-trees.ts
+  - cooperad-weights-extras.ts
+  - cooperad-weights.ts
+  - cooperad.ts
+  - deconstruct.ts
+  - deformation-dgla-enhanced.ts
+  - deformation-dgla.ts
+  - deformation-integration.ts
+  - deformation.examples.ts
+  - dependent-types.ts
+  - derivable-instances.ts
+  - derivation-helpers.ts
+  - dg-cooperad-integration.ts
+  - dg-cooperad.examples.ts
+  - dg-cooperad.ts
+  - dg-core.ts
+  - do.ts
+  - dot-style-stream-coordination.ts
+  - dual-api.ts
+  - enhanced-dual-api.ts
+  - enrichment.spec.ts
+  - enrichment.ts
+  - flat-species-catalan.ts
+  - fromarray.ts
+  - frp-bridge.ts
+  - frp-fusion.ts
+  - gadt-enhanced.ts
+  - gadt-integrated-clean.ts
+  - gadt-integrated.ts
+  - gadt.ts
+  - grothendieck-construction.ts
+  - grothendieck-fibrations-bijections.ts
+  - hkt-either-result-kinds.ts
+  - hylo.ts
+  - infinity-functor-natural-transformation-bridge.ts
+  - internal-logic.ts
+  - laws-arrows.ts
+  - laws-attach.ts
+  - laws-core.ts
+  - laws-optics.ts
+  - laws-runner.ts
+  - laws-suites.ts
+  - laws.ts
+  - lifting-property.ts
+  - linear-logic.ts
+  - match-product.ts
+  - material-shape-separation.ts
+  - model-sets.ts
+  - model-toy.spec.ts
+  - nishimura-weil-diffeology.ts
+  - normal-functors-slice.ts
+  - operad-cofree.ts
+  - pattern-guards.ts
+  - pattern-matching-ergonomics.ts
+  - pattern-matching-with-guards-complete-fixed.ts
+  - persistent-functionk-bridges.ts
+  - persistent-hkt-gadt.ts
+  - persistent-hkt.ts
+  - persistent.ts
+  - precise-categorical-types.ts
+  - presheaf-topos.ts
+  - product-matchers.ts
+  - profunctor-optics.ts
+  - proof-nets-polynomial.ts
+  - punctured-cube.ts
+  - pushout.ts
+  - quillen-equivalences.ts
+  - recursion-schemes-extra.ts
+  - resource.ts
+  - selective.ts
+  - seven-equivalent-characterizations.ts
+  - shapely-functors.ts
+  - sheaf-theory-topology.ts
+  - species-analytic.ts
+  - synthetic-differential-geometry.ts
+  - traversal-shim.ts
+  - typeclass-optimization.ts
+  - typeclass-usage-derivation.ts
+  - typeclasses-arrows-new.ts
+  - typeclasses-arrows.ts
+  - typeclasses-hkt.ts
+  - typeclasses-hok.ts
+  - typeclasses-id.ts
+  - typeclasses-std.ts
+  - typeclasses-unified.ts
+  - unified-adt-definition.ts
+  - unified-fluent-api.ts
+  - usage-integration.ts
+  - variance-derivation.ts
+  - wfs-set.ts
+- src/math/
+  - rational.ts
+- src/optics/
+  - bazaar-algebraic.examples.ts
+  - bazaar-algebraic.ts
+  - bazaar-composition.examples.ts
+  - bazaar-composition.ts
+  - bazaar-effects.ts
+  - bazaar-planner.ts
+  - bazaar-reified.ts
+  - bazaar-stream.ts
+  - bazaar-traversable-bridge.examples.ts
+  - bazaar-traversable-bridge.ts
+  - optics-adapter.ts
+  - optics-affine.ts
+  - optics-ambifibration.ts
+  - optics-auto-derivation.ts
+  - optics-codiagonal.ts
+  - optics-core - Copy.ts
+  - optics-core.ts
+  - optics-dialens-fibration.ts
+  - optics-dialens.ts
+  - optics-everywhere.ts
+  - optics-fib-vertcart.ts
+  - optics-indexed - Copy.ts
+  - optics-indexed.ts
+  - optics-instances.ts
+  - optics-iso-helpers.ts
+  - optics-law-harness.examples.ts
+  - optics-law-harness.ts
+  - optics-plens.ts
+  - optics-preoptic.ts
+  - optics-scheduler - Copy.ts
+  - optics-scheduler.ts
+  - optics-traversal.ts
+  - optics.ts
+- src/polynomial/
+  - index.ts
+  - polynomial-2category.ts
+  - polynomial-calculus.ts
+  - polynomial-characterizations.ts
+  - polynomial-degree.ts
+  - polynomial-distributive-laws.ts
+  - polynomial-foundations.ts
+  - polynomial-functors.ts
+  - polynomial-monads.ts
+  - polynomial-topology.ts
+- src/stream/
+  - dot-stream-modules-complete.ts
+  - dot-stream-modules-simple.ts
+  - dot-stream-modules.ts
+  - observable-lite.ts
+  - observable-optics.ts
+  - stream-boundaries.ts
+  - stream-combinator-roles.ts
+  - stream-concurrent.ts
+  - stream-core.ts
+  - stream-fusion.ts
+  - stream-ops.ts
+  - stream-pull.ts
+  - stream-resource.ts
+  - stream-state.ts
+- src/trees/
+  - canonicalTree.ts
+  - canonicalTreeLabeled.ts
+  - symmetryKey.ts
+- src/util/
+  - adt-registry.ts
+  - gadt-readonly-demo.ts
+  - gadt-readonly.ts
+  - interrupt.ts
+  - readonly-builder-demo.ts
+  - readonly-builder.ts
+  - readonly-patterns.ts
+  - registry-init.ts
+  - witness-registry.ts
+
+## File moves (from → to)
+- `fp-adjunction-core.ts` → `src/category/adjunction-core.ts`
+- `fp-adjunction-framework.ts` → `src/category/adjunction-framework.ts`
+- `fp-adjunction-free.ts` → `src/category/adjunction-free.ts`
+- `fp-adjunction-registry.ts` → `src/category/adjunction-registry.ts`
+- `fp-adjunction.ts` → `src/category/adjunction.ts`
+- `fp-adt-builders-enhanced.ts` → `src/legacy/adt-builders-enhanced.ts`
+- `fp-adt-builders-with-guards.ts` → `src/legacy/adt-builders-with-guards.ts`
+- `fp-adt-builders.ts` → `src/legacy/adt-builders.ts`
+- `fp-adt-eq-ord-show-complete.ts` → `src/legacy/adt-eq-ord-show-complete.ts`
+- `fp-adt-optics-simple.ts` → `src/legacy/adt-optics-simple.ts`
+- `fp-adt-optics.ts` → `src/legacy/adt-optics.ts`
+- `fp-adt-registry.ts` → `src/util/adt-registry.ts`
+- `fp-advanced-applications.ts` → `src/legacy/advanced-applications.ts`
+- `fp-advanced-dot-composition.ts` → `src/legacy/advanced-dot-composition.ts`
+- `fp-advanced-homotopy-type-theory.ts` → `src/homotopy/advanced-homotopy-type-theory.ts`
+- `fp-advanced-type-system-examples.ts` → `src/legacy/advanced-type-system-examples.ts`
+- `fp-algebra.ts` → `src/category/algebra.ts`
+- `fp-algebras-forgetful.ts` → `src/category/algebras-forgetful.ts`
+- `fp-align.ts` → `src/legacy/align.ts`
+- `fp-anamorphisms.ts` → `src/category/anamorphisms.ts`
+- `fp-array-comodel-equivalence.ts` → `src/legacy/array-comodel-equivalence.ts`
+- `fp-array-extensions.ts` → `src/legacy/array-extensions.ts`
+- `fp-arrow-laws-glue.ts` → `src/arrow/arrow-laws-glue.ts`
+- `fp-arrowchoice-cokleisli.ts` → `src/arrow/arrowchoice-cokleisli.ts`
+- `fp-arrows-cokleisli-choice-cofree.ts` → `src/arrow/arrows-cokleisli-choice-cofree.ts`
+- `fp-arrows-cokleisli-choice.ts` → `src/arrow/arrows-cokleisli-choice.ts`
+- `fp-arrows-cokleisli.ts` → `src/arrow/arrows-cokleisli.ts`
+- `fp-arrows-kleisli-star.ts` → `src/arrow/arrows-kleisli-star.ts`
+- `fp-auto-derivation-complete.ts` → `src/legacy/auto-derivation-complete.ts`
+- `fp-auto-registration.ts` → `src/legacy/auto-registration.ts`
+- `fp-batanin-berger-tame-polynomial-monads.ts` → `src/legacy/batanin-berger-tame-polynomial-monads.ts`
+- `fp-bazaar-algebraic.examples.ts` → `src/optics/bazaar-algebraic.examples.ts`
+- `fp-bazaar-algebraic.ts` → `src/optics/bazaar-algebraic.ts`
+- `fp-bazaar-composition.examples.ts` → `src/optics/bazaar-composition.examples.ts`
+- `fp-bazaar-composition.ts` → `src/optics/bazaar-composition.ts`
+- `fp-bazaar-effects.ts` → `src/optics/bazaar-effects.ts`
+- `fp-bazaar-planner.ts` → `src/optics/bazaar-planner.ts`
+- `fp-bazaar-reified.ts` → `src/optics/bazaar-reified.ts`
+- `fp-bazaar-stream.ts` → `src/optics/bazaar-stream.ts`
+- `fp-bazaar-traversable-bridge.examples.ts` → `src/optics/bazaar-traversable-bridge.examples.ts`
+- `fp-bazaar-traversable-bridge.ts` → `src/optics/bazaar-traversable-bridge.ts`
+- `fp-beck-chevalley.ts` → `src/legacy/beck-chevalley.ts`
+- `fp-bimonad-extended.ts` → `src/legacy/bimonad-extended.ts`
+- `fp-cartesian-2-cells.ts` → `src/legacy/cartesian-2-cells.ts`
+- `fp-catamorphisms-demo.ts` → `src/category/catamorphisms-demo.ts`
+- `fp-catamorphisms.ts` → `src/category/catamorphisms.ts`
+- `fp-classify-sets.ts` → `src/legacy/classify-sets.ts`
+- `fp-closure.ts` → `src/legacy/closure.ts`
+- `fp-cochoice.ts` → `src/legacy/cochoice.ts`
+- `fp-cofree-async.ts` → `src/free/cofree-async.ts`
+- `fp-cofree-choice-uniform.ts` → `src/free/cofree-choice-uniform.ts`
+- `fp-cofree-comonad.ts` → `src/free/cofree-comonad.ts`
+- `fp-cofree-lazy-bfs-build.ts` → `src/free/cofree-lazy-bfs-build.ts`
+- `fp-cofree-lazy-iter.ts` → `src/free/cofree-lazy-iter.ts`
+- `fp-cofree-lazy-para.ts` → `src/free/cofree-lazy-para.ts`
+- `fp-cofree-lazy.ts` → `src/free/cofree-lazy.ts`
+- `fp-cokleisli-arrow-choice.ts` → `src/free/cokleisli-arrow-choice.ts`
+- `fp-cokleisli-cofree.ts` → `src/free/cokleisli-cofree.ts`
+- `fp-cokleisli.ts` → `src/free/cokleisli.ts`
+- `fp-colimit-distribution.ts` → `src/legacy/colimit-distribution.ts`
+- `fp-colimit-optimizations.ts` → `src/legacy/colimit-optimizations.ts`
+- `fp-colimit-runner.ts` → `src/legacy/colimit-runner.ts`
+- `fp-colimit-sequentializer.ts` → `src/legacy/colimit-sequentializer.ts`
+- `fp-commutative-applicative.ts` → `src/category/commutative-applicative.ts`
+- `fp-comodel-lawvere-theory.ts` → `src/lawvere/comodel-lawvere-theory.ts`
+- `fp-comonad-instances.ts` → `src/legacy/comonad-instances.ts`
+- `fp-comonadic-arrays-complete.ts` → `src/legacy/comonadic-arrays-complete.ts`
+- `fp-compact-closed-bicategories.ts` → `src/category/compact-closed-bicategories.ts`
+- `fp-comprehension-integration-polynomial-bridge.ts` → `src/legacy/comprehension-integration-polynomial-bridge.ts`
+- `fp-computational-topos-framework.ts` → `src/legacy/computational-topos-framework.ts`
+- `fp-cooperad-dg.examples.ts` → `src/legacy/cooperad-dg.examples.ts`
+- `fp-cooperad-dg.test.ts` → `src/legacy/cooperad-dg.test.ts`
+- `fp-cooperad-dg.ts` → `src/legacy/cooperad-dg.ts`
+- `fp-cooperad-trees.ts` → `src/legacy/cooperad-trees.ts`
+- `fp-cooperad-weights-extras.ts` → `src/legacy/cooperad-weights-extras.ts`
+- `fp-cooperad-weights.ts` → `src/legacy/cooperad-weights.ts`
+- `fp-cooperad.ts` → `src/legacy/cooperad.ts`
+- `fp-deformation-dgla-enhanced.ts` → `src/legacy/deformation-dgla-enhanced.ts`
+- `fp-deformation-dgla.ts` → `src/legacy/deformation-dgla.ts`
+- `fp-deformation-integration.ts` → `src/legacy/deformation-integration.ts`
+- `fp-deformation.examples.ts` → `src/legacy/deformation.examples.ts`
+- `fp-dense-class-yoneda-polynomial-bridge.ts` → `src/category/dense-class-yoneda-polynomial-bridge.ts`
+- `fp-dependent-types.ts` → `src/legacy/dependent-types.ts`
+- `fp-derivable-instances.ts` → `src/legacy/derivable-instances.ts`
+- `fp-derivable-purity.ts` → `src/effects/derivable-purity.ts`
+- `fp-derivation-helpers.ts` → `src/legacy/derivation-helpers.ts`
+- `fp-derived-category-infinity-bridge.ts` → `src/category/derived-category-infinity-bridge.ts`
+- `fp-dg-cooperad-integration.ts` → `src/legacy/dg-cooperad-integration.ts`
+- `fp-dg-cooperad.examples.ts` → `src/legacy/dg-cooperad.examples.ts`
+- `fp-dg-cooperad.ts` → `src/legacy/dg-cooperad.ts`
+- `fp-dg-core.ts` → `src/legacy/dg-core.ts`
+- `fp-do.ts` → `src/legacy/do.ts`
+- `fp-dot-stream-modules-complete.ts` → `src/stream/dot-stream-modules-complete.ts`
+- `fp-dot-stream-modules-simple.ts` → `src/stream/dot-stream-modules-simple.ts`
+- `fp-dot-stream-modules.ts` → `src/stream/dot-stream-modules.ts`
+- `fp-dot-style-stream-coordination.ts` → `src/legacy/dot-style-stream-coordination.ts`
+- `fp-double-category.ts` → `src/category/double-category.ts`
+- `fp-dual-api.ts` → `src/legacy/dual-api.ts`
+- `fp-effect-monads-complete.ts` → `src/effects/effect-monads-complete.ts`
+- `fp-effect-monads.ts` → `src/effects/effect-monads.ts`
+- `fp-effects-interop.ts` → `src/effects/effects-interop.ts`
+- `fp-either-classes.ts` → `src/data/either/either-classes.ts`
+- `fp-either-derivation.ts` → `src/data/either/either-derivation.ts`
+- `fp-either-hkt.ts` → `src/data/either/either-hkt.ts`
+- `fp-either-ops-table.ts` → `src/data/either/either-ops-table.ts`
+- `fp-either-register.ts` → `src/data/either/either-register.ts`
+- `fp-either-traversable.ts` → `src/data/either/either-traversable.ts`
+- `fp-either-unified.ts` → `src/data/either/either-unified.ts`
+- `fp-either.ts` → `src/data/either/either.ts`
+- `fp-enhanced-dual-api.ts` → `src/legacy/enhanced-dual-api.ts`
+- `fp-enrichment.spec.ts` → `src/legacy/enrichment.spec.ts`
+- `fp-enrichment.ts` → `src/legacy/enrichment.ts`
+- `fp-flat-species-catalan.ts` → `src/legacy/flat-species-catalan.ts`
+- `fp-fluent-adt-complete.ts` → `src/fluent/fluent-adt-complete.ts`
+- `fp-fluent-adt.ts` → `src/fluent/fluent-adt.ts`
+- `fp-fluent-api.ts` → `src/fluent/fluent-api.ts`
+- `fp-fluent-instance-methods.ts` → `src/fluent/fluent-instance-methods.ts`
+- `fp-fluent-methods.ts` → `src/fluent/fluent-methods.ts`
+- `fp-fluent-traverse.ts` → `src/fluent/fluent-traverse.ts`
+- `fp-free-applicative.ts` → `src/free/free-applicative.ts`
+- `fp-free-cofree-pairing.ts` → `src/free/free-cofree-pairing.ts`
+- `fp-free-monad-module.ts` → `src/free/free-monad-module.ts`
+- `fp-free.ts` → `src/free/free.ts`
+- `fp-freedman-topological-quantum-computation.ts` → `src/free/freedman-topological-quantum-computation.ts`
+- `fp-fromarray.ts` → `src/legacy/fromarray.ts`
+- `fp-frp-bridge.ts` → `src/legacy/frp-bridge.ts`
+- `fp-frp-fusion.ts` → `src/legacy/frp-fusion.ts`
+- `fp-gadt-enhanced.ts` → `src/legacy/gadt-enhanced.ts`
+- `fp-gadt-integrated-clean.ts` → `src/legacy/gadt-integrated-clean.ts`
+- `fp-gadt-integrated.ts` → `src/legacy/gadt-integrated.ts`
+- `fp-gadt-readonly-demo.ts` → `src/util/gadt-readonly-demo.ts`
+- `fp-gadt.ts` → `src/legacy/gadt.ts`
+- `fp-global-state-lawvere-theory.ts` → `src/lawvere/global-state-lawvere-theory.ts`
+- `fp-grothendieck-construction.ts` → `src/legacy/grothendieck-construction.ts`
+- `fp-grothendieck-fibrations-bijections.ts` → `src/legacy/grothendieck-fibrations-bijections.ts`
+- `fp-hkt-either-result-kinds.ts` → `src/legacy/hkt-either-result-kinds.ts`
+- `fp-hkt.ts` → `src/core/hkt.ts`
+- `fp-hoffnung-spans-tricategory-refactored.ts` → `src/category/hoffnung-spans-tricategory-refactored.ts`
+- `fp-hoffnung-spans-tricategory.ts` → `src/category/hoffnung-spans-tricategory.ts`
+- `fp-homotopy-ergonomics.examples.ts` → `src/homotopy/homotopy-ergonomics.examples.ts`
+- `fp-homotopy-ergonomics.ts` → `src/homotopy/homotopy-ergonomics.ts`
+- `fp-homotopy-type-theory-bridge.ts` → `src/homotopy/homotopy-type-theory-bridge.ts`
+- `fp-hylo.ts` → `src/legacy/hylo.ts`
+- `fp-hylomorphisms.ts` → `src/category/hylomorphisms.ts`
+- `fp-immutable.ts` → `src/core/immutable.ts`
+- `fp-infinity-functor-natural-transformation-bridge.ts` → `src/legacy/infinity-functor-natural-transformation-bridge.ts`
+- `fp-infinity-simplicial-operators.ts` → `src/homotopy/infinity-simplicial-operators.ts`
+- `fp-infinity-simplicial-polynomial-unification.ts` → `src/homotopy/infinity-simplicial-polynomial-unification.ts`
+- `fp-infinity-simplicial-sets.ts` → `src/homotopy/infinity-simplicial-sets.ts`
+- `fp-internal-logic.ts` → `src/legacy/internal-logic.ts`
+- `fp-khavkine-schreiber-categorical-foundations.ts` → `src/homotopy/khavkine-schreiber-categorical-foundations.ts`
+- `fp-khavkine-schreiber-formal-smooth-sets.ts` → `src/homotopy/khavkine-schreiber-formal-smooth-sets.ts`
+- `fp-khavkine-schreiber-jet-comonad.ts` → `src/homotopy/khavkine-schreiber-jet-comonad.ts`
+- `fp-khavkine-schreiber-pde-theory.ts` → `src/homotopy/khavkine-schreiber-pde-theory.ts`
+- `fp-khavkine-schreiber-synthetic-topos.ts` → `src/homotopy/khavkine-schreiber-synthetic-topos.ts`
+- `fp-khavkine-schreiber-topos-completion.ts` → `src/homotopy/khavkine-schreiber-topos-completion.ts`
+- `fp-kripke-joyal-satisfaction-polynomial-bridge.ts` → `src/homotopy/kripke-joyal-satisfaction-polynomial-bridge.ts`
+- `fp-laws-arrows.ts` → `src/legacy/laws-arrows.ts`
+- `fp-laws-optics.ts` → `src/legacy/laws-optics.ts`
+- `fp-laws.ts` → `src/legacy/laws.ts`
+- `fp-lifting-property.ts` → `src/legacy/lifting-property.ts`
+- `fp-linear-logic.ts` → `src/legacy/linear-logic.ts`
+- `fp-match-product.ts` → `src/legacy/match-product.ts`
+- `fp-material-shape-separation.ts` → `src/legacy/material-shape-separation.ts`
+- `fp-maybe-fluent.ts` → `src/data/maybe/maybe-fluent.ts`
+- `fp-maybe-hkt.ts` → `src/data/maybe/maybe-hkt.ts`
+- `fp-maybe-unified-enhanced.ts` → `src/data/maybe/maybe-unified-enhanced.ts`
+- `fp-maybe-unified.ts` → `src/data/maybe/maybe-unified.ts`
+- `fp-maybe.ts` → `src/data/maybe/maybe.ts`
+- `fp-mealy.ts` → `src/arrow/mealy.ts`
+- `fp-model-category-infinity-bridge.ts` → `src/category/model-category-infinity-bridge.ts`
+- `fp-model-sets.ts` → `src/legacy/model-sets.ts`
+- `fp-model-toy.spec.ts` → `src/legacy/model-toy.spec.ts`
+- `fp-monoidal-bridge.ts` → `src/category/monoidal-bridge.ts`
+- `fp-monoidal.ts` → `src/category/monoidal.ts`
+- `fp-monoids.ts` → `src/core/monoids.ts`
+- `fp-morphisms.ts` → `src/category/morphisms.ts`
+- `fp-nat.ts` → `src/core/nat.ts`
+- `fp-nishimura-synthetic-differential-homotopy.ts` → `src/homotopy/nishimura-synthetic-differential-homotopy.ts`
+- `fp-nishimura-weil-diffeology.ts` → `src/legacy/nishimura-weil-diffeology.ts`
+- `fp-normal-functors-slice.ts` → `src/legacy/normal-functors-slice.ts`
+- `fp-observable-lite.ts` → `src/stream/observable-lite.ts`
+- `fp-observable-optics.ts` → `src/stream/observable-optics.ts`
+- `fp-operad-cofree.ts` → `src/legacy/operad-cofree.ts`
+- `fp-optics-adapter.ts` → `src/optics/optics-adapter.ts`
+- `fp-optics-affine.ts` → `src/optics/optics-affine.ts`
+- `fp-optics-ambifibration.ts` → `src/optics/optics-ambifibration.ts`
+- `fp-optics-auto-derivation.ts` → `src/optics/optics-auto-derivation.ts`
+- `fp-optics-core - Copy.ts` → `src/optics/optics-core - Copy.ts`
+- `fp-optics-core.ts` → `src/optics/optics-core.ts`
+- `fp-optics-dialens-fibration.ts` → `src/optics/optics-dialens-fibration.ts`
+- `fp-optics-dialens.ts` → `src/optics/optics-dialens.ts`
+- `fp-optics-everywhere.ts` → `src/optics/optics-everywhere.ts`
+- `fp-optics-fib-vertcart.ts` → `src/optics/optics-fib-vertcart.ts`
+- `fp-optics-indexed - Copy.ts` → `src/optics/optics-indexed - Copy.ts`
+- `fp-optics-indexed.ts` → `src/optics/optics-indexed.ts`
+- `fp-optics-instances.ts` → `src/optics/optics-instances.ts`
+- `fp-optics-iso-helpers.ts` → `src/optics/optics-iso-helpers.ts`
+- `fp-optics-law-harness.examples.ts` → `src/optics/optics-law-harness.examples.ts`
+- `fp-optics-law-harness.ts` → `src/optics/optics-law-harness.ts`
+- `fp-optics-plens.ts` → `src/optics/optics-plens.ts`
+- `fp-optics-preoptic.ts` → `src/optics/optics-preoptic.ts`
+- `fp-optics-scheduler - Copy.ts` → `src/optics/optics-scheduler - Copy.ts`
+- `fp-optics-scheduler.ts` → `src/optics/optics-scheduler.ts`
+- `fp-optics-traversal.ts` → `src/optics/optics-traversal.ts`
+- `fp-optics.ts` → `src/optics/optics.ts`
+- `fp-option.ts` → `src/data/maybe/option.ts`
+- `fp-partial.ts` → `src/core/partial.ts`
+- `fp-pattern-guards.ts` → `src/legacy/pattern-guards.ts`
+- `fp-pattern-matching-ergonomics.ts` → `src/legacy/pattern-matching-ergonomics.ts`
+- `fp-pattern-matching-with-guards-complete-fixed.ts` → `src/legacy/pattern-matching-with-guards-complete-fixed.ts`
+- `fp-persistent-functionk-bridges.ts` → `src/legacy/persistent-functionk-bridges.ts`
+- `fp-persistent-hkt-gadt.ts` → `src/legacy/persistent-hkt-gadt.ts`
+- `fp-persistent-hkt.ts` → `src/legacy/persistent-hkt.ts`
+- `fp-persistent.ts` → `src/legacy/persistent.ts`
+- `fp-polynomial-2category.ts` → `src/polynomial/polynomial-2category.ts`
+- `fp-polynomial-calculus.ts` → `src/polynomial/polynomial-calculus.ts`
+- `fp-polynomial-characterizations.ts` → `src/polynomial/polynomial-characterizations.ts`
+- `fp-polynomial-degree.ts` → `src/polynomial/polynomial-degree.ts`
+- `fp-polynomial-distributive-laws.ts` → `src/polynomial/polynomial-distributive-laws.ts`
+- `fp-polynomial-foundations.ts` → `src/polynomial/polynomial-foundations.ts`
+- `fp-polynomial-functors.ts` → `src/polynomial/polynomial-functors.ts`
+- `fp-polynomial-monads.ts` → `src/polynomial/polynomial-monads.ts`
+- `fp-polynomial-topology.ts` → `src/polynomial/polynomial-topology.ts`
+- `fp-precise-categorical-types.ts` → `src/legacy/precise-categorical-types.ts`
+- `fp-presheaf-topos.ts` → `src/legacy/presheaf-topos.ts`
+- `fp-product-matchers.ts` → `src/legacy/product-matchers.ts`
+- `fp-profunctor-optics.ts` → `src/legacy/profunctor-optics.ts`
+- `fp-proof-nets-polynomial.ts` → `src/legacy/proof-nets-polynomial.ts`
+- `fp-punctured-cube.ts` → `src/legacy/punctured-cube.ts`
+- `fp-purity-combinators.ts` → `src/effects/purity-combinators.ts`
+- `fp-purity-pattern-matching.ts` → `src/effects/purity-pattern-matching.ts`
+- `fp-purity.ts` → `src/effects/purity.ts`
+- `fp-pushout.ts` → `src/legacy/pushout.ts`
+- `fp-quillen-equivalences.ts` → `src/legacy/quillen-equivalences.ts`
+- `fp-readonly-builder-demo.ts` → `src/util/readonly-builder-demo.ts`
+- `fp-readonly-patterns.ts` → `src/util/readonly-patterns.ts`
+- `fp-recursion-schemes-extra.ts` → `src/legacy/recursion-schemes-extra.ts`
+- `fp-registry-init.ts` → `src/util/registry-init.ts`
+- `fp-result-unified.ts` → `src/data/result/result-unified.ts`
+- `fp-result.ts` → `src/data/result/result.ts`
+- `fp-selective.ts` → `src/legacy/selective.ts`
+- `fp-semiring.ts` → `src/core/semiring.ts`
+- `fp-seven-equivalent-characterizations.ts` → `src/legacy/seven-equivalent-characterizations.ts`
+- `fp-sf-arrowchoice.ts` → `src/arrow/sf-arrowchoice.ts`
+- `fp-shapely-functors.ts` → `src/legacy/shapely-functors.ts`
+- `fp-sheaf-theory-topology.ts` → `src/legacy/sheaf-theory-topology.ts`
+- `fp-species-analytic.ts` → `src/legacy/species-analytic.ts`
+- `fp-stream-boundaries.ts` → `src/stream/stream-boundaries.ts`
+- `fp-stream-combinator-roles.ts` → `src/stream/stream-combinator-roles.ts`
+- `fp-stream-fusion.ts` → `src/stream/stream-fusion.ts`
+- `fp-stream-ops.ts` → `src/stream/stream-ops.ts`
+- `fp-stream-state.ts` → `src/stream/stream-state.ts`
+- `fp-synthetic-differential-geometry.ts` → `src/legacy/synthetic-differential-geometry.ts`
+- `fp-tambara-lawvere.ts` → `src/lawvere/tambara-lawvere.ts`
+- `fp-tangent-categories.ts` → `src/homotopy/tangent-categories.ts`
+- `fp-topological-quantum-field-theory.ts` → `src/homotopy/topological-quantum-field-theory.ts`
+- `fp-trampoline.ts` → `src/core/trampoline.ts`
+- `fp-traversal-shim.ts` → `src/legacy/traversal-shim.ts`
+- `fp-typeclass-optimization.ts` → `src/legacy/typeclass-optimization.ts`
+- `fp-typeclass-usage-derivation.ts` → `src/legacy/typeclass-usage-derivation.ts`
+- `fp-typeclasses-hkt.ts` → `src/legacy/typeclasses-hkt.ts`
+- `fp-typeclasses-hok.ts` → `src/legacy/typeclasses-hok.ts`
+- `fp-typeclasses-id.ts` → `src/legacy/typeclasses-id.ts`
+- `fp-typeclasses-std.ts` → `src/legacy/typeclasses-std.ts`
+- `fp-typeclasses-unified.ts` → `src/legacy/typeclasses-unified.ts`
+- `fp-typeclasses.ts` → `src/core/typeclasses.ts`
+- `fp-unified-adt-definition.ts` → `src/legacy/unified-adt-definition.ts`
+- `fp-unified-fluent-api.ts` → `src/legacy/unified-fluent-api.ts`
+- `fp-usage-integration.ts` → `src/legacy/usage-integration.ts`
+- `fp-variance-derivation.ts` → `src/legacy/variance-derivation.ts`
+- `fp-weil-algebras.ts` → `src/category/weil-algebras.ts`
+- `fp-wfs-set.ts` → `src/legacy/wfs-set.ts`
+- `fp-yoneda.ts` → `src/core/yoneda.ts`
+- `math/rational.ts` → `src/math/rational.ts`
+- `poly/index.ts` → `src/polynomial/index.ts`
+- `src/cofree/fp-cofree-compose-lift.ts` → `src/free/cofree-compose-lift.ts`
+- `src/cofree/fp-cofree-lift.ts` → `src/free/cofree-lift.ts`
+- `src/cofree/fp-cofree-tensor.ts` → `src/free/cofree-tensor.ts`
+- `src/fp-arrows-function.ts` → `src/arrow/arrows-function.ts`
+- `src/fp-arrows-kleisli.ts` → `src/arrow/arrows-kleisli.ts`
+- `src/fp-deconstruct.ts` → `src/legacy/deconstruct.ts`
+- `src/fp-fluent-adt-complete.ts` → `src/fluent/fluent-adt-complete.ts`
+- `src/fp-fluent-core.ts` → `src/fluent/fluent-core.ts`
+- `src/fp-fluent-instance-methods.ts` → `src/fluent/fluent-instance-methods.ts`
+- `src/fp-fluent.ts` → `src/fluent/fluent.ts`
+- `src/fp-gadt-readonly.ts` → `src/util/gadt-readonly.ts`
+- `src/fp-interrupt.ts` → `src/util/interrupt.ts`
+- `src/fp-laws-attach.ts` → `src/legacy/laws-attach.ts`
+- `src/fp-laws-core.ts` → `src/legacy/laws-core.ts`
+- `src/fp-laws-runner.ts` → `src/legacy/laws-runner.ts`
+- `src/fp-laws-suites.ts` → `src/legacy/laws-suites.ts`
+- `src/fp-mealy-cofree.ts` → `src/arrow/mealy-cofree.ts`
+- `src/fp-optics-codiagonal.ts` → `src/optics/optics-codiagonal.ts`
+- `src/fp-readonly-builder.ts` → `src/util/readonly-builder.ts`
+- `src/fp-readonly.ts` → `src/core/readonly.ts`
+- `src/fp-resource.ts` → `src/legacy/resource.ts`
+- `src/fp-stream-concurrent.ts` → `src/stream/stream-concurrent.ts`
+- `src/fp-stream-core.ts` → `src/stream/stream-core.ts`
+- `src/fp-stream-pull.ts` → `src/stream/stream-pull.ts`
+- `src/fp-stream-resource.ts` → `src/stream/stream-resource.ts`
+- `src/fp-typeclasses-arrows-new.ts` → `src/legacy/typeclasses-arrows-new.ts`
+- `src/fp-typeclasses-arrows.ts` → `src/legacy/typeclasses-arrows.ts`
+- `src/fp-witness-registry.ts` → `src/util/witness-registry.ts`
+- `src/recursion/fp-coalagra.ts` → `src/legacy/coalagra.ts`
+- `src/recursion/fp-coalgebra.ts` → `src/category/coalgebra.ts`
+- `trees/canonicalTree.ts` → `src/trees/canonicalTree.ts`
+- `trees/canonicalTreeLabeled.ts` → `src/trees/canonicalTreeLabeled.ts`
+- `trees/symmetryKey.ts` → `src/trees/symmetryKey.ts`
+
+## Import path updates
+- `__tests__/fp-cooperad-dg.spec.ts`: `../fp-cooperad-dg` → `legacy/cooperad-dg`
+- `__tests__/fp-cooperad-dg.spec.ts`: `../fp-cooperad-trees` → `legacy/cooperad-trees`
+- `__tests__/fp-cooperad-dg.spec.ts`: `../fp-dg-core` → `legacy/dg-core`
+- `bicategory/core.ts`: `../fp-hkt` → `core/hkt`
+- `bicategory/examples/profunctor-sum-monoidal.ts`: `../../fp-hkt` → `core/hkt`
+- `bicategory/examples/profunctor-sum-monoidal.ts`: `fp-hkt` → `core/hkt`
+- `bicategory/instances/function.ts`: `../../fp-hkt` → `core/hkt`
+- `bicategory/instances/profunctor-choice.ts`: `../../fp-hkt` → `core/hkt`
+- `bicategory/instances/profunctor.ts`: `../../fp-hkt` → `core/hkt`
+- `bicategory/laws.ts`: `../fp-hkt` → `core/hkt`
+- `bicategory/monoidal-laws.ts`: `../fp-hkt` → `core/hkt`
+- `bicategory/profunctor-bicategory.ts`: `../fp-hkt` → `core/hkt`
+- `example-after-migration.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `example-after-migration.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `example-after-migration.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `example-before-migration.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `example-before-migration.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `example-before-migration.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `example-usage.ts`: `./fp-typeclasses` → `core/typeclasses`
+- `fluent-usage-wrapper.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fluent-usage-wrapper.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-adjunction-core.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adjunction-core.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adjunction-framework.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-adjunction-free.ts`: `./fp-adjunction` → `category/adjunction`
+- `fp-adjunction-free.ts`: `./fp-algebras-forgetful` → `category/algebras-forgetful`
+- `fp-adjunction-free.ts`: `./fp-free` → `free/free`
+- `fp-adjunction-free.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adjunction-free.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adjunction-registry.ts`: `./fp-adjunction` → `category/adjunction`
+- `fp-adjunction-registry.ts`: `./fp-adjunction-free` → `category/adjunction-free`
+- `fp-adjunction-registry.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adjunction-registry.ts`: `./fp-laws` → `legacy/laws`
+- `fp-adjunction-registry.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-adjunction-registry.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adjunction.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adjunction.ts`: `./fp-nat` → `core/nat`
+- `fp-adjunction.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adt-builders-enhanced.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-adt-builders-enhanced.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adt-builders-enhanced.ts`: `./fp-purity` → `effects/purity`
+- `fp-adt-builders-with-guards.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-adt-builders-with-guards.ts`: `./fp-adt-builders-enhanced` → `legacy/adt-builders-enhanced`
+- `fp-adt-builders-with-guards.ts`: `./fp-pattern-guards` → `legacy/pattern-guards`
+- `fp-adt-builders.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-adt-builders.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adt-builders.ts`: `./fp-purity` → `effects/purity`
+- `fp-adt-builders.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-adt-builders.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-bimonad-extended` → `legacy/bimonad-extended`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-effect-monads` → `effects/effect-monads`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-adt-eq-ord-show-complete.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-adt-optics-simple.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-adt-optics-simple.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-adt-optics-simple.ts`: `./fp-optics-adapter` → `optics/optics-adapter`
+- `fp-adt-optics.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-adt-optics.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-adt-optics.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adt-optics.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-adt-optics.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-adt-optics.ts`: `./fp-optics-adapter` → `optics/optics-adapter`
+- `fp-adt-optics.ts`: `./fp-purity` → `effects/purity`
+- `fp-adt-optics.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-adt-optics.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adt-registry.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-adt-registry.ts`: `./fp-hkt` → `core/hkt`
+- `fp-adt-registry.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-adt-registry.ts`: `./fp-purity` → `effects/purity`
+- `fp-adt-registry.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-adt-registry.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-adt-registry.ts`: `./fp-typeclasses-std` → `legacy/typeclasses-std`
+- `fp-advanced-applications.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-advanced-dot-composition.ts`: `./fp-dot-stream-modules-complete` → `stream/dot-stream-modules-complete`
+- `fp-advanced-homotopy-type-theory.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-advanced-homotopy-type-theory.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-algebra.ts`: `./fp-free` → `free/free`
+- `fp-algebra.ts`: `./fp-hkt` → `core/hkt`
+- `fp-algebras-forgetful.ts`: `./fp-free` → `free/free`
+- `fp-algebras-forgetful.ts`: `./fp-hkt` → `core/hkt`
+- `fp-align.ts`: `./fp-hkt` → `core/hkt`
+- `fp-anamorphisms.ts`: `./fp-hkt` → `core/hkt`
+- `fp-array-comodel-equivalence.ts`: `./fp-global-state-lawvere-theory` → `lawvere/global-state-lawvere-theory`
+- `fp-array-comodel-equivalence.ts`: `./fp-hkt` → `core/hkt`
+- `fp-array-comodel-equivalence.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-arrow-laws-glue.ts`: `./fp-arrowchoice-cokleisli` → `arrow/arrowchoice-cokleisli`
+- `fp-arrow-laws-glue.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-arrow-laws-glue.ts`: `./fp-hkt` → `core/hkt`
+- `fp-arrow-laws-glue.ts`: `./fp-laws-arrows` → `legacy/laws-arrows`
+- `fp-arrow-laws-glue.ts`: `./fp-sf-arrowchoice` → `arrow/sf-arrowchoice`
+- `fp-arrowchoice-cokleisli.ts`: `./fp-cochoice` → `legacy/cochoice`
+- `fp-arrowchoice-cokleisli.ts`: `./fp-hkt` → `core/hkt`
+- `fp-arrows-cokleisli-choice-cofree.ts`: `./fp-arrows-cokleisli-choice` → `arrow/arrows-cokleisli-choice`
+- `fp-arrows-cokleisli-choice-cofree.ts`: `./fp-cofree-choice-uniform` → `free/cofree-choice-uniform`
+- `fp-arrows-cokleisli-choice-cofree.ts`: `./fp-free` → `free/free`
+- `fp-arrows-cokleisli-choice-cofree.ts`: `./fp-hkt` → `core/hkt`
+- `fp-arrows-cokleisli-choice-cofree.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-arrows-cokleisli-choice.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-arrows-cokleisli-choice.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-arrows-cokleisli-choice.ts`: `./fp-hkt` → `core/hkt`
+- `fp-arrows-cokleisli.ts`: `./fp-hkt` → `core/hkt`
+- `fp-arrows-kleisli-star.ts`: `./fp-hkt` → `core/hkt`
+- `fp-arrows-kleisli-star.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-arrows-kleisli-star.ts`: `./src/fp-typeclasses-arrows` → `legacy/typeclasses-arrows`
+- `fp-auto-derivation-complete.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-auto-derivation-complete.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-auto-registration.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-auto-registration.ts`: `./fp-hkt` → `core/hkt`
+- `fp-auto-registration.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-auto-registration.ts`: `./fp-typeclasses` → `core/typeclasses`
+- `fp-bazaar-algebraic.examples.ts`: `./fp-bazaar-algebraic` → `optics/bazaar-algebraic`
+- `fp-bazaar-algebraic.examples.ts`: `./fp-optics-iso-helpers` → `optics/optics-iso-helpers`
+- `fp-bazaar-algebraic.examples.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-algebraic.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-algebraic.ts`: `./fp-optics-iso-helpers` → `optics/optics-iso-helpers`
+- `fp-bazaar-algebraic.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-composition.examples.ts`: `./fp-bazaar-composition` → `optics/bazaar-composition`
+- `fp-bazaar-composition.examples.ts`: `./fp-optics-iso-helpers` → `optics/optics-iso-helpers`
+- `fp-bazaar-composition.examples.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-composition.ts`: `./fp-bazaar-reified` → `optics/bazaar-reified`
+- `fp-bazaar-composition.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-composition.ts`: `./fp-optics-iso-helpers` → `optics/optics-iso-helpers`
+- `fp-bazaar-composition.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-effects.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-bazaar-effects.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-effects.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-planner.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-bazaar-planner.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-planner.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-reified.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-reified.ts`: `./fp-optics-iso-helpers` → `optics/optics-iso-helpers`
+- `fp-bazaar-reified.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-stream.ts`: `./fp-bazaar-effects` → `optics/bazaar-effects`
+- `fp-bazaar-stream.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-bazaar-stream.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-stream.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-traversable-bridge.examples.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-bazaar-traversable-bridge.examples.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-traversable-bridge.examples.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-bazaar-traversable-bridge.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bazaar-traversable-bridge.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-beck-chevalley.ts`: `./fp-morphisms` → `category/morphisms`
+- `fp-bimonad-extended.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-bimonad-extended.ts`: `./fp-hkt` → `core/hkt`
+- `fp-bimonad-extended.ts`: `./fp-purity` → `effects/purity`
+- `fp-bimonad-extended.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-bimonad-extended.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cartesian-2-cells.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-catamorphisms-demo.ts`: `./fp-catamorphisms` → `category/catamorphisms`
+- `fp-catamorphisms-demo.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-catamorphisms-demo.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-catamorphisms-demo.ts`: `./src/fp-readonly` → `core/readonly`
+- `fp-catamorphisms.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-catamorphisms.ts`: `./fp-hkt` → `core/hkt`
+- `fp-catamorphisms.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-classify-sets.ts`: `./fp-model-sets` → `legacy/model-sets`
+- `fp-classify-sets.ts`: `./fp-wfs-set` → `legacy/wfs-set`
+- `fp-cochoice.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-async.ts`: `./fp-cofree-lazy` → `free/cofree-lazy`
+- `fp-cofree-async.ts`: `./fp-free` → `free/free`
+- `fp-cofree-async.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-async.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cofree-choice-uniform.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-cofree-choice-uniform.ts`: `./fp-free` → `free/free`
+- `fp-cofree-choice-uniform.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-choice-uniform.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cofree-comonad.ts`: `./fp-free` → `free/free`
+- `fp-cofree-comonad.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-comonad.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cofree-lazy-bfs-build.ts`: `./fp-cofree-lazy` → `free/cofree-lazy`
+- `fp-cofree-lazy-bfs-build.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-lazy-bfs-build.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cofree-lazy-iter.ts`: `./fp-cofree-lazy` → `free/cofree-lazy`
+- `fp-cofree-lazy-iter.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-lazy-iter.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cofree-lazy-para.ts`: `./fp-cofree-lazy` → `free/cofree-lazy`
+- `fp-cofree-lazy-para.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cofree-lazy.ts`: `./fp-free` → `free/free`
+- `fp-cofree-lazy.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cokleisli-arrow-choice.ts`: `./fp-cofree-comonad` → `free/cofree-comonad`
+- `fp-cokleisli-arrow-choice.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-cokleisli-arrow-choice.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-cokleisli-arrow-choice.ts`: `./fp-free` → `free/free`
+- `fp-cokleisli-arrow-choice.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cokleisli-arrow-choice.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cokleisli-cofree.ts`: `./fp-cofree-comonad` → `free/cofree-comonad`
+- `fp-cokleisli-cofree.ts`: `./fp-cokleisli` → `free/cokleisli`
+- `fp-cokleisli-cofree.ts`: `./fp-hkt` → `core/hkt`
+- `fp-cokleisli-cofree.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-cokleisli.ts`: `./fp-adjunction` → `category/adjunction`
+- `fp-cokleisli.ts`: `./fp-hkt` → `core/hkt`
+- `fp-colimit-distribution.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-colimit-runner.ts`: `./fp-colimit-sequentializer` → `legacy/colimit-sequentializer`
+- `fp-colimit-runner.ts`: `./fp-pushout` → `legacy/pushout`
+- `fp-commutative-applicative.ts`: `./fp-hkt` → `core/hkt`
+- `fp-commutative-applicative.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-comodel-lawvere-theory.ts`: `./fp-comonad-instances` → `legacy/comonad-instances`
+- `fp-comodel-lawvere-theory.ts`: `./fp-double-category` → `category/double-category`
+- `fp-comodel-lawvere-theory.ts`: `./fp-hkt` → `core/hkt`
+- `fp-comonad-instances.ts`: `./fp-hkt` → `core/hkt`
+- `fp-comonad-instances.ts`: `./fp-purity` → `effects/purity`
+- `fp-comonad-instances.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-comonadic-arrays-complete.ts`: `./fp-array-comodel-equivalence` → `legacy/array-comodel-equivalence`
+- `fp-comonadic-arrays-complete.ts`: `./fp-global-state-lawvere-theory` → `lawvere/global-state-lawvere-theory`
+- `fp-comonadic-arrays-complete.ts`: `./fp-hkt` → `core/hkt`
+- `fp-comonadic-arrays-complete.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-compact-closed-bicategories.ts`: `./fp-adjunction-framework` → `category/adjunction-framework`
+- `fp-compact-closed-bicategories.ts`: `./fp-double-category` → `category/double-category`
+- `fp-compact-closed-bicategories.ts`: `./fp-hkt` → `core/hkt`
+- `fp-comprehension-integration-polynomial-bridge.ts`: `./fp-free-monad-module` → `free/free-monad-module`
+- `fp-comprehension-integration-polynomial-bridge.ts`: `./fp-infinity-simplicial-sets` → `homotopy/infinity-simplicial-sets`
+- `fp-comprehension-integration-polynomial-bridge.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-computational-topos-framework.ts`: `./fp-internal-logic` → `legacy/internal-logic`
+- `fp-computational-topos-framework.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-cooperad-dg.examples.ts`: `./fp-cooperad-dg` → `legacy/cooperad-dg`
+- `fp-cooperad-dg.examples.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-dg.examples.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-cooperad-dg.test.ts`: `./fp-cooperad-dg` → `legacy/cooperad-dg`
+- `fp-cooperad-dg.test.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-dg.test.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-cooperad-dg.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-dg.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-dg.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-cooperad-weights-extras.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-weights-extras.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-weights-extras.ts`: `./fp-cooperad-weights` → `legacy/cooperad-weights`
+- `fp-cooperad-weights.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-weights.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad-weights.ts`: `./math/rational` → `math/rational`
+- `fp-cooperad-weights.ts`: `./trees/canonicalTree` → `trees/canonicalTree`
+- `fp-cooperad.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-cooperad.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-deformation-dgla-enhanced.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-deformation-dgla.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-deformation-integration.ts`: `./fp-cooperad-dg` → `legacy/cooperad-dg`
+- `fp-deformation-integration.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-deformation-integration.ts`: `./fp-deformation-dgla-enhanced` → `legacy/deformation-dgla-enhanced`
+- `fp-deformation-integration.ts`: `./fp-deformation-dgla-enhanced` → `legacy/deformation-dgla-enhanced`
+- `fp-deformation-integration.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-dense-class-yoneda-polynomial-bridge.ts`: `./fp-free-monad-module` → `free/free-monad-module`
+- `fp-dense-class-yoneda-polynomial-bridge.ts`: `./fp-infinity-simplicial-sets` → `homotopy/infinity-simplicial-sets`
+- `fp-dense-class-yoneda-polynomial-bridge.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-dense-class-yoneda-polynomial-bridge.ts`: `./fp-yoneda` → `core/yoneda`
+- `fp-dependent-types.ts`: `./fp-beck-chevalley` → `legacy/beck-chevalley`
+- `fp-dependent-types.ts`: `./fp-morphisms` → `category/morphisms`
+- `fp-derivable-instances.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-derivable-instances.ts`: `./fp-hkt` → `core/hkt`
+- `fp-derivable-instances.ts`: `./fp-immutable` → `core/immutable`
+- `fp-derivable-instances.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-derivable-instances.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-derivable-purity.ts`: `./fp-hkt` → `core/hkt`
+- `fp-derivable-purity.ts`: `./fp-purity` → `effects/purity`
+- `fp-derivable-purity.ts`: `./fp-purity-combinators` → `effects/purity-combinators`
+- `fp-derivable-purity.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-derivation-helpers.ts`: `./fp-hkt` → `core/hkt`
+- `fp-derivation-helpers.ts`: `./fp-typeclasses` → `core/typeclasses`
+- `fp-derived-category-infinity-bridge.ts`: `./fp-free-monad-module` → `free/free-monad-module`
+- `fp-derived-category-infinity-bridge.ts`: `./fp-infinity-simplicial-sets` → `homotopy/infinity-simplicial-sets`
+- `fp-derived-category-infinity-bridge.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-dg-cooperad-integration.ts`: `./fp-cooperad-dg` → `legacy/cooperad-dg`
+- `fp-dg-cooperad-integration.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-dg-cooperad-integration.ts`: `./fp-dg-cooperad` → `legacy/dg-cooperad`
+- `fp-dg-cooperad-integration.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-dg-cooperad.examples.ts`: `./fp-cooperad-trees` → `legacy/cooperad-trees`
+- `fp-dg-cooperad.examples.ts`: `./fp-dg-cooperad-integration` → `legacy/dg-cooperad-integration`
+- `fp-dg-cooperad.examples.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-dg-cooperad.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-do.ts`: `./fp-hkt` → `core/hkt`
+- `fp-do.ts`: `./fp-purity` → `effects/purity`
+- `fp-do.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-dot-style-stream-coordination.ts`: `./fp-colimit-sequentializer` → `legacy/colimit-sequentializer`
+- `fp-double-category.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-dual-api.ts`: `./fp-hkt` → `core/hkt`
+- `fp-dual-api.ts`: `./fp-typeclasses` → `core/typeclasses`
+- `fp-effect-monads-complete.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-effect-monads-complete.ts`: `./fp-dual-api` → `legacy/dual-api`
+- `fp-effect-monads-complete.ts`: `./fp-effects-interop` → `effects/effects-interop`
+- `fp-effect-monads-complete.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-effect-monads-complete.ts`: `./fp-hkt` → `core/hkt`
+- `fp-effect-monads.ts`: `./fp-effect-monads-complete` → `effects/effect-monads-complete`
+- `fp-effect-monads.ts`: `./fp-effect-monads-complete` → `effects/effect-monads-complete`
+- `fp-either-classes.ts`: `./fp-either-ops-table` → `data/either/either-ops-table`
+- `fp-either-classes.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-either-derivation.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-either-derivation.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-either-hkt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-either-hkt.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-either-ops-table.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-either-register.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-either-register.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-either-traversable.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-either-traversable.ts`: `./fp-hkt` → `core/hkt`
+- `fp-either-traversable.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-either-unified.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-either-unified.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-either-unified.ts`: `./fp-hkt` → `core/hkt`
+- `fp-either-unified.ts`: `./fp-hkt` → `core/hkt`
+- `fp-either-unified.ts`: `./fp-purity` → `effects/purity`
+- `fp-either-unified.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-either.ts`: `./fp-either-ops-table` → `data/either/either-ops-table`
+- `fp-either.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-enhanced-dual-api.ts`: `./fp-hkt` → `core/hkt`
+- `fp-enhanced-dual-api.ts`: `./fp-unified-fluent-api` → `legacy/unified-fluent-api`
+- `fp-enrichment.spec.ts`: `./fp-enrichment` → `legacy/enrichment`
+- `fp-flat-species-catalan.ts`: `./fp-species-analytic` → `legacy/species-analytic`
+- `fp-fluent-adt-complete.ts`: `./fp-adt-eq-ord-show-complete` → `legacy/adt-eq-ord-show-complete`
+- `fp-fluent-adt-complete.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-fluent-adt-complete.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-fluent-adt-complete.ts`: `./fp-maybe` → `data/maybe/maybe`
+- `fp-fluent-adt-complete.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-fluent-adt-complete.ts`: `./fp-result` → `data/result/result`
+- `fp-fluent-adt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-fluent-adt.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-fluent-adt.ts`: `./fp-typeclasses` → `core/typeclasses`
+- `fp-fluent-api.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-fluent-api.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-fluent-api.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-fluent-api.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-fluent-api.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-fluent-api.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-fluent-api.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-fluent-instance-methods.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-fluent-instance-methods.ts`: `./fp-fluent-adt-complete` → `fluent/fluent-adt-complete`
+- `fp-fluent-instance-methods.ts`: `./fp-maybe-unified-enhanced` → `data/maybe/maybe-unified-enhanced`
+- `fp-fluent-instance-methods.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-fluent-instance-methods.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-fluent-instance-methods.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-fluent-instance-methods.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-fluent-methods.ts`: `./fp-adt-registry` → `util/adt-registry`
+- `fp-fluent-methods.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-fluent-methods.ts`: `./fp-hkt` → `core/hkt`
+- `fp-fluent-methods.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-fluent-methods.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-fluent-methods.ts`: `./fp-purity` → `effects/purity`
+- `fp-fluent-methods.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-fluent-methods.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-fluent-traverse.ts`: `./fp-hkt` → `core/hkt`
+- `fp-fluent-traverse.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-free-applicative.ts`: `./fp-hkt` → `core/hkt`
+- `fp-free-applicative.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-free-cofree-pairing.ts`: `./fp-align` → `legacy/align`
+- `fp-free-cofree-pairing.ts`: `./fp-free` → `free/free`
+- `fp-free-cofree-pairing.ts`: `./fp-hkt` → `core/hkt`
+- `fp-free-cofree-pairing.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-free-monad-module.ts`: `./fp-hkt` → `core/hkt`
+- `fp-free-monad-module.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-free.ts`: `./fp-hkt` → `core/hkt`
+- `fp-free.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-freedman-topological-quantum-computation.ts`: `./fp-adjunction-framework` → `category/adjunction-framework`
+- `fp-freedman-topological-quantum-computation.ts`: `./fp-double-category` → `category/double-category`
+- `fp-fromarray.ts`: `./fp-hkt` → `core/hkt`
+- `fp-frp-bridge.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-frp-bridge.ts`: `./fp-optics` → `optics/optics`
+- `fp-frp-bridge.ts`: `./fp-purity` → `effects/purity`
+- `fp-frp-bridge.ts`: `./fp-stream-fusion` → `stream/stream-fusion`
+- `fp-frp-bridge.ts`: `./fp-stream-ops` → `stream/stream-ops`
+- `fp-frp-bridge.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-frp-fusion.ts`: `./fp-frp-bridge` → `legacy/frp-bridge`
+- `fp-frp-fusion.ts`: `./fp-stream-fusion` → `stream/stream-fusion`
+- `fp-frp-fusion.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-gadt-enhanced.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-gadt-enhanced.ts`: `./fp-hkt` → `core/hkt`
+- `fp-gadt-enhanced.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-gadt-integrated-clean.ts`: `./fp-anamorphisms` → `category/anamorphisms`
+- `fp-gadt-integrated-clean.ts`: `./fp-catamorphisms` → `category/catamorphisms`
+- `fp-gadt-integrated-clean.ts`: `./fp-gadt` → `legacy/gadt`
+- `fp-gadt-integrated-clean.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-gadt-integrated-clean.ts`: `./fp-hkt` → `core/hkt`
+- `fp-gadt-integrated-clean.ts`: `./fp-hylomorphisms` → `category/hylomorphisms`
+- `fp-gadt-integrated.ts`: `./fp-gadt-integrated-clean` → `legacy/gadt-integrated-clean`
+- `fp-gadt-integrated.ts`: `./fp-gadt-integrated-clean` → `legacy/gadt-integrated-clean`
+- `fp-gadt-readonly-demo.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-gadt-readonly-demo.ts`: `./fp-readonly-patterns` → `util/readonly-patterns`
+- `fp-gadt.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-gadt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-gadt.ts`: `./fp-purity` → `effects/purity`
+- `fp-gadt.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-global-state-lawvere-theory.ts`: `./fp-comodel-lawvere-theory` → `lawvere/comodel-lawvere-theory`
+- `fp-global-state-lawvere-theory.ts`: `./fp-double-category` → `category/double-category`
+- `fp-global-state-lawvere-theory.ts`: `./fp-hkt` → `core/hkt`
+- `fp-grothendieck-fibrations-bijections.ts`: `./fp-species-analytic` → `legacy/species-analytic`
+- `fp-hkt-either-result-kinds.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-hkt-either-result-kinds.ts`: `./fp-hkt` → `core/hkt`
+- `fp-hkt.ts`: `./fp-hkt-either-result-kinds` → `legacy/hkt-either-result-kinds`
+- `fp-hkt.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-hkt.ts`: `./fp-typeclasses` → `core/typeclasses`
+- `fp-hoffnung-spans-tricategory-refactored.ts`: `./fp-precise-categorical-types` → `legacy/precise-categorical-types`
+- `fp-hoffnung-spans-tricategory.ts`: `./fp-adjunction-framework` → `category/adjunction-framework`
+- `fp-hoffnung-spans-tricategory.ts`: `./fp-double-category` → `category/double-category`
+- `fp-homotopy-type-theory-bridge.ts`: `./fp-computational-topos-framework` → `legacy/computational-topos-framework`
+- `fp-homotopy-type-theory-bridge.ts`: `./fp-deformation-dgla-enhanced` → `legacy/deformation-dgla-enhanced`
+- `fp-homotopy-type-theory-bridge.ts`: `./fp-dependent-types` → `legacy/dependent-types`
+- `fp-homotopy-type-theory-bridge.ts`: `./fp-dg-core` → `legacy/dg-core`
+- `fp-hylo.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-hylo.ts`: `./fp-hkt` → `core/hkt`
+- `fp-hylo.ts`: `./fp-purity` → `effects/purity`
+- `fp-hylo.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-hylomorphisms.ts`: `./fp-anamorphisms` → `category/anamorphisms`
+- `fp-hylomorphisms.ts`: `./fp-catamorphisms` → `category/catamorphisms`
+- `fp-hylomorphisms.ts`: `./fp-gadt` → `legacy/gadt`
+- `fp-hylomorphisms.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-hylomorphisms.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-hylomorphisms.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-hylomorphisms.ts`: `./fp-hkt` → `core/hkt`
+- `fp-hylomorphisms.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-immutable.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-immutable.ts`: `./fp-hkt` → `core/hkt`
+- `fp-immutable.ts`: `./fp-purity` → `effects/purity`
+- `fp-immutable.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-infinity-functor-natural-transformation-bridge.ts`: `./fp-free-monad-module` → `free/free-monad-module`
+- `fp-infinity-functor-natural-transformation-bridge.ts`: `./fp-infinity-simplicial-sets` → `homotopy/infinity-simplicial-sets`
+- `fp-infinity-functor-natural-transformation-bridge.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-infinity-simplicial-operators.ts`: `./fp-hkt` → `core/hkt`
+- `fp-infinity-simplicial-operators.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-infinity-simplicial-polynomial-unification.ts`: `./fp-infinity-simplicial-operators` → `homotopy/infinity-simplicial-operators`
+- `fp-infinity-simplicial-polynomial-unification.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-infinity-simplicial-sets.ts`: `./fp-hkt` → `core/hkt`
+- `fp-infinity-simplicial-sets.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-internal-logic.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-khavkine-schreiber-categorical-foundations.ts`: `./fp-synthetic-differential-geometry` → `legacy/synthetic-differential-geometry`
+- `fp-khavkine-schreiber-formal-smooth-sets.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-khavkine-schreiber-formal-smooth-sets.ts`: `./fp-synthetic-differential-geometry` → `legacy/synthetic-differential-geometry`
+- `fp-khavkine-schreiber-jet-comonad.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-khavkine-schreiber-jet-comonad.ts`: `./fp-khavkine-schreiber-formal-smooth-sets` → `homotopy/khavkine-schreiber-formal-smooth-sets`
+- `fp-khavkine-schreiber-pde-theory.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-khavkine-schreiber-pde-theory.ts`: `./fp-khavkine-schreiber-formal-smooth-sets` → `homotopy/khavkine-schreiber-formal-smooth-sets`
+- `fp-khavkine-schreiber-pde-theory.ts`: `./fp-khavkine-schreiber-jet-comonad` → `homotopy/khavkine-schreiber-jet-comonad`
+- `fp-khavkine-schreiber-synthetic-topos.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-khavkine-schreiber-synthetic-topos.ts`: `./fp-khavkine-schreiber-formal-smooth-sets` → `homotopy/khavkine-schreiber-formal-smooth-sets`
+- `fp-khavkine-schreiber-synthetic-topos.ts`: `./fp-khavkine-schreiber-jet-comonad` → `homotopy/khavkine-schreiber-jet-comonad`
+- `fp-khavkine-schreiber-synthetic-topos.ts`: `./fp-khavkine-schreiber-pde-theory` → `homotopy/khavkine-schreiber-pde-theory`
+- `fp-khavkine-schreiber-topos-completion.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-khavkine-schreiber-topos-completion.ts`: `./fp-khavkine-schreiber-formal-smooth-sets` → `homotopy/khavkine-schreiber-formal-smooth-sets`
+- `fp-khavkine-schreiber-topos-completion.ts`: `./fp-khavkine-schreiber-jet-comonad` → `homotopy/khavkine-schreiber-jet-comonad`
+- `fp-khavkine-schreiber-topos-completion.ts`: `./fp-khavkine-schreiber-pde-theory` → `homotopy/khavkine-schreiber-pde-theory`
+- `fp-khavkine-schreiber-topos-completion.ts`: `./fp-khavkine-schreiber-synthetic-topos` → `homotopy/khavkine-schreiber-synthetic-topos`
+- `fp-kripke-joyal-satisfaction-polynomial-bridge.ts`: `./fp-free-monad-module` → `free/free-monad-module`
+- `fp-kripke-joyal-satisfaction-polynomial-bridge.ts`: `./fp-infinity-simplicial-sets` → `homotopy/infinity-simplicial-sets`
+- `fp-kripke-joyal-satisfaction-polynomial-bridge.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-kripke-joyal-satisfaction-polynomial-bridge.ts`: `./fp-yoneda` → `core/yoneda`
+- `fp-laws-arrows.ts`: `./fp-arrows-kleisli-star` → `arrow/arrows-kleisli-star`
+- `fp-laws-arrows.ts`: `./fp-bazaar-planner` → `optics/bazaar-planner`
+- `fp-laws-arrows.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-laws-arrows.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-laws-arrows.ts`: `./fp-hkt` → `core/hkt`
+- `fp-laws-arrows.ts`: `./fp-selective` → `legacy/selective`
+- `fp-laws-arrows.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-laws.ts`: `./fp-hkt` → `core/hkt`
+- `fp-laws.ts`: `./fp-laws-arrows` → `legacy/laws-arrows`
+- `fp-laws.ts`: `./fp-laws-arrows` → `legacy/laws-arrows`
+- `fp-laws.ts`: `./fp-nat` → `core/nat`
+- `fp-laws.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-lifting-property.ts`: `./fp-wfs-set` → `legacy/wfs-set`
+- `fp-lifting-property.ts`: `./fp-wfs-set` → `legacy/wfs-set`
+- `fp-linear-logic.ts`: `./fp-normal-functors-slice` → `legacy/normal-functors-slice`
+- `fp-linear-logic.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-maybe-fluent.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-maybe-fluent.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-maybe-hkt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-maybe-hkt.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-maybe-unified-enhanced.ts`: `./fp-adt-builders-enhanced` → `legacy/adt-builders-enhanced`
+- `fp-maybe-unified-enhanced.ts`: `./fp-hkt` → `core/hkt`
+- `fp-maybe-unified-enhanced.ts`: `./fp-purity` → `effects/purity`
+- `fp-maybe-unified-enhanced.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-maybe-unified.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-maybe-unified.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-maybe-unified.ts`: `./fp-hkt` → `core/hkt`
+- `fp-maybe-unified.ts`: `./fp-purity` → `effects/purity`
+- `fp-maybe-unified.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-maybe.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-mealy.ts`: `./fp-free` → `free/free`
+- `fp-mealy.ts`: `./fp-hkt` → `core/hkt`
+- `fp-mealy.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-model-category-infinity-bridge.ts`: `./fp-free-monad-module` → `free/free-monad-module`
+- `fp-model-category-infinity-bridge.ts`: `./fp-infinity-simplicial-sets` → `homotopy/infinity-simplicial-sets`
+- `fp-model-category-infinity-bridge.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-model-sets.ts`: `./fp-wfs-set` → `legacy/wfs-set`
+- `fp-model-toy.spec.ts`: `./fp-model-sets` → `legacy/model-sets`
+- `fp-model-toy.spec.ts`: `./fp-quillen-equivalences` → `legacy/quillen-equivalences`
+- `fp-model-toy.spec.ts`: `./fp-wfs-set` → `legacy/wfs-set`
+- `fp-monoidal-bridge.ts`: `./fp-hkt` → `core/hkt`
+- `fp-monoidal-bridge.ts`: `./fp-monoidal` → `category/monoidal`
+- `fp-monoidal-bridge.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-monoidal-bridge.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-monoidal.ts`: `./fp-hkt` → `core/hkt`
+- `fp-monoidal.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-monoids.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-monoids.ts`: `./fp-hkt` → `core/hkt`
+- `fp-monoids.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-monoids.ts`: `./fp-purity` → `effects/purity`
+- `fp-nat.ts`: `./fp-hkt` → `core/hkt`
+- `fp-nat.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-nishimura-synthetic-differential-homotopy.ts`: `./fp-dependent-types` → `legacy/dependent-types`
+- `fp-nishimura-synthetic-differential-homotopy.ts`: `./fp-homotopy-type-theory-bridge` → `homotopy/homotopy-type-theory-bridge`
+- `fp-nishimura-synthetic-differential-homotopy.ts`: `./fp-synthetic-differential-geometry` → `legacy/synthetic-differential-geometry`
+- `fp-nishimura-weil-diffeology.ts`: `./fp-synthetic-differential-geometry` → `legacy/synthetic-differential-geometry`
+- `fp-nishimura-weil-diffeology.ts`: `./fp-weil-algebras` → `category/weil-algebras`
+- `fp-normal-functors-slice.ts`: `./fp-species-analytic` → `legacy/species-analytic`
+- `fp-observable-lite.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-observable-lite.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-observable-lite.ts`: `./fp-frp-bridge` → `legacy/frp-bridge`
+- `fp-observable-lite.ts`: `./fp-hkt` → `core/hkt`
+- `fp-observable-lite.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-observable-lite.ts`: `./fp-purity` → `effects/purity`
+- `fp-observable-lite.ts`: `./fp-stream-fusion` → `stream/stream-fusion`
+- `fp-observable-lite.ts`: `./fp-stream-ops` → `stream/stream-ops`
+- `fp-observable-lite.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-observable-optics.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-observable-optics.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-observable-optics.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-observable-optics.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-operad-cofree.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-adapter.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-optics-adapter.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-optics-adapter.ts`: `./fp-optics-core` → `optics/optics-core`
+- `fp-optics-adapter.ts`: `./fp-optics-core` → `optics/optics-core`
+- `fp-optics-adapter.ts`: `./fp-result-unified` → `data/result/result-unified`
+- `fp-optics-adapter.ts`: `./fp-traversal-shim` → `legacy/traversal-shim`
+- `fp-optics-auto-derivation.ts`: `./fp-optics-adapter` → `optics/optics-adapter`
+- `fp-optics-dialens.ts`: `./fp-optics-fib-vertcart` → `optics/optics-fib-vertcart`
+- `fp-optics-dialens.ts`: `./fp-optics-fib-vertcart` → `optics/optics-fib-vertcart`
+- `fp-optics-everywhere.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-everywhere.ts`: `./fp-optics` → `optics/optics`
+- `fp-optics-everywhere.ts`: `./fp-optics-adapter` → `optics/optics-adapter`
+- `fp-optics-everywhere.ts`: `./fp-optics-traversal` → `optics/optics-traversal`
+- `fp-optics-indexed - Copy.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-indexed.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-instances.ts`: `./fp-optics` → `optics/optics`
+- `fp-optics-iso-helpers.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-iso-helpers.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-optics-law-harness.examples.ts`: `./fp-optics-law-harness` → `optics/optics-law-harness`
+- `fp-optics-plens.ts`: `./fp-optics-dialens` → `optics/optics-dialens`
+- `fp-optics-preoptic.ts`: `./fp-optics-dialens` → `optics/optics-dialens`
+- `fp-optics-scheduler - Copy.ts`: `./fp-bazaar-planner` → `optics/bazaar-planner`
+- `fp-optics-scheduler - Copy.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-optics-scheduler - Copy.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-scheduler - Copy.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-optics-scheduler - Copy.ts`: `./src/fp-resource` → `legacy/resource`
+- `fp-optics-scheduler - Copy.ts`: `./src/fp-stream-concurrent` → `stream/stream-concurrent`
+- `fp-optics-scheduler.ts`: `./fp-bazaar-planner` → `optics/bazaar-planner`
+- `fp-optics-scheduler.ts`: `./fp-bazaar-planner` → `optics/bazaar-planner`
+- `fp-optics-scheduler.ts`: `./fp-bazaar-traversable-bridge` → `optics/bazaar-traversable-bridge`
+- `fp-optics-scheduler.ts`: `./fp-hkt` → `core/hkt`
+- `fp-optics-scheduler.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-optics-scheduler.ts`: `./src/fp-resource` → `legacy/resource`
+- `fp-optics-scheduler.ts`: `./src/fp-stream-concurrent` → `stream/stream-concurrent`
+- `fp-optics-traversal.ts`: `./fp-traversal-shim` → `legacy/traversal-shim`
+- `fp-optics.ts`: `./fp-bazaar-reified` → `optics/bazaar-reified`
+- `fp-optics.ts`: `./fp-optics-ambifibration` → `optics/optics-ambifibration`
+- `fp-optics.ts`: `./fp-optics-core` → `optics/optics-core`
+- `fp-optics.ts`: `./fp-optics-dialens` → `optics/optics-dialens`
+- `fp-optics.ts`: `./fp-optics-everywhere` → `optics/optics-everywhere`
+- `fp-optics.ts`: `./fp-optics-fib-vertcart` → `optics/optics-fib-vertcart`
+- `fp-optics.ts`: `./fp-optics-instances` → `optics/optics-instances`
+- `fp-optics.ts`: `./fp-optics-plens` → `optics/optics-plens`
+- `fp-optics.ts`: `./fp-optics-preoptic` → `optics/optics-preoptic`
+- `fp-option.ts`: `./fp-hkt` → `core/hkt`
+- `fp-option.ts`: `./fp-maybe-unified` → `data/maybe/maybe-unified`
+- `fp-option.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-partial.ts`: `./fp-hkt` → `core/hkt`
+- `fp-pattern-guards.ts`: `./fp-adt-builders-enhanced` → `legacy/adt-builders-enhanced`
+- `fp-pattern-matching-ergonomics.ts`: `./fp-adt-registry` → `util/adt-registry`
+- `fp-pattern-matching-with-guards-complete-fixed.ts`: `./fp-pattern-matching-ergonomics` → `legacy/pattern-matching-ergonomics`
+- `fp-persistent-functionk-bridges.ts`: `./fp-hkt` → `core/hkt`
+- `fp-persistent-functionk-bridges.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-persistent-hkt-gadt.ts`: `./fp-derivable-instances` → `legacy/derivable-instances`
+- `fp-persistent-hkt-gadt.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-persistent-hkt-gadt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-persistent-hkt-gadt.ts`: `./fp-immutable` → `core/immutable`
+- `fp-persistent-hkt-gadt.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-persistent-hkt-gadt.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-persistent-hkt.ts`: `./fp-derivable-instances` → `legacy/derivable-instances`
+- `fp-persistent-hkt.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-persistent-hkt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-persistent-hkt.ts`: `./fp-immutable` → `core/immutable`
+- `fp-persistent-hkt.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-persistent-hkt.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-persistent.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-persistent.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-persistent.ts`: `./fp-hkt` → `core/hkt`
+- `fp-persistent.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-polynomial-2category.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-polynomial-calculus.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-polynomial-characterizations.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-polynomial-distributive-laws.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-polynomial-foundations.ts`: `./fp-polynomial-degree` → `polynomial/polynomial-degree`
+- `fp-polynomial-foundations.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-polynomial-monads.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-polynomial-topology.ts`: `./fp-polynomial-2category` → `polynomial/polynomial-2category`
+- `fp-polynomial-topology.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-product-matchers.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-profunctor-optics.ts`: `./fp-optics-adapter` → `optics/optics-adapter`
+- `fp-profunctor-optics.ts`: `./fp-optics-adapter` → `optics/optics-adapter`
+- `fp-purity-combinators.ts`: `./fp-hkt` → `core/hkt`
+- `fp-purity-combinators.ts`: `./fp-purity` → `effects/purity`
+- `fp-purity-combinators.ts`: `./fp-purity-pattern-matching` → `effects/purity-pattern-matching`
+- `fp-purity-combinators.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-purity-pattern-matching.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-purity-pattern-matching.ts`: `./fp-hkt` → `core/hkt`
+- `fp-purity-pattern-matching.ts`: `./fp-purity` → `effects/purity`
+- `fp-purity-pattern-matching.ts`: `./fp-purity-combinators` → `effects/purity-combinators`
+- `fp-purity-pattern-matching.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-purity.ts`: `./fp-bimonad-extended` → `legacy/bimonad-extended`
+- `fp-purity.ts`: `./fp-hkt` → `core/hkt`
+- `fp-purity.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-purity.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-quillen-equivalences.ts`: `./fp-model-sets` → `legacy/model-sets`
+- `fp-readonly-builder-demo.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-readonly-builder-demo.ts`: `./fp-readonly-patterns` → `util/readonly-patterns`
+- `fp-readonly-patterns.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-readonly-patterns.ts`: `./fp-immutable` → `core/immutable`
+- `fp-readonly-patterns.ts`: `./fp-persistent` → `legacy/persistent`
+- `fp-readonly-patterns.ts`: `./src/fp-gadt-readonly` → `util/gadt-readonly`
+- `fp-readonly-patterns.ts`: `./src/fp-readonly-builder` → `util/readonly-builder`
+- `fp-recursion-schemes-extra.ts`: `./fp-hkt` → `core/hkt`
+- `fp-result-unified.ts`: `./fp-adt-builders` → `legacy/adt-builders`
+- `fp-result-unified.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-result-unified.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-result-unified.ts`: `./fp-hkt` → `core/hkt`
+- `fp-result-unified.ts`: `./fp-purity` → `effects/purity`
+- `fp-result-unified.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-result.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-selective.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-selective.ts`: `./fp-either-unified` → `data/either/either-unified`
+- `fp-selective.ts`: `./fp-hkt` → `core/hkt`
+- `fp-selective.ts`: `./fp-option` → `data/maybe/option`
+- `fp-selective.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-seven-equivalent-characterizations.ts`: `./fp-normal-functors-slice` → `legacy/normal-functors-slice`
+- `fp-seven-equivalent-characterizations.ts`: `./fp-polynomial-characterizations` → `polynomial/polynomial-characterizations`
+- `fp-seven-equivalent-characterizations.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-seven-equivalent-characterizations.ts`: `./fp-presheaf-topos` → `legacy/presheaf-topos`
+- `fp-sf-arrowchoice.ts`: `./fp-hkt` → `core/hkt`
+- `fp-shapely-functors.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-sheaf-theory-topology.ts`: `./fp-species-analytic` → `legacy/species-analytic`
+- `fp-stream-boundaries.ts`: `./fp-hkt` → `core/hkt`
+- `fp-stream-boundaries.ts`: `./fp-purity` → `effects/purity`
+- `fp-stream-boundaries.ts`: `./fp-purity` → `effects/purity`
+- `fp-stream-fusion.ts`: `./fp-purity` → `effects/purity`
+- `fp-stream-fusion.ts`: `./fp-stream-boundaries` → `stream/stream-boundaries`
+- `fp-stream-ops.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-stream-ops.ts`: `./fp-purity` → `effects/purity`
+- `fp-stream-ops.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-stream-state.ts`: `./fp-hkt` → `core/hkt`
+- `fp-stream-state.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-stream-state.ts`: `./fp-purity` → `effects/purity`
+- `fp-stream-state.ts`: `./fp-stream-fusion` → `stream/stream-fusion`
+- `fp-stream-state.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-synthetic-differential-geometry.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `fp-tambara-lawvere.ts`: `./fp-species-analytic` → `legacy/species-analytic`
+- `fp-tangent-categories.ts`: `./fp-adjunction-framework` → `category/adjunction-framework`
+- `fp-tangent-categories.ts`: `./fp-double-category` → `category/double-category`
+- `fp-tangent-categories.ts`: `./fp-synthetic-differential-geometry` → `legacy/synthetic-differential-geometry`
+- `fp-topological-quantum-field-theory.ts`: `./fp-adjunction-framework` → `category/adjunction-framework`
+- `fp-topological-quantum-field-theory.ts`: `./fp-double-category` → `category/double-category`
+- `fp-trampoline.ts`: `./fp-cofree-lazy` → `free/cofree-lazy`
+- `fp-trampoline.ts`: `./fp-free` → `free/free`
+- `fp-trampoline.ts`: `./fp-hkt` → `core/hkt`
+- `fp-trampoline.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-traversal-shim.ts`: `./fp-optics-core` → `optics/optics-core`
+- `fp-typeclass-optimization.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclass-optimization.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-typeclasses-hkt.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-typeclasses-hkt.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses-hkt.ts`: `./fp-purity` → `effects/purity`
+- `fp-typeclasses-hok.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses-id.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses-std.ts`: `./fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `fp-typeclasses-std.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses-std.ts`: `./fp-hkt-either-result-kinds` → `legacy/hkt-either-result-kinds`
+- `fp-typeclasses-std.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-typeclasses-unified.ts`: `./fp-frp-bridge` → `legacy/frp-bridge`
+- `fp-typeclasses-unified.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses-unified.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-typeclasses-unified.ts`: `./fp-observable-lite` → `stream/observable-lite`
+- `fp-typeclasses-unified.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-typeclasses-unified.ts`: `./fp-stream-state` → `stream/stream-state`
+- `fp-typeclasses-unified.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `fp-typeclasses.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses.ts`: `./fp-hkt` → `core/hkt`
+- `fp-typeclasses.ts`: `./fp-hkt` → `core/hkt`
+- `fp-unified-adt-definition.ts`: `./fp-adt-builders-enhanced` → `legacy/adt-builders-enhanced`
+- `fp-unified-adt-definition.ts`: `./fp-auto-derivation-complete` → `legacy/auto-derivation-complete`
+- `fp-unified-adt-definition.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-unified-adt-definition.ts`: `./fp-fluent-api` → `fluent/fluent-api`
+- `fp-unified-adt-definition.ts`: `./fp-hkt` → `core/hkt`
+- `fp-unified-adt-definition.ts`: `./fp-optics-core` → `optics/optics-core`
+- `fp-unified-adt-definition.ts`: `./fp-purity` → `effects/purity`
+- `fp-unified-fluent-api.ts`: `./fp-hkt` → `core/hkt`
+- `fp-unified-fluent-api.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-unified-fluent-api.ts`: `./fp-registry-init` → `util/registry-init`
+- `fp-unified-fluent-api.ts`: `./fp-typeclass-optimization` → `legacy/typeclass-optimization`
+- `fp-usage-integration.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+- `fp-variance-derivation.ts`: `./fp-hkt` → `core/hkt`
+- `fp-yoneda.ts`: `./fp-hkt` → `core/hkt`
+- `fp-yoneda.ts`: `./fp-typeclasses-hkt` → `legacy/typeclasses-hkt`
+- `index.ts`: `./fp-classify-sets` → `legacy/classify-sets`
+- `index.ts`: `./fp-colimit-optimizations` → `legacy/colimit-optimizations`
+- `index.ts`: `./fp-colimit-runner` → `legacy/colimit-runner`
+- `index.ts`: `./fp-colimit-sequentializer` → `legacy/colimit-sequentializer`
+- `index.ts`: `./fp-dot-style-stream-coordination` → `legacy/dot-style-stream-coordination`
+- `index.ts`: `./fp-enrichment` → `legacy/enrichment`
+- `index.ts`: `./fp-grothendieck-construction` → `legacy/grothendieck-construction`
+- `index.ts`: `./fp-lifting-property` → `legacy/lifting-property`
+- `index.ts`: `./fp-model-sets` → `legacy/model-sets`
+- `index.ts`: `./fp-polynomial-degree` → `polynomial/polynomial-degree`
+- `index.ts`: `./fp-polynomial-foundations` → `polynomial/polynomial-foundations`
+- `index.ts`: `./fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `index.ts`: `./fp-punctured-cube` → `legacy/punctured-cube`
+- `index.ts`: `./fp-pushout` → `legacy/pushout`
+- `index.ts`: `./fp-quillen-equivalences` → `legacy/quillen-equivalences`
+- `index.ts`: `./fp-wfs-set` → `legacy/wfs-set`
+- `src/arrow/CoKleisliCategory.ts`: `../../fp-free` → `free/free`
+- `src/arrow/CoKleisliCategory.ts`: `fp-hkt` → `core/hkt`
+- `src/arrow/MealyPure.ts`: `fp-hkt` → `core/hkt`
+- `src/arrow/SFArrow.ts`: `../../fp-free` → `free/free`
+- `src/arrow/SFArrow.ts`: `fp-hkt` → `core/hkt`
+- `src/arrow/sfCategoryLawsBridge.ts`: `../../fp-laws-arrows` → `legacy/laws-arrows`
+- `src/bicategory/core.ts`: `fp-hkt` → `core/hkt`
+- `src/bicategory/examples/fromChoiceSumTensor.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/examples/fromChoiceSumTensor.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/examples/profunctor-sum-monoidal.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/instances/function.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/instances/profunctor-choice.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/instances/profunctor-choice.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/instances/profunctor.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/bicategory/laws.ts`: `fp-hkt` → `core/hkt`
+- `src/bicategory/monoidal-laws.ts`: `fp-hkt` → `core/hkt`
+- `src/bicategory/profunctor-bicategory.ts`: `fp-hkt` → `core/hkt`
+- `src/bicategory/profunctor-bicategory.ts`: `fp-hkt` → `core/hkt`
+- `src/cofree/fp-cofree-compose-lift.ts`: `../../fp-free` → `free/free`
+- `src/cofree/fp-cofree-compose-lift.ts`: `../../fp-hkt` → `core/hkt`
+- `src/cofree/fp-cofree-lift.ts`: `../../fp-free` → `free/free`
+- `src/cofree/fp-cofree-lift.ts`: `../../fp-hkt` → `core/hkt`
+- `src/cofree/fp-cofree-lift.ts`: `../../fp-nat` → `core/nat`
+- `src/cofree/fp-cofree-tensor.ts`: `../../fp-free` → `free/free`
+- `src/cofree/fp-cofree-tensor.ts`: `../../fp-hkt` → `core/hkt`
+- `src/fluent/fluent.ts`: `../../fp-hkt` → `core/hkt`
+- `src/fluent/typeclass-interfaces.ts`: `../../fp-hkt` → `core/hkt`
+- `src/fluent/typeclass-interfaces.ts`: `../../fp-typeclasses` → `core/typeclasses`
+- `src/fp-arrows-function.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-arrows-function.ts`: `./fp-typeclasses-arrows` → `legacy/typeclasses-arrows`
+- `src/fp-arrows-kleisli.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-arrows-kleisli.ts`: `./fp-typeclasses-arrows` → `legacy/typeclasses-arrows`
+- `src/fp-deconstruct.ts`: `../fp-immutable` → `core/immutable`
+- `src/fp-deconstruct.ts`: `../fp-persistent` → `legacy/persistent`
+- `src/fp-fluent-instance-methods.ts`: `../fp-effect-monads-complete` → `effects/effect-monads-complete`
+- `src/fp-fluent.ts`: `./fp-fluent-adt-complete` → `fluent/fluent-adt-complete`
+- `src/fp-fluent.ts`: `./fp-fluent-core` → `fluent/fluent-core`
+- `src/fp-gadt-readonly.ts`: `../fp-gadt-enhanced` → `legacy/gadt-enhanced`
+- `src/fp-gadt-readonly.ts`: `../fp-immutable` → `core/immutable`
+- `src/fp-laws-attach.ts`: `./fp-laws-core` → `legacy/laws-core`
+- `src/fp-laws-attach.ts`: `./fp-laws-suites` → `legacy/laws-suites`
+- `src/fp-laws-attach.ts`: `./fp-witness-registry` → `util/witness-registry`
+- `src/fp-laws-core.ts`: `./fp-witness-registry` → `util/witness-registry`
+- `src/fp-laws-runner.ts`: `./fp-laws-attach` → `legacy/laws-attach`
+- `src/fp-laws-suites.ts`: `./fp-laws-core` → `legacy/laws-core`
+- `src/fp-laws-suites.ts`: `./fp-laws-core` → `legacy/laws-core`
+- `src/fp-laws-suites.ts`: `./fp-witness-registry` → `util/witness-registry`
+- `src/fp-mealy-cofree.ts`: `../fp-free` → `free/free`
+- `src/fp-mealy-cofree.ts`: `fp-hkt` → `core/hkt`
+- `src/fp-optics-codiagonal.ts`: `../fp-either-unified` → `data/either/either-unified`
+- `src/fp-optics-codiagonal.ts`: `../fp-optics-core` → `optics/optics-core`
+- `src/fp-readonly-builder.ts`: `../fp-immutable` → `core/immutable`
+- `src/fp-readonly-builder.ts`: `../fp-persistent` → `legacy/persistent`
+- `src/fp-readonly.ts`: `./fp-deconstruct` → `legacy/deconstruct`
+- `src/fp-readonly.ts`: `./fp-gadt-readonly` → `util/gadt-readonly`
+- `src/fp-readonly.ts`: `./fp-readonly-builder` → `util/readonly-builder`
+- `src/fp-resource.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-stream-concurrent.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-stream-concurrent.ts`: `./fp-stream-core` → `stream/stream-core`
+- `src/fp-stream-core.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-stream-pull.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-stream-pull.ts`: `./fp-stream-core` → `stream/stream-core`
+- `src/fp-stream-resource.ts`: `./fp-resource` → `legacy/resource`
+- `src/fp-stream-resource.ts`: `./fp-stream-core` → `stream/stream-core`
+- `src/fp-stream-resource.ts`: `./fp-stream-core` → `stream/stream-core`
+- `src/fp-stream-resource.ts`: `./fp-stream-pull` → `stream/stream-pull`
+- `src/fp-stream-resource.ts`: `fp-hkt` → `core/hkt`
+- `src/fp-typeclasses-arrows-new.ts`: `../fp-hkt` → `core/hkt`
+- `src/fp-typeclasses-arrows.ts`: `../fp-hkt` → `core/hkt`
+- `src/optics/dialens-mod-sig.ts`: `../../fp-optics-dialens` → `optics/optics-dialens`
+- `src/profunctor/instances/profunctor-rel.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/recursion/fp-coalagra.ts`: `./fp-coalgebra` → `category/coalgebra`
+- `src/recursion/fp-coalgebra.ts`: `../../fp-hkt` → `core/hkt`
+- `src/sdg/integration/categorical-polynomial-bridge.ts`: `../../../fp-polynomial-functors` → `polynomial/polynomial-functors`
+- `src/sdg/integration/weil-differential-bridge.ts`: `../../../fp-weil-algebras` → `category/weil-algebras`
+- `src/stream/adapters/index.ts`: `../../../fp-either-unified` → `data/either/either-unified`
+- `src/stream/adapters/index.ts`: `../../../fp-maybe-unified` → `data/maybe/maybe-unified`
+- `src/stream/adapters/index.ts`: `../../../fp-observable-lite` → `stream/observable-lite`
+- `src/stream/core/types.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/stream/core/types.ts`: `../../../fp-purity` → `effects/purity`
+- `src/stream/multiplicity/registry.ts`: `../../../fp-hkt` → `core/hkt`
+- `src/stream/optics/types.ts`: `../../../fp-optics` → `optics/optics`
+- `test-sheafifiable-updates.ts`: `./fp-computational-topos-framework` → `legacy/computational-topos-framework`
+- `trees/symmetryKey.ts`: `./canonicalTreeLabeled` → `trees/canonicalTreeLabeled`
+- `trees/symmetryKey.ts`: `./canonicalTreeLabeled` → `trees/canonicalTreeLabeled`
+- `usageRegistry.ts`: `./fp-derivation-helpers` → `legacy/derivation-helpers`
+
+## Source files missing a corresponding spec.ts
+- `CoKleisliCategory.ts`
+- `MealyPure.ts`
+- `SFArrow.ts`
+- `SX.ts`
+- `adjunction-core.ts`
+- `adjunction-free.ts`
+- `adjunction-registry.ts`
+- `adjunction.ts`
+- `adt-builders-enhanced.ts`
+- `adt-builders-with-guards.ts`
+- `adt-builders.ts`
+- `adt-eq-ord-show-complete.ts`
+- `adt-optics-simple.ts`
+- `adt-optics.ts`
+- `adt-registry.ts`
+- `advanced-dot-composition.ts`
+- `advanced-type-system-examples.ts`
+- `algebra.ts`
+- `algebras-forgetful.ts`
+- `align.ts`
+- `anamorphisms.ts`
+- `array-extensions.ts`
+- `arrow-category.ts`
+- `arrow-laws-glue.ts`
+- `arrowchoice-cokleisli.ts`
+- `arrows-cokleisli-choice-cofree.ts`
+- `arrows-cokleisli-choice.ts`
+- `arrows-cokleisli.ts`
+- `arrows-function.ts`
+- `arrows-kleisli-star.ts`
+- `arrows-kleisli.ts`
+- `assert.ts`
+- `auto-derivation-complete.ts`
+- `auto-registration.ts`
+- `bazaar-algebraic.examples.ts`
+- `bazaar-algebraic.ts`
+- `bazaar-composition.examples.ts`
+- `bazaar-composition.ts`
+- `bazaar-effects.ts`
+- `bazaar-planner.ts`
+- `bazaar-reified.ts`
+- `bazaar-stream.ts`
+- `bazaar-traversable-bridge.examples.ts`
+- `bazaar-traversable-bridge.ts`
+- `beck-chevalley.ts`
+- `bimonad-extended.ts`
+- `brands.ts`
+- `canonicalTree.ts`
+- `canonicalTreeLabeled.ts`
+- `cart-dollar-T.ts`
+- `cartesian-to-qe.ts`
+- `catamorphisms-demo.ts`
+- `catamorphisms.ts`
+- `category-presentations.ts`
+- `chase-lkan.ts`
+- `chase.ts`
+- `classify-sets.ts`
+- `closure.ts`
+- `coalagra.ts`
+- `coalgebra.ts`
+- `cochoice.ts`
+- `cofree-async.ts`
+- `cofree-choice-uniform.ts`
+- `cofree-comonad.ts`
+- `cofree-compose-lift.ts`
+- `cofree-lazy-bfs-build.ts`
+- `cofree-lazy-iter.ts`
+- `cofree-lazy-para.ts`
+- `cofree-lazy.ts`
+- `cofree-lift.ts`
+- `cofree-tensor.ts`
+- `cofunctor.ts`
+- `cograph.ts`
+- `cokleisli-arrow-choice.ts`
+- `cokleisli-cofree.ts`
+- `cokleisli.ts`
+- `colimit-explicit.ts`
+- `colimit-optimizations.ts`
+- `colimit-runner.ts`
+- `colimit-sequentializer.ts`
+- `commutative-applicative.ts`
+- `composition.ts`
+- `cooperad-dg.examples.ts`
+- `cooperad-dg.test.ts`
+- `cooperad-dg.ts`
+- `cooperad-trees.ts`
+- `cooperad-weights-extras.ts`
+- `cooperad-weights.ts`
+- `cooperad.ts`
+- `core.ts`
+- `deconstruct.ts`
+- `definition.ts`
+- `deformation-dgla-enhanced.ts`
+- `deformation-dgla.ts`
+- `deformation-integration.ts`
+- `deformation.examples.ts`
+- `delta-p.ts`
+- `delta.ts`
+- `dependent-types.ts`
+- `derivable-instances.ts`
+- `derivable-purity.ts`
+- `derivation-helpers.ts`
+- `detection-functor.ts`
+- `dg-cooperad-integration.ts`
+- `dg-cooperad.examples.ts`
+- `dg-cooperad.ts`
+- `dg-core.ts`
+- `dialens-mod-sig.ts`
+- `do.ts`
+- `dot-stream-modules-complete.ts`
+- `dot-stream-modules-simple.ts`
+- `dot-stream-modules.ts`
+- `dot-style-stream-coordination.ts`
+- `double-zigzag.ts`
+- `dual-api.ts`
+- `duals.ts`
+- `duoidal.ts`
+- `edits.ts`
+- `effect-monads-complete.ts`
+- `effect-monads.ts`
+- `effects-interop.ts`
+- `either-classes.ts`
+- `either-derivation.ts`
+- `either-hkt.ts`
+- `either-ops-table.ts`
+- `either-register.ts`
+- `either-traversable.ts`
+- `either-unified.ts`
+- `either.ts`
+- `elementary-to-catsharp.ts`
+- `elementary.ts`
+- `elements-obF.ts`
+- `enhanced-dual-api.ts`
+- `enrichment.spec.ts`
+- `enrichment.ts`
+- `essentially-algebraic.ts`
+- `explicit-colim.ts`
+- `extensionality.ts`
+- `fibration.ts`
+- `finite-limit-and-coherent.ts`
+- `flat-species-catalan.ts`
+- `fluent-adt-complete.ts`
+- `fluent-adt.ts`
+- `fluent-api.ts`
+- `fluent-core.ts`
+- `fluent-instance-methods.ts`
+- `fluent-methods.ts`
+- `fluent-traverse.ts`
+- `fluent.ts`
+- `free-applicative.ts`
+- `free-cofree-pairing.ts`
+- `free-left-adjoint.ts`
+- `free-monad-module.ts`
+- `free.ts`
+- `fromChoiceSumTensor.ts`
+- `fromarray.ts`
+- `frp-bridge.ts`
+- `frp-fusion.ts`
+- `function-description.ts`
+- `function-objects.ts`
+- `function.ts`
+- `fusionReachability.ts`
+- `gadt-integrated-clean.ts`
+- `gadt-integrated.ts`
+- `gadt-readonly-demo.ts`
+- `gadt-readonly.ts`
+- `gadt.ts`
+- `generalized-morphism.ts`
+- `geometric-to-quillen.ts`
+- `graphs.ts`
+- `grothendieck-construction.ts`
+- `grothendieck-fibrations-bijections.ts`
+- `handler.ts`
+- `hkt-either-result-kinds.ts`
+- `hkt.ts`
+- `hoffnung-spans-tricategory-refactored.ts`
+- `hom-objects.ts`
+- `homomorphism.ts`
+- `homotopy-ergonomics.examples.ts`
+- `homotopy-ergonomics.ts`
+- `hylo.ts`
+- `hylomorphisms.ts`
+- `immutable.ts`
+- `index.ts`
+- `indexed-from-chased.ts`
+- `indexed-view.ts`
+- `interrupt.ts`
+- `jeff-smith-theorem.ts`
+- `khavkine-schreiber-categorical-foundations.ts`
+- `kindAliasMetadata.ts`
+- `kindAliasResolutionFix.ts`
+- `kindCache.ts`
+- `kindCheckerIntegration.ts`
+- `kindCheckerTimingFix.ts`
+- `kindComparison.ts`
+- `kindCompatibility.ts`
+- `kindConditionalTypeIntegration.ts`
+- `kindConstraintChecker.ts`
+- `kindConstraintInference.ts`
+- `kindConstraintPropagation.ts`
+- `kindDiagnosticAlias.ts`
+- `kindDiagnosticPositionHelper.ts`
+- `kindDiagnosticReporter.ts`
+- `kindDiagnostics.ts`
+- `kindExplain.ts`
+- `kindFPPatternDetection.ts`
+- `kindInference.ts`
+- `kindMetadata.ts`
+- `kindMetadataCentral.ts`
+- `kindPartialApplication.ts`
+- `kindPartialApplicationConfig.ts`
+- `kindPartialApplicationValidation.ts`
+- `kindScopeAnalysis.ts`
+- `kindTypeCache.ts`
+- `kindTypeFactory.ts`
+- `kindVariance.ts`
+- `laws-arrows.ts`
+- `laws-attach.ts`
+- `laws-core.ts`
+- `laws-optics.ts`
+- `laws-runner.ts`
+- `laws-suites.ts`
+- `laws.ts`
+- `lifting-property.ts`
+- `linear.ts`
+- `local-weak-equivalence.ts`
+- `match-product.ts`
+- `material-shape-separation.ts`
+- `maybe-fluent.ts`
+- `maybe-hkt.ts`
+- `maybe-unified-enhanced.ts`
+- `maybe-unified.ts`
+- `maybe.ts`
+- `mealy-cofree.ts`
+- `mealy.ts`
+- `mealyPureLawsBridge.ts`
+- `model-sets.ts`
+- `model-toy.spec.ts`
+- `monoidal-bridge.ts`
+- `monoidal-laws.ts`
+- `monoidal.ts`
+- `monoids.ts`
+- `monos-as-cofibrations.ts`
+- `morphisms.ts`
+- `nat.ts`
+- `necklace-replacement-functor.ts`
+- `necklace.ts`
+- `nerve.ts`
+- `normal-functors-slice.ts`
+- `npX.ts`
+- `observable-lite.ts`
+- `observable-optics.ts`
+- `operad-cofree.ts`
+- `operators.ts`
+- `optics-adapter.ts`
+- `optics-affine.ts`
+- `optics-ambifibration.ts`
+- `optics-auto-derivation.ts`
+- `optics-codiagonal.ts`
+- `optics-core - Copy.ts`
+- `optics-core.ts`
+- `optics-dialens-fibration.ts`
+- `optics-dialens.ts`
+- `optics-everywhere.ts`
+- `optics-fib-vertcart.ts`
+- `optics-indexed - Copy.ts`
+- `optics-indexed.ts`
+- `optics-instances.ts`
+- `optics-iso-helpers.ts`
+- `optics-law-harness.examples.ts`
+- `optics-law-harness.ts`
+- `optics-plens.ts`
+- `optics-preoptic.ts`
+- `optics-scheduler - Copy.ts`
+- `optics-scheduler.ts`
+- `optics-traversal.ts`
+- `optics.ts`
+- `option.ts`
+- `org-behavior.ts`
+- `org-to-catsharp.ts`
+- `org.ts`
+- `p-arrows.ts`
+- `partial-func.ts`
+- `partial-horn.ts`
+- `partial-maps.ts`
+- `partial.ts`
+- `pattern-guards.ts`
+- `pattern-matching-ergonomics.ts`
+- `pattern-matching-with-guards-complete-fixed.ts`
+- `persistent-functionk-bridges.ts`
+- `persistent-hkt-gadt.ts`
+- `persistent-hkt.ts`
+- `persistent.ts`
+- `phl-assume.ts`
+- `phl-categorical.ts`
+- `phl-kits.ts`
+- `phl-sequent.ts`
+- `polyE.ts`
+- `polycat-example.ts`
+- `polynomial-2category.ts`
+- `polynomial-calculus.ts`
+- `polynomial-degree.ts`
+- `polynomial-monads.ts`
+- `polynomial-topology.ts`
+- `polynomial.ts`
+- `prafunctor.ts`
+- `precise-categorical-types.ts`
+- `presheaf-to-sheaf.ts`
+- `presheaf-topos.ts`
+- `print-org-as-elementary.ts`
+- `product-matchers.ts`
+- `profunctor-bicategory.ts`
+- `profunctor-choice.ts`
+- `profunctor-optics.ts`
+- `profunctor-rel.ts`
+- `profunctor-sum-monoidal.ts`
+- `profunctor.ts`
+- `property-transfer-harness.ts`
+- `punctured-cube.ts`
+- `purity-combinators.ts`
+- `purity-pattern-matching.ts`
+- `purity.ts`
+- `pushout.ts`
+- `quasi-equationalize.ts`
+- `quasieq-cartesian-kits.ts`
+- `quillen-equivalence-target.ts`
+- `quillen-equivalences.ts`
+- `rational.ts`
+- `readonly-builder-demo.ts`
+- `readonly-builder.ts`
+- `readonly-patterns.ts`
+- `readonly.ts`
+- `recursion-schemes-extra.ts`
+- `registry-init.ts`
+- `registry.ts`
+- `regular-cartesian.ts`
+- `resource.ts`
+- `result-unified.ts`
+- `result.ts`
+- `sSet-in-topos.ts`
+- `selective.ts`
+- `semiring.ts`
+- `sf-arrowchoice.ts`
+- `sfCategoryLawsBridge.ts`
+- `sfLawsBridge.ts`
+- `sheaf-theory-topology.ts`
+- `sheafifiable-model-structure.ts`
+- `sheafifiable-syntax.ts`
+- `sig-morphism.ts`
+- `simplicial-colimit-pointwise.ts`
+- `simplicial-sheaves-homotopy.ts`
+- `small-object-argument.ts`
+- `solution-set.ts`
+- `span-to-catsharp.ts`
+- `spans.ts`
+- `species-analytic.ts`
+- `stream-boundaries.ts`
+- `stream-combinator-roles.ts`
+- `stream-concurrent.ts`
+- `stream-core.ts`
+- `stream-fusion.ts`
+- `stream-ops.ts`
+- `stream-pull.ts`
+- `stream-resource.ts`
+- `stream-state.ts`
+- `strings.ts`
+- `subobjects.ts`
+- `symmetryKey.ts`
+- `tambara-lawvere.ts`
+- `term-model.ts`
+- `th-of-C.ts`
+- `theorem-2_8-discovery.ts`
+- `to-catsharp.ts`
+- `trampoline.ts`
+- `traversal-shim.ts`
+- `typeclass-interfaces.ts`
+- `typeclass-optimization.ts`
+- `typeclass-usage-derivation.ts`
+- `typeclasses-arrows-new.ts`
+- `typeclasses-arrows.ts`
+- `typeclasses-hkt.ts`
+- `typeclasses-hok.ts`
+- `typeclasses-id.ts`
+- `typeclasses-std.ts`
+- `typeclasses-unified.ts`
+- `typeclasses.ts`
+- `types.ts`
+- `types2.ts`
+- `unified-adt-definition.ts`
+- `unified-fluent-api.ts`
+- `usage-integration.ts`
+- `variance-derivation.ts`
+- `wfs-set.ts`
+- `witness-registry.ts`
+- `yoneda.ts`
+- `zigzag-colimit.ts`
