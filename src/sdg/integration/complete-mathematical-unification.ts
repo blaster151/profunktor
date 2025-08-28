@@ -58,17 +58,33 @@ export interface CofreeComonad<F, A> {
 export function createFreeMonadModuleAction<F, A, B>(): FreeMonadModuleAction<F, A, B> {
   return {
     kind: 'FreeMonadModuleAction',
-    pattern: { type: 'Pure', value: {} as A },
-    matter: { extract: {} as B, extend: <C>(f: (a: B) => C) => ({ extract: f({} as B), extend: () => ({}) }) },
+    pattern: { type: 'Pure' as const, value: {} as A },
+    matter: { 
+      extract: {} as B, 
+      extend: function<C>(f: (a: B) => C): CofreeComonad<F, C> {
+        const self = this;
+        return {
+          extract: f({} as B),
+          extend: function<D>(g: (a: C) => D): CofreeComonad<F, D> {
+            return {
+              extract: g(f({} as B)),
+              extend: function<E>(h: (a: D) => E): CofreeComonad<F, E> {
+                return { extract: h(g(f({} as B))), extend: (() => {}) as any };
+              }
+            };
+          }
+        };
+      }
+    },
     
     moduleAction: (pattern: FreeMonad<F, A>, matter: CofreeComonad<F, B>): FreeMonad<F, [A, B]> => {
       // Ξ: Mp ⊗ Cq → Mp⊗q
-      return { type: 'Pure', value: [pattern.value!, matter.extract] };
+      return { type: 'Pure' as const, value: [pattern.value!, matter.extract] };
     },
     
     patternRunsOnMatter: (pattern: FreeMonad<F, A>, matter: CofreeComonad<F, B>): FreeMonad<F, [A, B]> => {
       // Pattern runs on matter via module action
-      return { type: 'Pure', value: [pattern.value!, matter.extract] };
+      return { type: 'Pure' as const, value: [pattern.value!, matter.extract] };
     }
   };
 }
@@ -397,7 +413,7 @@ export function createCompleteMathematicalUnification<A, B, R, X, F, W, I, J>(
     completeCrossSystemOperations: {
       sdgToFreeMonad: (sdgFormula: string) => {
         // SDG → Free Monad: Convert SDG formula to pattern
-        return { type: 'Pure', value: {} as A };
+        return { type: 'Pure' as const, value: {} as A };
       },
       
       freeMonadToAdjunction: (pattern: FreeMonad<F, A>) => {
@@ -422,7 +438,7 @@ export function createCompleteMathematicalUnification<A, B, R, X, F, W, I, J>(
       
       fullRevolutionaryCircle: (input: A) => {
         // Full revolutionary circle: SDG → Free Monad → Adjunction → Polynomial → Weil → SDG
-        const pattern = { type: 'Pure', value: input };
+        const pattern: FreeMonad<F, A> = { type: 'Pure' as const, value: input };
         const adjunction = adjunctionFramework.polyModAdjunction;
         const polynomial = polynomialDifferential.polynomialFunctor;
         const weil = weilFreeMonad.weilAlgebra;
@@ -447,8 +463,23 @@ export function createCompleteMathematicalUnification<A, B, R, X, F, W, I, J>(
       },
       
       patternMatterCoherence: (): boolean => {
-        const pattern = { type: 'Pure', value: {} as A };
-        const matter = { extract: {} as B, extend: <C>(f: (a: B) => C) => ({ extract: f({} as B), extend: () => ({}) }) };
+        const pattern: FreeMonad<F, A> = { type: 'Pure' as const, value: {} as A };
+        const matter: CofreeComonad<F, B> = { 
+          extract: {} as B, 
+          extend: function<C>(f: (a: B) => C): CofreeComonad<F, C> {
+            return {
+              extract: f({} as B),
+              extend: function<D>(g: (a: C) => D): CofreeComonad<F, D> {
+                return {
+                  extract: g(f({} as B)),
+                  extend: function<E>(h: (a: D) => E): CofreeComonad<F, E> {
+                    return { extract: h(g(f({} as B))), extend: (() => {}) as any };
+                  }
+                };
+              }
+            };
+          }
+        };
         const result = freeMonadModuleAction.patternRunsOnMatter(pattern, matter);
         return result.type === 'Pure' && result.value !== undefined;
       },
@@ -544,8 +575,23 @@ export function examplePatternRunsOnMatter() {
   const unification = createCompleteMathematicalUnification<number, number, number, string, string, string, string, string>(0, "test");
   
   // Create pattern and matter
-  const pattern: FreeMonad<string, number> = { type: 'Pure', value: 42 };
-  const matter: CofreeComonad<string, number> = { extract: 17, extend: <C>(f: (a: number) => C) => ({ extract: f(17), extend: () => ({}) }) };
+  const pattern: FreeMonad<string, number> = { type: 'Pure' as const, value: 42 };
+  const matter: CofreeComonad<string, number> = { 
+    extract: 17, 
+    extend: function<C>(f: (a: number) => C): CofreeComonad<string, C> {
+      return {
+        extract: f(17),
+        extend: function<D>(g: (a: C) => D): CofreeComonad<string, D> {
+          return {
+            extract: g(f(17)),
+            extend: function<E>(h: (a: D) => E): CofreeComonad<string, E> {
+              return { extract: h(g(f(17))), extend: (() => {}) as any };
+            }
+          };
+        }
+      };
+    }
+  };
   
   // Pattern runs on matter
   const result = unification.freeMonadModuleAction.patternRunsOnMatter(pattern, matter);
@@ -571,10 +617,25 @@ export function exampleRevolutionaryMathematicalComputation() {
     const sdgResult = unification.unifiedFramework.sdgInternalLogic.stageBasedKockLawvere.extractDerivative;
     
     // Step 2: Free monad pattern
-    const pattern: FreeMonad<string, number> = { type: 'Pure', value: input };
+    const pattern: FreeMonad<string, number> = { type: 'Pure' as const, value: input };
     
     // Step 3: Pattern runs on matter
-    const matter: CofreeComonad<string, number> = { extract: input * 2, extend: <C>(f: (a: number) => C) => ({ extract: f(input * 2), extend: () => ({}) }) };
+    const matter: CofreeComonad<string, number> = { 
+      extract: input * 2, 
+      extend: function<C>(f: (a: number) => C): CofreeComonad<string, C> {
+        return {
+          extract: f(input * 2),
+          extend: function<D>(g: (a: C) => D): CofreeComonad<string, D> {
+            return {
+              extract: g(f(input * 2)),
+              extend: function<E>(h: (a: D) => E): CofreeComonad<string, E> {
+                return { extract: h(g(f(input * 2))), extend: (() => {}) as any };
+              }
+            };
+          }
+        };
+      }
+    };
     const patternMatter = unification.freeMonadModuleAction.patternRunsOnMatter(pattern, matter);
     
     // Step 4: Adjunction framework

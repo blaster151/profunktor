@@ -119,7 +119,7 @@ export function createUnifiedMathematicalFramework<A, B, R, X>(
   const evaluationSystem = createCategoricalUnifiedEvaluation<A, B>({} as A, {} as B);
   
   // Phase 1.3: Create Weil Algebras ↔ Differential Forms components
-  const weilAlgebra = createWeilDifferentialAlgebra<A, B, R>(
+  const weilAlgebra = createWeilDifferentialAlgebra<A, R, R>(
     {
       kind: 'WeilAlgebra' as const,
       name: 'unified',
@@ -132,7 +132,7 @@ export function createUnifiedMathematicalFramework<A, B, R, X>(
     },
     baseRing
   );
-  const jetBridge = createJetDifferentialBridge<A, B>(weilAlgebra.jetBundle);
+  const jetBridge = createJetDifferentialBridge<A, B>(weilAlgebra.jetBundle as any);
   const algebraicGeometric = createAlgebraicGeometricUnification<A, B, R>(baseRing);
   
   const framework: UnifiedMathematicalFramework<A, B, R, X> = {
@@ -149,7 +149,7 @@ export function createUnifiedMathematicalFramework<A, B, R, X>(
     },
     
     weilDifferential: {
-      algebra: weilAlgebra,
+      algebra: weilAlgebra as any,
       jetBridge,
       algebraicGeometric
     },
@@ -158,31 +158,27 @@ export function createUnifiedMathematicalFramework<A, B, R, X>(
       sdgToCategorical: (sdgFormula: any) => {
         // Convert SDG formula to categorical operation
         // SDG satisfaction → categorical evaluation
-        const evalAsUnary = (f: (a: A) => B, a: A) => f(a);
-        return (a: A) => evalAsUnary(functorObject.unifiedEvaluation, a);
+        return functorObject.unifiedEvaluation;
       },
       
       categoricalToWeil: (categoricalOp: any) => {
         // Convert categorical operation to Weil algebra element
         // Categorical morphism → algebraic operation → differential form
-        const evalAsUnary = (f: (a: A) => B, a: A) => f(a);
-        return weilAlgebra.algebraicDifferentialForm((a: A) => evalAsUnary(categoricalOp, a));
+        return weilAlgebra.algebraicDifferentialForm(categoricalOp);
       },
       
       weilToSdg: (weilElement: any) => {
         // Convert Weil element back to SDG
         // Differential form → jet bundle → infinitesimal → SDG stage
         const jetForm = weilAlgebra.jetDifferentialForm(weilAlgebra.jetBundle);
-        const evalAsUnary = (f: (a: any) => R, a: any) => f(a);
-        return (a: any) => evalAsUnary(stageBasedKockLawvere.extractDerivative, a);
+        return stageBasedKockLawvere.extractDerivative;
       },
       
       fullCircle: (input: any) => {
         // Full circle: SDG → Categorical → Weil → SDG
-        const evalAsUnary = (f: (a: A) => B, a: A) => f(a);
-        const categorical = (a: A) => evalAsUnary(functorObject.unifiedEvaluation, a);
-        const weil = weilAlgebra.algebraicDifferentialForm(categorical);
-        const backToSdg = (a: any) => evalAsUnary(stageBasedKockLawvere.extractDerivative, a);
+        const categorical = functorObject.unifiedEvaluation;
+        const weil = weilAlgebra.algebraicDifferentialForm(categorical as any);
+        const backToSdg = stageBasedKockLawvere.extractDerivative;
         return backToSdg;
       }
     },
@@ -193,8 +189,7 @@ export function createUnifiedMathematicalFramework<A, B, R, X>(
           // Test that operations are consistent across systems
           const testInput = {} as any;
           const sdgResult = stageBasedKockLawvere.satisfiesAxiom;
-          const evalAsUnary = (f: (a: A) => B, a: A) => f(a);
-          const categoricalResult = (a: A) => evalAsUnary(functorObject.unifiedEvaluation, a);
+          const categoricalResult = functorObject.unifiedEvaluation;
           const weilResult = weilAlgebra.algebraicDifferentialForm;
           
           // All systems should be operational
@@ -236,7 +231,7 @@ export function createUnifiedMathematicalFramework<A, B, R, X>(
           const categoricalCoherent = exponentialBridge.coherenceCondition();
           
           // Phase 1.3 coherence
-          const weilCoherent = jetBridge.bridgeCondition(weilAlgebra.jetBundle);
+          const weilCoherent = jetBridge.bridgeCondition(weilAlgebra.jetBundle as any);
           
           return sdgCoherent && categoricalCoherent && weilCoherent;
         } catch {
@@ -327,8 +322,7 @@ export function createCrossSystemValidation<A, B, R, X>(
       categoricalWeilConsistency: (): boolean => {
         try {
           // Test Categorical → Weil conversion consistency
-          const evalAsUnary = (f: (a: any) => any, a: any) => f(a);
-          const categoricalOp = (a: any) => evalAsUnary(unifiedFramework.categoricalPolynomial.functorObject.unifiedEvaluation, a);
+          const categoricalOp = unifiedFramework.categoricalPolynomial.functorObject.unifiedEvaluation;
           const weilElement = unifiedFramework.crossSystemOperations.categoricalToWeil(categoricalOp);
           
           return weilElement !== undefined && typeof weilElement.form === 'function';
@@ -527,8 +521,7 @@ export function exampleRevolutionaryOperations() {
     const sdgStage = unified.sdgInternalLogic.stageBasedKockLawvere.extractDerivative;
     
     // Step 2: Categorical - Apply function composition
-    const evalAsUnary = (f: (a: number) => number, a: number) => f(a);
-    const categoricalComposition = (a: number) => evalAsUnary(unified.categoricalPolynomial.functorObject.unifiedComposition((x: number) => x * 2), a);
+    const categoricalComposition = unified.categoricalPolynomial.functorObject.unifiedComposition((x: number) => x * 2);
     
     // Step 3: Weil - Convert to differential form
     const differentialForm = unified.weilDifferential.algebra.algebraicDifferentialForm(categoricalComposition);

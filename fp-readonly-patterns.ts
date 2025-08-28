@@ -584,8 +584,11 @@ export function matchWithWildcard<T extends object, R>(
   
   const k = assertDefined(keys[0], "key required") as keyof T;
   const valueForKey = value[k];
-  const pattern = patterns[k] ?? patterns["_"];
-  return pattern?.(valueForKey as T[typeof k]) ?? patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
+  const pattern = patterns[k];
+  if (pattern) {
+    return pattern(valueForKey as any);
+  }
+  return patterns._?.(value) ?? (() => { throw new Error('No matching pattern'); })();
 }
 
 // ============================================================================
@@ -655,12 +658,17 @@ export function matchExhaustive<T extends object, R>(
   }
   
   const k = assertDefined(keys[0], "key required") as keyof T;
-  const handler = patterns[k] ?? patterns["_"];
-  if (!handler) {
-    return assertExhaustive(value as never);
+  const handler = patterns[k];
+  if (handler) {
+    return handler(value[k] as any);
   }
   
-  return handler(value[k] as T[typeof k]);
+  const wildcardHandler = patterns._;
+  if (wildcardHandler) {
+    return wildcardHandler(value);
+  }
+  
+  return assertExhaustive(value as never);
 }
 
 // ============================================================================
