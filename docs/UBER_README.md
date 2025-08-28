@@ -1,3 +1,64 @@
+## Introduction
+
+Profunktor is an opinionated TypeScript toolkit for writing compositional, law‑respecting software with the vocabulary of modern functional programming and category theory. If you’ve ever wanted the ergonomics of a fluent API, the guarantees of law‑checked typeclasses, and the reach of research‑grade abstractions (optics, recursion schemes, profunctors, monoidal/bicategorical structure, homotopy‑inspired bridges) in one coherent system, this project is that attempt—built for practical use today, not as a thought experiment.
+
+The core bet is simple: when you treat data types as algebraic objects (ADTs), effects as first‑class metadata (purity tags), and composition as the default mode of building programs, the incidental complexity of everyday code drops sharply while the headroom for advanced modeling rises. Everything else in this repo is in service of that bet: a unified ADT definition system; a registry that knows about typeclasses, purity, and usage; higher‑kinded types (HKT) and higher‑order kinds (HOK) that let algorithms stay generic; a profunctor‑based optics core; a stream layer that interops losslessly with ADTs and persistent collections; and a fluent API that never abandons the underlying laws.
+
+### What this is, in one sentence
+A compositional programming substrate where algebraic data types, typeclasses, optics, streams, and persistence share one consistent, law‑driven surface—so you can move ideas between theory and production code without rewriting them.
+
+### Why it exists
+- To bridge research and production: the same constructs used to reason about programs are the ones you ship.
+- To reduce glue code: one call defines an ADT and wires derivations, fluent methods, optics hooks, and registry metadata.
+- To keep codebases coherent: a single import surface, a single set of laws, and a single set of stories for composition.
+
+### Where it innovates (in practice, not just on paper)
+- Unified ADT definition: one entrypoint yields constructors, typeclass instances (derived), fluent methods, registry entries, and optic hooks—no scattered boilerplate.
+- Law‑aware registry: a central registry carries typeclass witnesses, purity tags (Pure/Async/IO/State), and even usage bounds for stream/optic integration. Composition consults this metadata.
+- HKT + HOK under one roof: HKTs for everyday generic programming; HOKs to treat type constructors as inputs/outputs of type‑level functions, enabling cross‑arity polymorphism and better reuse.
+- Profunctor optics as a first‑class citizen: Lens/Prism/Traversal are built on principled profunctor machinery and integrate with purity and streams.
+- Unified fluent API across domains: Maybe/Either/Result, ObservableLite/StatefulStream, and PersistentList/Map/Set share one fluent surface with lossless, type‑safe conversions.
+- Research‑grade modules in the open: bicategories, compact‑closed structure, polynomial functors, tangent categories, and homotopy bridges are present as real code, not isolated notes.
+
+### What it enables
+- Faster exploration: define a data type and immediately get lawful operations, optics, conversions, fluent ergonomics, and testable laws.
+- Vertical composability: move fluidly between persistent collections, streams, and ADTs without information loss or API cliff‑edges.
+- Safer refactors: a common law suite and a single registry make it obvious when a change violates intended algebraic behavior.
+- Design by laws: adopt the minimal algebra necessary (Functor → Applicative → Monad; Bifunctor/Profunctor where appropriate) and let the system enforce the rest.
+
+### What it can become
+- A programmable algebraic substrate for applications: richer effect systems, verified derivations, and deeper IDE support that understands laws and purity.
+- A plugin ecosystem: derivation plugins, optic dialects, stream schedulers, and topic‑specific kits (e.g., graph optics, probabilistic effects) registered into the same uniform surface.
+- A verified workbench: property‑based and law‑based testing wired from the registry, with coverage metrics tied to algebraic guarantees rather than only code branches.
+
+### A mental model
+Think “literate algebra” in TypeScript: you write with values and morphisms (data and functions), decorate them with minimal laws, and the system arranges fluent ergonomics and interoperable runtimes (optics, streams, persistence) around those guarantees. Composition is the primitive. Glue is the exception.
+
+### A quick storyline
+1) Define an ADT in one call. You immediately get Functor/Applicative/Monad (if requested), Eq/Ord/Show (where meaningful), fluent instance methods, registry metadata, and optic lenses/prisms when it makes sense.
+2) Use it in pipelines with other structures: persistent collections fold into streams, streams convert back to ADTs, and purity tags annotate the journey. Nothing is “special”; everything composes.
+3) Check the laws. Suites run via common helpers; failures point to either a buggy instance or a misapplied algebra.
+4) Scale up: swap traversals for optics, or stream combinators for batch transforms. The story does not change.
+
+### Principles guiding the code
+- Compositionality first: everything should compose—both at the value level and the type level.
+- Purity is data: treat effect information as metadata that informs composition and testing.
+- Laws over conventions: correctness flows from algebraic laws, not only from style guides.
+- Ergonomics without compromise: fluent methods are fine—so long as they’re lawful, typed, and interchangeable with data‑last functions.
+- Escape hatches exist: when you must drop to concrete code, do it knowingly and keep the algebra at the boundaries.
+
+### How to approach the repo
+- If you’re new to the type system: start with the type‑system foundations (HKT/HOK) to understand how generic algorithms stay reusable.
+- If you’re here for the API: read the unified fluent API overview, then the ADT/optics/stream sections, then the law/registry pieces.
+- If you’re experimenting: define an ADT, derive instances, and wire an optic; convert it through the stream layer and back; run the law suites.
+
+### Who this is for
+- FP engineers who want a principled but productive stack.
+- Researchers who want clean, executable artifacts for categorical structures.
+- Builders who want the readability of fluent APIs but refuse to give up algebraic guarantees.
+
+The rest of this document is a map—first the type‑system foundations that make the generic story real, then the capabilities and ergonomics you use day‑to‑day, and finally status and pointers for where to deepen your exploration.
+
 # Profunktor: Foundations, Capabilities, and Implementation Status
 
 This Uber-README orients new contributors quickly: what the system is, what you can build, the core type-system foundations, and current implementation status across modules.
