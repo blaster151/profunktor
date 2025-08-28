@@ -32,8 +32,8 @@ test("Org (linear) → Cat♯ respects composition boundaries and shows ⋉_midd
   const B2 = orgLinearToCatSharp(C2).bicomodule; // c@ ▷ cA
   const B12 = hcomp(B1, B2, Tools);              // c? ▷ cA
 
-  expect(B12.left.poly.name).toContain("c?");
-  expect(B12.right.poly.name).toContain("c@") || expect(B12.right.poly.name).toContain("cA");
+  expect(B12.left.poly.name).toBe("c?");
+  expect(B12.right.poly.name).toBe("c@");
   expect(B12.carrier.name).toContain("⋉_c@");
 });
 

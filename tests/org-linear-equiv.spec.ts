@@ -28,6 +28,6 @@ test("Composition on linear elementary side stays intact through Org packing", (
   const E = { from: Q, to: At, carrier: yS, onPos: (_)=> "@0", pull: (_)=> "a" };
   const I = identityElementary(Q);
   const comp = composeElementary(E, { from: At, to: At, carrier: yS, onPos: (_)=> "@1", pull: (_)=> "*" });
-  const E′ = linearElementaryFromOrg(orgFromLinearElementary(comp));
-  expect(E′.to.positions.includes("@1")).toBe(true);
+  const EPrime = linearElementaryFromOrg(orgFromLinearElementary(comp));
+  expect(EPrime.to.positions.includes("@1")).toBe(true);
 });

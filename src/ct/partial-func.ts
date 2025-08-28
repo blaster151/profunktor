@@ -15,11 +15,10 @@ const adapt = <A, D>(g: (d: D) => A): ((a: A) => A) => (a) => a;
 export const wave1ViaExists = <A,B,D extends A>(
   incl: (d:D)=>A, med: (d:D)=>B, a: (y:B)=>boolean
 ) => (x:A) => {
-  // Create the predicate function that matches Sub<A> signature
-  const predicate: Sub<A> = (x: A) => {
-    // Find d such that incl(d) = x, then check if a(med(d)) is true
-    // This is a simplified implementation - in practice you'd need to handle the inverse properly
-    return a(med(x as D));
+  // Create the predicate function that matches Sub<D> signature
+  const predicate: Sub<D> = (d: D) => {
+    // Check if a(med(d)) is true
+    return a(med(d));
   };
   return existsAlongMono(adapt(incl), predicate)(x);
 };

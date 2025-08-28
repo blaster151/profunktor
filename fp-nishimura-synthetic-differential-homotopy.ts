@@ -631,24 +631,24 @@ export function validateHomotopicalKockLawvereAxiom<W>(axiom: HomotopicalKockLaw
 
 export function validateSimplicialInfinitesimalTypes(simplicial: SimplicialInfinitesimalTypes): boolean {
   return simplicial.kind === 'SimplicialInfinitesimalTypes' &&
-         simplicial.baseType !== undefined &&
+         simplicial.baseInfinitesimal !== undefined &&
          simplicial.simplicialStructure !== undefined &&
-         simplicial.faceMaps !== undefined &&
-         simplicial.degeneracyMaps !== undefined;
+         simplicial.simplicialStructure.faceMaps !== undefined &&
+         simplicial.simplicialStructure.degeneracyMaps !== undefined;
 }
 
 export function validateUnitaryCommutativeRingAxiom(ring: UnitaryCommutativeRingAxiom): boolean {
   return ring.kind === 'UnitaryCommutativeRingAxiom' &&
-         ring.baseRing !== undefined &&
-         ring.unityElement !== undefined &&
-         typeof ring.multiplication === 'function';
+         ring.ringStructure !== undefined &&
+         ring.ringStructure.multiplication !== undefined &&
+         ring.ringStructure.unit !== undefined;
 }
 
 export function validateTypeTheoreticDerivative<A>(derivative: TypeTheoreticDerivative<A>): boolean {
   return derivative.kind === 'TypeTheoreticDerivative' &&
-         derivative.baseType !== undefined &&
-         derivative.derivativeFunction !== undefined &&
-         typeof derivative.derivativeFunction === 'function';
+         derivative.baseFunction !== undefined &&
+         derivative.derivative !== undefined &&
+         derivative.derivativeType !== undefined;
 }
 
 export function validateInfinitesimalTaylorExpansion(expansion: InfinitesimalTaylorExpansion): boolean {

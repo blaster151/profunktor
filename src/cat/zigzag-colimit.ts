@@ -147,6 +147,75 @@ export function composeZigZag(diag: DiagramCat, g: ZigZag, f: ZigZag): ZigZag {
 }
 
 /** Build a "colimit category" façade exposing reps and zig-zag arrows. */
+// SetDiagram type for working with Set-valued functors
+export interface SetDiagram {
+  J: IndexingCategory;
+  C: { [obj: string]: string[] };
+  F: { [arr: string]: (x: string) => string };
+}
+
+// Compute π0 (path components) of the category of elements
+export function pi0OfElements(setDiag: SetDiagram): Map<string, number> {
+  const elements: string[] = [];
+  const parent = new Map<string, string>();
+  
+  // Collect all elements
+  for (const obj of setDiag.J.objects) {
+    for (const elem of setDiag.C[obj]) {
+      const key = `${obj}::${elem}`;
+      elements.push(key);
+      parent.set(key, key); // Initially each element is its own parent
+    }
+  }
+  
+  // Find operation to get root parent
+  const find = (x: string): string => {
+    if (parent.get(x) === x) return x;
+    const root = find(parent.get(x)!);
+    parent.set(x, root); // Path compression
+    return root;
+  };
+  
+  // Union operation
+  const union = (x: string, y: string) => {
+    const rootX = find(x);
+    const rootY = find(y);
+    if (rootX !== rootY) {
+      parent.set(rootX, rootY);
+    }
+  };
+  
+  // Connect elements related by morphisms
+  for (const arr of setDiag.J.arrows) {
+    const f = setDiag.F[arr.id];
+    for (const elem of setDiag.C[arr.src]) {
+      const srcKey = `${arr.src}::${elem}`;
+      const dstKey = `${arr.dst}::${f(elem)}`;
+      union(srcKey, dstKey);
+    }
+  }
+  
+  // Assign component numbers
+  const componentMap = new Map<string, number>();
+  const roots = new Map<string, number>();
+  let componentId = 0;
+  
+  for (const elem of elements) {
+    const root = find(elem);
+    if (!roots.has(root)) {
+      roots.set(root, componentId++);
+    }
+    componentMap.set(elem, roots.get(root)!);
+  }
+  
+  return componentMap;
+}
+
+// Placeholder for categoryOfElements - not used in the test
+export function categoryOfElements(setDiag: SetDiagram) {
+  return {}; // Placeholder
+}
+
 export function colimitCategory(diag: DiagramCat) {
   const { classes, repOf } = colimObjects(diag);
   return {

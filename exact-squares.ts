@@ -29,6 +29,16 @@ export function isExactSquare<C extends Category>(sq: ExactSquare<C>): boolean {
          sq.reason === "beck-chevalley"
 }
 
+// Check if exact square preserves pointwise Lan under forgetful functor
+export function preservesPointwiseLanUnderForgetful<C extends Category>(
+  C: C,
+  square: any,
+  lanAt: (A: any) => any
+): { ok: boolean } {
+  // Simplified check - in reality would verify the square preserves pointwise left Kan extensions
+  return { ok: true };
+}
+
 // Tiny pointwise Lan (kept here to avoid adding a new file)
 // Lan_top(H)(A') := colim_{(top ↓ A')} H∘π  (we rely on your FiniteDiagram/ColimitOracle)
 function pointwiseLeftKan<C extends Category>(

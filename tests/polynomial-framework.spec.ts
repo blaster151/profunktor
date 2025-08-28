@@ -187,12 +187,6 @@ describe('Polynomial Framework', () => {
 
   describe('Exact Squares', () => {
     it('should check exact square properties', () => {
-      const square = {
-        tl: "obj1", tr: "obj2", bl: "obj3", br: "obj4",
-        top: "morphism1", right: "morphism2", left: "morphism3", bottom: "morphism4",
-        reason: "pullback-square" as const
-      }
-      
       const C = {
         unit: "unit",
         tensor: (x: any, y: any) => x,
@@ -201,7 +195,16 @@ describe('Polynomial Framework', () => {
         comp: (g: any, f: any) => "composite"
       }
       
-      expect(isExactSquare(C, square)).toBe(true)
+      const square = {
+        X: "obj1", Xp: "obj2", Y: "obj3", Yp: "obj4",
+        top: { apply: (x: any) => x } as any,
+        left: { apply: (x: any) => x } as any,
+        right: { apply: (x: any) => x } as any,
+        bot: { apply: (x: any) => x } as any,
+        reason: "pullback-square" as const
+      }
+      
+      expect(isExactSquare(square)).toBe(true)
     })
 
     it('should check pointwise Lan preservation', () => {
