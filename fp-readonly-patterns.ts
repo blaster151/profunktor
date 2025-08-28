@@ -34,6 +34,7 @@ import {
   Immutable, immutableArray
 } from './fp-immutable';
 import { assertDefined, isDefined } from './src/util/assert';
+import { Either, Left, Right } from './fp-either-unified';
 
 // ============================================================================
 // Part 1: Type Utilities for Readonly Pattern Matching
