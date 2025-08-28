@@ -42,7 +42,7 @@ import {
 
 import { ensureFPRegistry } from './fp-registry-init';
 import { FPKey, toFPKey } from './src/types/brands';
-import { assertDefined, isDefined } from './src/util/assert';
+import { assertDefined, isDefined, getRequired } from './src/util/assert';
 
 // ============================================================================
 // Type Definitions
@@ -478,7 +478,7 @@ export function createSumType<
     // Derive Ord instance
     if (derive.includes('Ord')) {
       derivedInstances.Ord = deriveOrdInstance({
-        customOrd: (a: SumTypeInstance<Spec>, b: SumTypeInstance<Spec>): number => {
+        customOrd: (a: NonNullable<SumTypeInstance<Spec>>, b: NonNullable<SumTypeInstance<Spec>>): number => {
           // First compare tags
           if (a.tag < b.tag) return -1;
           if (a.tag > b.tag) return 1;
@@ -489,8 +489,10 @@ export function createSumType<
           
           // Compare keys first
           for (let i = 0; i < Math.min(aKeys.length, bKeys.length); i++) {
-            if (aKeys[i] < bKeys[i]) return -1;
-            if (aKeys[i] > bKeys[i]) return 1;
+            const aKey = assertDefined(aKeys[i], "aKeys[i] required");
+            const bKey = assertDefined(bKeys[i], "bKeys[i] required");
+            if (aKey < bKey) return -1;
+            if (aKey > bKey) return 1;
           }
           
           if (aKeys.length < bKeys.length) return -1;
@@ -498,11 +500,12 @@ export function createSumType<
           
           // Compare values
           for (const key of aKeys) {
-            const aVal = assertDefined(a[key as keyof typeof a], `customOrd: a[${String(key)}] must be defined`);
-            const bVal = assertDefined(b[key as keyof typeof b], `customOrd: b[${String(key)}] must be defined`);
+            const k = assertDefined(key, "key required") as keyof typeof a;
+            const aValRaw = getRequired(a, k, `ADT: missing field ${String(k)}`);
+            const bValRaw = getRequired(b, k, `ADT: missing field ${String(k)}`);
             
-            if (aVal < bVal) return -1;
-            if (aVal > bVal) return 1;
+            if (aValRaw < bValRaw) return -1;
+            if (aValRaw > bValRaw) return 1;
           }
           
           return 0;
@@ -712,7 +715,7 @@ export function createProductType<
     // Derive Ord instance
     if (derive.includes('Ord')) {
       derivedInstances.Ord = deriveOrdInstance({
-        customOrd: (a: ProductTypeInstance<Fields>, b: ProductTypeInstance<Fields>): number => {
+        customOrd: (a: NonNullable<ProductTypeInstance<Fields>>, b: NonNullable<ProductTypeInstance<Fields>>): number => {
           const aKeys = Object.keys(a).sort();
           const bKeys = Object.keys(b).sort();
 
@@ -725,8 +728,9 @@ export function createProductType<
           if (aKeys.length > bKeys.length) return 1;
 
           for (const key of aKeys) {
-            const aVal = assertDefined(a[key as keyof typeof a], `customOrd: a[${String(key)}] must be defined`);
-            const bVal = assertDefined(b[key as keyof typeof b], `customOrd: b[${String(key)}] must be defined`);
+            const k = assertDefined(key, "key required") as keyof typeof a;
+            const aVal = getRequired(a, k, `customOrd: a[${String(k)}] must be defined`);
+            const bVal = getRequired(b, k, `customOrd: b[${String(k)}] must be defined`);
 
             if (aVal < bVal) return -1;
             if (aVal > bVal) return 1;

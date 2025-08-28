@@ -81,16 +81,16 @@ export const ArrayMonad: Monad<ArrayK> = {
 
 // Tuple (Kind2) - Bifunctor instance
 export const TupleBifunctor = <L>() => ({
-  bimap: (fab, f, g) => {
-    const [a, b] = fab as unknown as [any, any];
+  bimap: <A, B, C, D>(fab: Apply<TupleK, [A, B]>, f: (a: A) => C, g: (b: B) => D) => {
+    const [a, b] = fab as unknown as [A, B];
     return [f(a), g(b)] as any;
   },
-  mapLeft: (fab, f) => {
-    const [a, b] = fab as unknown as [any, any];
+  mapLeft: <A, B, C>(fab: Apply<TupleK, [A, B]>, f: (a: A) => C) => {
+    const [a, b] = fab as unknown as [A, B];
     return [f(a), b] as any;
   },
-  mapRight: (fab, g) => {
-    const [a, b] = fab as unknown as [any, any];
+  mapRight: <A, B, D>(fab: Apply<TupleK, [A, B]>, g: (b: B) => D) => {
+    const [a, b] = fab as unknown as [A, B];
     return [a, g(b)] as any;
   },
   __arity: 1

@@ -464,7 +464,7 @@ export function derivePurityAwareInstance<F>(
   return {
     instance,
     purity,
-    runtimeMarker
+    ...(runtimeMarker ? { runtimeMarker } : {})
   };
 }
 

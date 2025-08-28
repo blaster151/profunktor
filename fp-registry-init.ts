@@ -16,9 +16,9 @@ function createRegistry<V = unknown>(): FPRegistry<V> {
   return {
     store,
     derivable,
-    register: (key, value) => { store.set(key, value); },
-    get: <T extends V = V>(key) => store.get(key) as T | undefined,
-    has: (key) => store.has(key)
+    register: (key: FPKey, value: V) => { store.set(key, value); },
+    get: <T extends V = V>(key: FPKey) => store.get(key) as T | undefined,
+    has: (key: FPKey) => store.has(key)
   };
 }
 
@@ -127,13 +127,13 @@ export function getTypeclassInstance(name: string, tc: string): unknown {
   
   // Switch on typeclass name and return from derivable map
   switch (tc) {
-    case 'Functor': return (instances as Record<string, unknown>).Functor;
-    case 'Applicative': return (instances as Record<string, unknown>).Applicative;
-    case 'Monad': return (instances as Record<string, unknown>).Monad;
-    case 'Traversable': return (instances as Record<string, unknown>).Traversable;
-    case 'Bifunctor': return (instances as Record<string, unknown>).Bifunctor;
-    case 'Alternative': return (instances as Record<string, unknown>).Alternative;
-    case 'MonadError': return (instances as Record<string, unknown>).MonadError;
+          case 'Functor': return (instances as Record<string, unknown>)["Functor"];
+      case 'Applicative': return (instances as Record<string, unknown>)["Applicative"];
+      case 'Monad': return (instances as Record<string, unknown>)["Monad"];
+      case 'Traversable': return (instances as Record<string, unknown>)["Traversable"];
+      case 'Bifunctor': return (instances as Record<string, unknown>)["Bifunctor"];
+      case 'Alternative': return (instances as Record<string, unknown>)["Alternative"];
+      case 'MonadError': return (instances as Record<string, unknown>)["MonadError"];
     default: return (instances as Record<string, unknown>)[tc];
   }
 }

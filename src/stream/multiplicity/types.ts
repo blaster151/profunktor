@@ -26,6 +26,7 @@ export type Nat = number;
  * - "∞": unbounded/infinite usage
  */
 export type Multiplicity = Nat | "∞";
+export const InfinityMult: Multiplicity = "∞";
 
 /**
  * Usage function that can vary with the input type
@@ -194,14 +195,16 @@ export function multiplyUsageBounds<B>(
   outer: UsageBound<B>,
   inner: UsageBound<B>
 ): UsageBound<B> {
+  const maxUsage =
+    outer.maxUsage === "∞" || inner.maxUsage === "∞"
+      ? "∞"
+      : outer.maxUsage !== undefined && inner.maxUsage !== undefined
+      ? Math.min(outer.maxUsage, inner.maxUsage)
+      : outer.maxUsage ?? inner.maxUsage;
+  
   return {
     usage: (input: B) => multiply(inner.usage(input), outer.usage(input)),
-    maxUsage:
-      outer.maxUsage === "∞" || inner.maxUsage === "∞"
-        ? "∞"
-        : outer.maxUsage !== undefined && inner.maxUsage !== undefined
-        ? Math.min(outer.maxUsage, inner.maxUsage)
-        : outer.maxUsage ?? inner.maxUsage
+    ...(maxUsage !== undefined ? { maxUsage } : {})
   };
 }
 

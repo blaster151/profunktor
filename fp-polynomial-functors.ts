@@ -111,14 +111,9 @@ export const teaInterviewPolynomial: Polynomial<
 > = {
   positions: 'Tea?' as const,
   directions: (pos) => {
-    switch (pos) {
-      case 'Tea?':
-        return { 'Tea?': 'yes' as const, 'Kind?': 'green' as const };
-      case 'Kind?':
-        return { 'Tea?': 'no' as const, 'Kind?': 'black' as const };
-      default:
-        return { 'Tea?': 'yes' as const, 'Kind?': 'green' as const };
-    }
+    // Use the factory function instead of the function type
+    const m = mk(pos as QuestionKey);
+    return m;
   }
 };
 
@@ -347,8 +342,12 @@ export function moduleActionΞ<P extends Polynomial<any, any>, Q extends Polynom
  */
 export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPolynomial, string> {
   return suspendPolynomial('Tea?', (dir1) => {
+    // Use the factory function to get the proper type
+    const m1 = mk('Tea?' as QuestionKey);
     if (dir1['Tea?'] === 'yes') {
       return suspendPolynomial('Kind?', (dir2) => {
+        // Use the factory function to get the proper type
+        const m2 = mk('Kind?' as QuestionKey);
         return purePolynomial(`You chose ${dir2['Kind?']} tea!`);
       });
     } else {
@@ -362,16 +361,9 @@ export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPol
  */
 export function createTeaPerson(): CofreeComonadPolynomial<typeof teaInterviewPolynomial, string> {
   return cofreePolynomial('Alice', (question) => {
-    // Always return a full directions object matching the polynomial's directions for the given position.
-    // Example policy: prefers tea and defaults to green.
-    if (question === 'Tea?') {
-      return { 'Tea?': 'yes', 'Kind?': 'green' } as any;
-    }
-    if (question === 'Kind?') {
-      return { 'Tea?': 'yes', 'Kind?': 'green' } as any;
-    }
-    // Fallback (shouldn't be hit if positions are only 'Tea?' | 'Kind?')
-    return { 'Tea?': 'no', 'Kind?': 'green' } as any;
+    // Use the factory function instead of the function type
+    const m = mk(question as QuestionKey);
+    return m;
   });
 }
 

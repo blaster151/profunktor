@@ -374,8 +374,13 @@ export const sSetSheafifiableSpec: SheafifiableSpec<SimplicialMap> = {
   isLeftProper: true,
   isRightProper: true,
   isSimplicial: true,
-  ops: ( { lift: (_i,_p)=>undefined, pushout: (i)=>i, coproduct: (xs)=> (xs[0] ?? ({} as unknown as SimplicialMap)),
-          compose: (_g,f)=>f, idLike: (x)=>x } ) as unknown as CategoryOps<SimplicialMap>
+  ops: ( { 
+    lift: (_i: SimplicialMap, _p: SimplicialMap) => undefined, 
+    pushout: (i: SimplicialMap) => i, 
+    coproduct: (xs: SimplicialMap[]) => (xs[0] ?? ({} as unknown as SimplicialMap)),
+    compose: (_g: SimplicialMap, f: SimplicialMap) => f, 
+    idLike: (x: SimplicialMap) => x 
+  } ) as unknown as CategoryOps<SimplicialMap>
 };
 
 /**

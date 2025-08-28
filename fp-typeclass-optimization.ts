@@ -329,7 +329,11 @@ export const mapMapFusion: FusionRule = {
     const [map1, map2] = ops;
     if (!map1 || !map2) return ops[0] || ops[1] || { type: 'identity', fn: (x: any) => x, metadata: { isPure: true, hasSideEffects: false, complexity: 1, allocationCost: 0 }, dependencies: [], outputType: 'unknown' };
     
-    const composedFn = (x: any) => map2.fn(map1.fn(x));
+    const composedFn = (x: any) => {
+      const chosen1 = assertDefined(map1, "mapMapFusion: map1 required");
+      const chosen2 = assertDefined(map2, "mapMapFusion: map2 required");
+      return chosen2.fn(chosen1.fn(x));
+    };
     
     return {
       type: 'map',
@@ -363,8 +367,10 @@ export const mapFilterFusion: FusionRule = {
     if (!mapOp || !filterOp) return ops[0] || ops[1] || { type: 'identity', fn: (x: any) => x, metadata: { isPure: true, hasSideEffects: false, complexity: 1, allocationCost: 0 }, dependencies: [], outputType: 'unknown' };
     
     const filterMapFn = (x: any) => {
-      const mapped = mapOp.fn(x);
-      return filterOp.fn(mapped) ? mapped : undefined;
+      const chosenMapOp = assertDefined(mapOp, "mapFilterFusion: mapOp required");
+      const chosenFilterOp = assertDefined(filterOp, "mapFilterFusion: filterOp required");
+      const mapped = chosenMapOp.fn(x);
+      return chosenFilterOp.fn(mapped) ? mapped : undefined;
     };
     
     return {
@@ -398,7 +404,11 @@ export const filterFilterFusion: FusionRule = {
     const [filter1, filter2] = ops;
     if (!filter1 || !filter2) return ops[0] || ops[1] || { type: 'identity', fn: (x: any) => x, metadata: { isPure: true, hasSideEffects: false, complexity: 1, allocationCost: 0 }, dependencies: [], outputType: 'unknown' };
     
-    const combinedPredicate = (x: any) => filter1.fn(x) && filter2.fn(x);
+    const combinedPredicate = (x: any) => {
+      const chosenFilter1 = assertDefined(filter1, "filterFilterFusion: filter1 required");
+      const chosenFilter2 = assertDefined(filter2, "filterFilterFusion: filter2 required");
+      return chosenFilter1.fn(x) && chosenFilter2.fn(x);
+    };
     
     return {
       type: 'filter',
@@ -576,6 +586,7 @@ export const inliningOptimizationHook: OptimizationHook = {
     
     for (let i = 0; i < optimizedPipeline.length; i++) {
       const op = optimizedPipeline[i];
+      if (!op) continue;
       if (op.metadata.isPure && op.metadata.complexity <= 1) {
         const inlined = inlineFunction(op);
         if (inlined) {

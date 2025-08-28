@@ -5,6 +5,7 @@
 import { colimObjects, type DiagramCat } from "./zigzag-colimit";
 import { actRhoConcat, type DecoratedLR, type RhoGen } from "./double-zigzag";
 import { elementsPath, type ObFDiagram } from "./elements-obF";
+import { assertDefined } from "../util/assert";
 
 export type RepKey = string; // canonical representative "i::a"
 
@@ -64,7 +65,7 @@ export function explicitColimitC<Obj, Mor>(diag: DiagramCat) {
     for (const bead of lrChain) {
       if (trivial(bead)) continue;                  // (unital) drop
       if (out.length) {
-        const prev = out[out.length - 1];
+        const prev = assertDefined(out[out.length - 1], "normalizeChain: prev must be defined");
         // (transposition-ish collapse): if two consecutive beads only shuttle objects with ids and "id" legs, merge
         const justIds =
           prev.lId === "id" && prev.rId === "id" &&
@@ -123,8 +124,8 @@ export function explicitColimitC<Obj, Mor>(diag: DiagramCat) {
       }
     ): MorRep<Obj, Mor> => {
       // Extract the middle endpoints as elements (j,b) and (j',b')
-      const last1 = m1.dec.lrChain[m1.dec.lrChain.length - 1];
-      const first2 = m2.dec.lrChain[0];
+      const last1 = assertDefined(m1.dec.lrChain[m1.dec.lrChain.length - 1], "compose: last1 must be defined");
+      const first2 = assertDefined(m2.dec.lrChain[0], "compose: first2 must be defined");
       const left = { i: last1.j, a: (last1.b as any).id ?? String(last1.b) };
       const right = { i: first2.i, a: (first2.a as any).id ?? String(first2.a) };
       const J = diag.J;
@@ -135,7 +136,8 @@ export function explicitColimitC<Obj, Mor>(diag: DiagramCat) {
       // Turn the E(ObF) path into a chain of *identity-decorated* length-1 beads.
       const idBeads: DecoratedLR<string, Obj, Mor>[] = [];
       for (let t = 1; t < path.length; t++) {
-        const p = path[t - 1], q = path[t];
+        const p = assertDefined(path[t - 1], "compose: p must be defined");
+        const q = assertDefined(path[t], "compose: q must be defined");
         const ida = opts.idIn(p.i, ({ id: p.a } as unknown) as Obj);
         const idb = opts.idIn(q.i, ({ id: q.a } as unknown) as Obj);
         idBeads.push({

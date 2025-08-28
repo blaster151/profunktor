@@ -22,7 +22,7 @@ export function isEssentiallyAlgebraic(T: QETheoryEA): { ok: true; order: string
   // Build precedence graph from domain axioms s,t referencing function symbols
   const refs = new Map<string, Set<string>>();
   T.funcs.forEach(f => refs.set(f.name, new Set<string>()));
-  T.axions?.forEach?.(()=>{}); // guard for typos
+  T.axioms?.forEach?.(()=>{}); // guard for typos
   for (const a of T.axioms) {
     if (a.kind !== "domain" || !a.func) continue;
     const dep = (a.formula.match(/([A-Za-z_][A-Za-z0-9_]*)\(/g) ?? [])

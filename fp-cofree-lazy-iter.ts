@@ -30,7 +30,10 @@ export function* dfsLazy<F extends Kind1, A>(
 
     const kids = toArrayF(Fold, node.tail());
     // push right-to-left so we visit leftmost first
-    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    for (let i = kids.length - 1; i >= 0; i--) {
+      const t = assertDefined(kids[i], "cofree: tail required");
+      stack.push(t);
+    }
   }
 }
 

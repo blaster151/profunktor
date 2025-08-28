@@ -292,8 +292,18 @@ export function deriveEq<A>(config: DerivationConfig = {}): Eq<A> {
         return (a as any).match({
           Just: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Just: ({ value: bValue }: { value: unknown }) => {
-              // Safe comparison with type assertion
-              return (aValue as any) === (bValue as any);
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "boolean" && typeof bValue === "boolean") {
+                return aValue === bValue;
+              }
+              // For objects, use JSON comparison as fallback
+              return JSON.stringify(aValue) === JSON.stringify(bValue);
             },
             Nothing: () => false
           }),
@@ -303,22 +313,52 @@ export function deriveEq<A>(config: DerivationConfig = {}): Eq<A> {
           }),
           Left: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Left: ({ value: bValue }: { value: unknown }) => {
-              // Safe comparison with type assertion
-              return (aValue as any) === (bValue as any);
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "boolean" && typeof bValue === "boolean") {
+                return aValue === bValue;
+              }
+              // For objects, use JSON comparison as fallback
+              return JSON.stringify(aValue) === JSON.stringify(bValue);
             },
             Right: () => false
           }),
           Right: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Left: () => false,
             Right: ({ value: bValue }: { value: unknown }) => {
-              // Safe comparison with type assertion
-              return (aValue as any) === (bValue as any);
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "boolean" && typeof bValue === "boolean") {
+                return aValue === bValue;
+              }
+              // For objects, use JSON comparison as fallback
+              return JSON.stringify(aValue) === JSON.stringify(bValue);
             }
           }),
           Ok: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Ok: ({ value: bValue }: { value: unknown }) => {
-              // Safe comparison with type assertion
-              return (aValue as any) === (bValue as any);
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                return aValue === bValue;
+              }
+              if (typeof aValue === "boolean" && typeof bValue === "boolean") {
+                return aValue === bValue;
+              }
+              // For objects, use JSON comparison as fallback
+              return JSON.stringify(aValue) === JSON.stringify(bValue);
             },
             Err: () => false
           }),
@@ -369,10 +409,24 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
 
         // Then compare values
         return (a as any).match({
-          Just: ({ value: aValue }: { value: unknown }) => (b as any).match({
+                      Just: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Just: ({ value: bValue }: { value: unknown }) => {
-              if (aValue < bValue) return -1;
-              if (aValue > bValue) return 1;
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                if (aValue < bValue) return -1;
+                if (aValue > bValue) return 1;
+                return 0;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                if (aValue < bValue) return -1;
+                if (aValue > bValue) return 1;
+                return 0;
+              }
+              // For other types, use JSON comparison
+              const aStr = JSON.stringify(aValue);
+              const bStr = JSON.stringify(bValue);
+              if (aStr < bStr) return -1;
+              if (aStr > bStr) return 1;
               return 0;
             },
             Nothing: () => 1 // Just > Nothing
@@ -383,17 +437,45 @@ export function deriveOrd<A>(config: DerivationConfig = {}): Ord<A> {
           }),
           Left: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Left: ({ value: bValue }: { value: unknown }) => {
-              if (aValue < bValue) return -1;
-              if (aValue > bValue) return 1;
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                if (aValue < bValue) return -1;
+                if (aValue > bValue) return 1;
+                return 0;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                if (aValue < bValue) return -1;
+                if (aValue > bValue) return 1;
+                return 0;
+              }
+              // For other types, use JSON comparison
+              const aStr = JSON.stringify(aValue);
+              const bStr = JSON.stringify(bValue);
+              if (aStr < bStr) return -1;
+              if (aStr > bStr) return 1;
               return 0;
             },
             Right: () => -1 // Left < Right
           }),
-          Right: ({ value: aValue }: { value: unknown }) => (b as any).match({
+                      Right: ({ value: aValue }: { value: unknown }) => (b as any).match({
             Left: () => 1, // Right > Left
             Right: ({ value: bValue }: { value: unknown }) => {
-              if (aValue < bValue) return -1;
-              if (aValue > bValue) return 1;
+              // Safe comparison with type narrowing
+              if (typeof aValue === "number" && typeof bValue === "number") {
+                if (aValue < bValue) return -1;
+                if (aValue > bValue) return 1;
+                return 0;
+              }
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                if (aValue < bValue) return -1;
+                if (aValue > bValue) return 1;
+                return 0;
+              }
+              // For other types, use JSON comparison
+              const aStr = JSON.stringify(aValue);
+              const bStr = JSON.stringify(bValue);
+              if (aStr < bStr) return -1;
+              if (aStr > bStr) return 1;
               return 0;
             }
           }),

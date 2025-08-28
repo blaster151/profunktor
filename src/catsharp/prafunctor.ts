@@ -4,6 +4,7 @@
 // Arrow-action can be added once you feed the bicomodule's left coaction maps.  :contentReference[oaicite:4]{index=4}
 
 import type { SmallCat, Morph, Obj } from "./cofunctor";
+import { assertString } from "../util/strings";
 
 // -------- Copresheaves on a small category C (functors C → Set) ----------------
 export interface Copresheaf<C extends SmallCat = SmallCat> {
@@ -56,10 +57,11 @@ export function natTransformations<C extends SmallCat>(
       return;
     }
     const x = objs[i];
-    const funcs = funsPerObj.get(x);
+    const xStr = x ? assertString(x, "natTransformations: x must be a string") : "";
+    const funcs = funsPerObj.get(xStr);
     if (funcs) {
       for (const f of funcs) {
-        acc[x] = f;
+        acc[xStr] = f;
         backtrack(i + 1, acc);
       }
     }
@@ -104,11 +106,13 @@ export function applyPra<Left extends SmallCat, Right extends SmallCat>(
 
 /** Representable copresheaf y(x) for object x in category C. */
 export function representable<C extends SmallCat>(C: C, x: string): Copresheaf<C> {
+  const xStr = assertString(x, "representable: x must be a string");
   return {
     onObj: (y: string) => {
+      const yStr = assertString(y, "representable: y must be a string");
       // y(x)(y) = C(x,y) - the set of morphisms from x to y
       return C.morphisms
-        .filter(m => m.src === x && m.dst === y)
+        .filter(m => m.src === xStr && m.dst === yStr)
         .map(m => m.id);
     },
     onMor: (m: { id: string; src: string; dst: string }) => (f: string) => {
@@ -162,8 +166,14 @@ export function externalProduct<C extends SmallCat, D extends SmallCat>(
       if (!x || !y || !xPrime || !yPrime) return ab;
       
       // Apply F and G morphisms
-      const aPrime = F.onMor({ id: "temp", src: x, dst: xPrime })(a);
-      const bPrime = G.onMor({ id: "temp", src: y, dst: yPrime })(b);
+      const xStr = assertString(x, "externalProduct: x must be a string");
+      const yStr = assertString(y, "externalProduct: y must be a string");
+      const xPrimeStr = assertString(xPrime, "externalProduct: xPrime must be a string");
+      const yPrimeStr = assertString(yPrime, "externalProduct: yPrime must be a string");
+      const aStr = assertString(a, "externalProduct: a must be a string");
+      const bStr = assertString(b, "externalProduct: b must be a string");
+      const aPrime = F.onMor({ id: "temp", src: xStr, dst: xPrimeStr })(aStr);
+      const bPrime = G.onMor({ id: "temp", src: yStr, dst: yPrimeStr })(bStr);
       
       return `${aPrime}⊗${bPrime}`;
     }

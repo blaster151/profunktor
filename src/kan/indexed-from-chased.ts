@@ -6,6 +6,7 @@
 import type { CategoryPresentation } from "./category-presentations";
 import type { IndexedLKEState, EdgeKey } from "./indexed-view";
 import { UnionFind } from "./indexed-view";
+import { assertDefined } from "../util/assert";
 
 export interface ChasedModel {
   sorts: Record<string, readonly unknown[]>;
@@ -38,9 +39,11 @@ export function indexedFromChasedModel(
     const rel = M.relations[`D:${e.id}`] ?? []; // tuples [x,y]
     const arr = new Array(J[e.src]).fill(0).map(() => new Set<number>());
     rel.forEach(([x, y]) => {
-      const i = idxOf[e.src].get(x);
-      const j = idxOf[e.dst].get(y);
-      if (i !== undefined && j !== undefined) arr[i].add(j);
+      const srcIdx = assertDefined(idxOf[e.src], `idxOf for ${e.src} not found`);
+      const dstIdx = assertDefined(idxOf[e.dst], `idxOf for ${e.dst} not found`);
+      const i = srcIdx.get(x);
+      const j = dstIdx.get(y);
+      if (i !== undefined && j !== undefined && i < arr.length) arr[i].add(j);
     });
     edges[key] = arr;
   }
@@ -56,7 +59,8 @@ export function indexedFromChasedModel(
     const m: Array<number | undefined> = [];
     pairs.forEach(([x, y]) => {
       const d = F_onObj(c);
-      const j = idxOf[d].get(y);
+      const dIdx = assertDefined(idxOf[d], `idxOf for ${d} not found`);
+      const j = dIdx.get(y);
       if (j !== undefined) {
         // Unsafe: we don't know positions of x in I(c); treat as sparse by pushing
         m.push(j);

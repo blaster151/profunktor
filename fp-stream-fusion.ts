@@ -284,83 +284,104 @@ export const FusionRegistry: FusionRule[] = [
   {
     name: 'Map-Map Fusion',
     match: (n) => n.type === 'map' && n.next?.type === 'map' && n.purity === 'Pure' && n.next.purity === 'Pure' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      type: 'map',
-      fn: fuseMapMap(n.fn!, n.next!.fn!),
-      purity: 'Pure',
-      next: n.next!.next
-    }),
+    rewrite: (n) => {
+      if (!n.fn || !n.next!.fn) return n; // Early-return if callbacks are missing
+      return {
+        type: 'map',
+        fn: fuseMapMap(n.fn, n.next!.fn),
+        purity: 'Pure',
+        ...(n.next!.next ? { next: n.next!.next } : {})
+      };
+    },
     description: 'Combines consecutive pure map operations'
   },
   
   {
     name: 'Map Past Scan',
     match: (n) => n.type === 'map' && n.next?.type === 'scan' && n.purity === 'Pure' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      ...n.next!,
-      scanFn: pushMapPastScan(n.fn!, n.next!.scanFn!),
-      purity: 'State'
-    }),
+    rewrite: (n) => {
+      if (!n.fn || !n.next!.scanFn) return n; // Early-return if callbacks are missing
+      return {
+        ...n.next!,
+        scanFn: pushMapPastScan(n.fn, n.next!.scanFn),
+        purity: 'State'
+      };
+    },
     description: 'Pushes pure map operations inside stateful scan operations'
   },
   
   {
     name: 'Filter-Filter Fusion',
     match: (n) => n.type === 'filter' && n.next?.type === 'filter' && n.purity === 'Pure' && n.next.purity === 'Pure' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      type: 'filter',
-      predicate: fuseFilters(n.predicate!, n.next!.predicate!),
-      purity: 'Pure',
-      next: n.next!.next
-    }),
+    rewrite: (n) => {
+      if (!n.predicate || !n.next!.predicate) return n; // Early-return if callbacks are missing
+      return {
+        type: 'filter',
+        predicate: fuseFilters(n.predicate, n.next!.predicate),
+        purity: 'Pure',
+        ...(n.next!.next ? { next: n.next!.next } : {})
+      };
+    },
     description: 'Combines consecutive pure filter operations'
   },
   
   {
     name: 'FilterMap-FilterMap Fusion',
     match: (n) => n.type === 'filterMap' && n.next?.type === 'filterMap' && n.purity === 'Pure' && n.next.purity === 'Pure' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      type: 'filterMap',
-      filterMapFn: fuseFilterMaps(n.filterMapFn!, n.next!.filterMapFn!),
-      purity: 'Pure',
-      next: n.next!.next
-    }),
+    rewrite: (n) => {
+      if (!n.filterMapFn || !n.next!.filterMapFn) return n; // Early-return if callbacks are missing
+      return {
+        type: 'filterMap',
+        filterMapFn: fuseFilterMaps(n.filterMapFn, n.next!.filterMapFn),
+        purity: 'Pure',
+        ...(n.next!.next ? { next: n.next!.next } : {})
+      };
+    },
     description: 'Combines consecutive pure filterMap operations'
   },
   
   {
     name: 'Map-Filter Fusion',
     match: (n) => n.type === 'map' && n.next?.type === 'filter' && n.purity === 'Pure' && n.next.purity === 'Pure' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      type: 'filterMap',
-      filterMapFn: fuseMapFilter(n.fn!, n.next!.predicate!),
-      purity: 'Pure',
-      next: n.next!.next
-    }),
+    rewrite: (n) => {
+      if (!n.fn || !n.next!.predicate) return n; // Early-return if callbacks are missing
+      return {
+        type: 'filterMap',
+        filterMapFn: fuseMapFilter(n.fn, n.next!.predicate),
+        purity: 'Pure',
+        ...(n.next!.next ? { next: n.next!.next } : {})
+      };
+    },
     description: 'Combines pure map and filter operations into filterMap'
   },
   
   {
     name: 'Filter-Map Fusion',
     match: (n) => n.type === 'filter' && n.next?.type === 'map' && n.purity === 'Pure' && n.next.purity === 'Pure' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      type: 'filterMap',
-      filterMapFn: fuseFilterMap(n.predicate!, n.next!.fn!),
-      purity: 'Pure',
-      next: n.next!.next
-    }),
+    rewrite: (n) => {
+      if (!n.predicate || !n.next!.fn) return n; // Early-return if callbacks are missing
+      return {
+        type: 'filterMap',
+        filterMapFn: fuseFilterMap(n.predicate, n.next!.fn),
+        purity: 'Pure',
+        ...(n.next!.next ? { next: n.next!.next } : {})
+      };
+    },
     description: 'Combines pure filter and map operations into filterMap'
   },
   
   {
     name: 'Scan-Scan Fusion',
     match: (n) => n.type === 'scan' && n.next?.type === 'scan' && n.purity === 'State' && n.next.purity === 'State' && canFuseByBoundary(n, n.next!),
-    rewrite: (n) => ({
-      type: 'scan',
-      scanFn: fuseScans(n.scanFn!, n.next!.scanFn!),
-      purity: 'State',
-      next: n.next!.next
-    }),
+    rewrite: (n) => {
+      if (!n.scanFn || !n.next!.scanFn) return n; // Early-return if callbacks are missing
+      return {
+        type: 'scan',
+        scanFn: fuseScans(n.scanFn, n.next!.scanFn),
+        purity: 'State',
+        ...(n.next!.next ? { next: n.next!.next } : {})
+      };
+    },
     description: 'Combines consecutive stateful scan operations'
   },
   
@@ -382,22 +403,42 @@ export const FusionRegistry: FusionRule[] = [
         current = current.next!;
       }
       
-      // Fuse all pure operations
-      const fusedOp = pureOps.reduce((acc, op) => {
-        if (op.type === 'map') {
-          return { type: 'map', fn: acc.fn ? fuseMapMap(acc.fn, op.fn!) : op.fn, purity: 'Pure' };
-        } else if (op.type === 'filter') {
-          return { type: 'filter', predicate: acc.predicate ? fuseFilters(acc.predicate, op.predicate!) : op.predicate, purity: 'Pure' };
-        } else if (op.type === 'filterMap') {
-          return { type: 'filterMap', filterMapFn: acc.filterMapFn ? fuseFilterMaps(acc.filterMapFn, op.filterMapFn!) : op.filterMapFn, purity: 'Pure' };
-        }
-        return acc;
-      });
+      // Fuse all pure operations with early-returns for missing callbacks
+      if (pureOps.length === 0) return n; // Early-return if no operations to fuse
       
-      return {
-        ...fusedOp,
-        next: current
-      };
+      const fusedOp = pureOps.reduce<StreamPlanNode>((acc, op) => {
+        if (op.type === 'map') {
+          if (!op.fn) return acc; // Early-return if fn is missing
+          if (!acc.fn) return op; // If acc has no fn, just return op
+          return { 
+            type: 'map', 
+            fn: fuseMapMap(acc.fn, op.fn), 
+            purity: 'Pure',
+            ...(current ? { next: current } : {})
+          };
+        } else if (op.type === 'filter') {
+          if (!op.predicate) return acc; // Early-return if predicate is missing
+          if (!acc.predicate) return op; // If acc has no predicate, just return op
+          return { 
+            type: 'filter', 
+            predicate: fuseFilters(acc.predicate, op.predicate), 
+            purity: 'Pure',
+            ...(current ? { next: current } : {})
+          };
+        } else if (op.type === 'filterMap') {
+          if (!op.filterMapFn) return acc; // Early-return if filterMapFn is missing
+          if (!acc.filterMapFn) return op; // If acc has no filterMapFn, just return op
+          return { 
+            type: 'filterMap', 
+            filterMapFn: fuseFilterMaps(acc.filterMapFn, op.filterMapFn), 
+            purity: 'Pure',
+            ...(current ? { next: current } : {})
+          };
+        }
+        return acc; // Return acc for unknown types
+      }, pureOps[0]!); // Start with the first operation (guaranteed to exist due to length check)
+      
+      return fusedOp;
     },
     description: 'Fuses consecutive pure operations into a single operation'
   }
@@ -419,12 +460,12 @@ export function optimizePlan(root: StreamPlanNode, context: FusionContext = { de
   let optimizedRoot = { ...root };
 
   // Yoneda-style map-run fusion: compose consecutive pure maps into a single map
-  const fuseMapRun = (node: StreamPlanNode | undefined): StreamPlanNode | undefined => {
-    if (!node) return node;
+  const fuseMapRun = (node: StreamPlanNode): StreamPlanNode => {
     // Compress at this node
     if (node.type === 'map' && node.purity === 'Pure') {
+      if (!node.fn) return node; // Early-return if fn is missing
       let current: StreamPlanNode | undefined = node.next;
-      const fns: UnaryFn[] = [node.fn!];
+      const fns: UnaryFn[] = [node.fn];
       while (current && current.type === 'map' && current.purity === 'Pure' && current.fn) {
         fns.push(current.fn);
         current = current.next;
@@ -433,20 +474,20 @@ export function optimizePlan(root: StreamPlanNode, context: FusionContext = { de
       if (fns.length > 1) {
         // Compose functions right-to-left: fns[n-1] ∘ ... ∘ fns[0]
          const composed = fns.reduce<UnaryFn>((acc, fn) => (x: unknown) => fn(acc(x)), (x: unknown) => x);
-        node = { type: 'map', fn: composed, purity: 'Pure', next: current } as StreamPlanNode;
+        node = { type: 'map', fn: composed, purity: 'Pure', ...(current ? { next: current } : {}) } as StreamPlanNode;
       }
     }
     // Recurse
-    if (node.next) node.next = fuseMapRun(node.next) as StreamPlanNode;
-    if (node.left) node.left = fuseMapRun(node.left) as StreamPlanNode;
-    if (node.right) node.right = fuseMapRun(node.right) as StreamPlanNode;
+    if (node.next) node.next = fuseMapRun(node.next);
+    if (node.left) node.left = fuseMapRun(node.left);
+    if (node.right) node.right = fuseMapRun(node.right);
     return node;
   };
   
   while (changed) {
     changed = false;
     // Apply map-run fusion before rule-driven fusion
-    optimizedRoot = fuseMapRun(optimizedRoot)!;
+    optimizedRoot = fuseMapRun(optimizedRoot);
     
     for (const rule of FusionRegistry) {
       if (rule.match(optimizedRoot)) {
@@ -552,8 +593,7 @@ export function planFromStream(stream: StatefulStream<any, any, any>): StreamPla
   return {
     type: 'map',
     fn: (x: any) => x,
-    purity: normalizePurityTag((stream as any).__purity as EffectTag),
-    next: undefined
+    purity: normalizePurityTag((stream as any).__purity as EffectTag)
   };
 }
 

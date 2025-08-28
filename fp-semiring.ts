@@ -5,6 +5,8 @@
  *  - Tropical semiring (min, +) → shortest paths
  */
 
+import { assertDefined } from './src/util/assert';
+
 // ---------- Type classes ----------
 export interface Semiring<A> {
   readonly zero: A;                 // additive identity
@@ -65,10 +67,12 @@ export function matMul<A>(S: Semiring<A>, X: Matrix<A>, Y: Matrix<A>): Matrix<A>
   const Z: Matrix<A> = Array.from({ length: n }, () => Array(m).fill(S.zero));
   for (let i = 0; i < n; i++) {
     for (let t = 0; t < k; t++) {
-      const xit = X[i][t];
+      const xit = assertDefined(X[i]?.[t], "matMul: X[i][t] must be defined");
       if (xit === S.zero) continue;
       for (let j = 0; j < m; j++) {
-        Z[i][j] = S.add(Z[i][j], S.mul(xit, Y[t][j]));
+        const ytj = assertDefined(Y[t]?.[j], "matMul: Y[t][j] must be defined");
+        const zij = assertDefined(Z[i]?.[j], "matMul: Z[i][j] must be defined");
+        Z[i][j] = S.add(zij, S.mul(xit, ytj));
       }
     }
   }
@@ -85,7 +89,10 @@ export function matId<A>(S: Semiring<A>, n: number): Matrix<A> {
 export function reflexive<A>(S: Semiring<A>, A0: Matrix<A>): Matrix<A> {
   const n = A0.length;
   const I = matId(S, n);
-  const R = A0.map((row, i) => row.map((aij, j) => S.add(I[i][j], aij)));
+  const R = A0.map((row, i) => row.map((aij, j) => {
+    const iij = assertDefined(I[i]?.[j], "reflexive: I[i][j] must be defined");
+    return S.add(iij, aij);
+  }));
   return R;
 }
 
@@ -96,11 +103,15 @@ export function closure<A>(S: StarSemiring<A>, A0: Matrix<A>): Matrix<A> {
   const n = A0.length;
   const C = reflexive(S, A0).map(row => row.slice());
   for (let k = 0; k < n; k++) {
-    const akkStar = S.star(A0[k][k]);
+    const akk = assertDefined(A0[k]?.[k], "closure: A0[k][k] must be defined");
+    const akkStar = S.star(akk);
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
-        const via = S.mul(C[i][k], S.mul(akkStar, C[k][j]));
-        C[i][j] = S.add(C[i][j], via);
+        const cik = assertDefined(C[i]?.[k], "closure: C[i][k] must be defined");
+        const ckj = assertDefined(C[k]?.[j], "closure: C[k][j] must be defined");
+        const cij = assertDefined(C[i]?.[j], "closure: C[i][j] must be defined");
+        const via = S.mul(cik, S.mul(akkStar, ckj));
+        C[i][j] = S.add(cij, via);
       }
     }
   }

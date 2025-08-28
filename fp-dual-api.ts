@@ -302,10 +302,10 @@ export interface ObservableLite<A> {
 export const dualAPIExamples = {
   // Fluent style
   fluent: {
-    array: [1, 2, 3].map((x: unknown) => x * 2),
-    maybe: MaybeAPI.instance.of(5).map((x: unknown) => x * 2),
-    either: EitherAPI.instance.of(5).map((x: unknown) => x * 2),
-    observable: ObservableLiteAPI.instance.of(5).map((x: unknown) => x * 2)
+    array: [1, 2, 3].map((x: number) => x * 2),
+    maybe: MaybeAPI.instance.of(5).map((x: number) => x * 2),
+    either: EitherAPI.instance.of(5).map((x: number) => x * 2),
+    observable: ObservableLiteAPI.instance.of(5).map((x: number) => x * 2)
   },
   
   // Pipe-friendly style

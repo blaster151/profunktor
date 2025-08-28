@@ -204,10 +204,14 @@ export const MaybeInstances = deriveInstances({
   functor: true,
   applicative: true,
   monad: true,
-  customMap: <A, B>(fa: Maybe<A>, f: (a: A) => B): Maybe<B> => 
-    fa === null || fa === undefined ? (fa as unknown as Maybe<B>) : f(fa),
-  customChain: <A, B>(fa: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> => 
-    fa === null || fa === undefined ? (fa as unknown as Maybe<B>) : f(fa)
+  customMap: <A, B>(fa: Maybe<A>, f: (a: A) => B): Maybe<B> => {
+    if (fa === null || fa === undefined) return fa as unknown as Maybe<B>;
+    return f(fa);
+  },
+  customChain: <A, B>(fa: Maybe<A>, f: (a: A) => Maybe<B>): Maybe<B> => {
+    if (fa === null || fa === undefined) return fa as unknown as Maybe<B>;
+    return f(fa);
+  }
 });
 
 export const MaybeFunctor = MaybeInstances.functor;

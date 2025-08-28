@@ -1295,7 +1295,9 @@ export const PersistentMapBifunctor = deriveBifunctorInstance<PersistentMapK>({
     g: (b: B) => D
   ): PersistentMap<C, D> => {
     const entries: [C, D][] = [];
-    for (const [key, value] of fab.entries()) {
+    const mapEntries = Array.from(fab.entries() as Iterable<[A, B]>);
+    for (const entry of mapEntries) {
+      const [key, value] = entry;
       entries.push([f(key), g(value)]);
     }
     return PersistentMap.fromEntries(entries);
@@ -1308,7 +1310,9 @@ export const PersistentMapBifunctor = deriveBifunctorInstance<PersistentMapK>({
 export const PersistentMapEq = deriveEqInstance({
   customEq: <A, B>(a: PersistentMap<A, B>, b: PersistentMap<A, B>): boolean => {
     if (a.size !== b.size) return false;
-    for (const [key, value] of a.entries()) {
+    const mapEntries = a.entries() ?? [];
+    for (const entry of mapEntries) {
+      const [key, value] = assertDefined(entry, "map entry required");
       if (!b.has(key) || b.get(key) !== value) return false;
     }
     return true;
@@ -1733,7 +1737,7 @@ const PersistentListFluentImpl: FluentImpl<any> = {
   map: (self, f) => {
     // Use the raw map method directly to avoid circular dependency
     const result: any[] = [];
-    self.forEach((value) => {
+    self.forEach((value: unknown) => {
       result.push(f(value));
     });
     return PersistentList.fromArray(result);
@@ -1741,10 +1745,10 @@ const PersistentListFluentImpl: FluentImpl<any> = {
   chain: (self, f) => {
     // Use the raw flatMap method directly to avoid circular dependency
     const result: any[] = [];
-    self.forEach((value) => {
+    self.forEach((value: unknown) => {
       const mapped = f(value);
       if (mapped instanceof PersistentList) {
-        mapped.forEach(v => result.push(v));
+        mapped.forEach((v: unknown) => result.push(v));
       } else {
         result.push(mapped);
       }
@@ -1754,10 +1758,10 @@ const PersistentListFluentImpl: FluentImpl<any> = {
   flatMap: (self, f) => {
     // Use the raw flatMap method directly to avoid circular dependency
     const result: any[] = [];
-    self.forEach((value) => {
+    self.forEach((value: unknown) => {
       const mapped = f(value);
       if (mapped instanceof PersistentList) {
-        mapped.forEach(v => result.push(v));
+        mapped.forEach((v: unknown) => result.push(v));
       } else {
         result.push(mapped);
       }
@@ -1767,7 +1771,7 @@ const PersistentListFluentImpl: FluentImpl<any> = {
   filter: (self, pred) => {
     // Use the raw filter method directly to avoid circular dependency
     const result: any[] = [];
-    self.forEach((value) => {
+    self.forEach((value: unknown) => {
       if (pred(value)) {
         result.push(value);
       }

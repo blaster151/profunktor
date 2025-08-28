@@ -36,7 +36,7 @@ export function composeDialens<X, Y, Z, ΔX, ΔY, ΔZ>(
     get: (x) => o2.get(o1.get(x)),
     put: (x, dZ) => {
       const mid = o2.put(o1.get(x), dZ);
-      const back = o1.put(x, mid.deltaY);
+      const back = o1.put(x, mid.deltaX);
       return { x1: back.x1, deltaX: back.deltaX };
     }
   };

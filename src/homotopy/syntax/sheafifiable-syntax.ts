@@ -131,6 +131,7 @@ export interface SheafifiableSyntacticPackage<Obj, Base = ConstantBase> {
   readonly base?: Base; // default {name:'Set'}
   readonly name?: string;
   readonly description?: string;
+  readonly context?: unknown;
 }
 
 // ============================================================================

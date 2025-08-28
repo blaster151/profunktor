@@ -636,7 +636,7 @@ function defineProductADT<Fields extends ProductFields>(
       const result: any = {};
       const fieldNames = Object.keys(fields);
       for (let i = 0; i < fieldNames.length; i++) {
-        result[fieldNames[i]] = args[i];
+        result[fieldNames[i] as string] = args[i];
       }
       return result;
     }

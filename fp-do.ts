@@ -30,6 +30,8 @@ import {
   createPurityInfo, attachPurityMarker, extractPurityMarker, hasPurityMarker
 } from './fp-purity';
 
+import { assertDefined } from './src/util/assert';
+
 // ============================================================================
 // Part 1: Type Definitions
 // ============================================================================
@@ -243,7 +245,8 @@ export function doMLoose<A>(
     const r = it.next(last);
     if (r.done) {
       // Best effort: if lastYield has .of, use it; if it's a Promise-like, wrap; else return as-is
-      if (lastYield && lastYield.constructor && lastYield.constructor.of) return lastYield.constructor.of(r.value);
+      const o = assertDefined(lastYield, "do: object required");
+      if (o.constructor && o.constructor.of) return o.constructor.of(r.value);
       if (typeof Promise !== 'undefined') return Promise.resolve(r.value);
       return r.value;
     }

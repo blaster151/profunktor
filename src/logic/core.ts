@@ -93,7 +93,8 @@ export function reduceToCategoricalCoreUnder(
 ): { I: Instance; map: Record<string, Map<unknown, unknown>> } {
   const prot: Protected = {};
   seedSorts.forEach(s => {
-    prot[s] = new Set(I.sorts[s] ?? []);
+    const sortsArray = I.sorts[s] ?? [];
+    prot[s] = new Set(sortsArray);
   });
   return reduceToCore(I, prot);
 }

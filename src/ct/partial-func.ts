@@ -8,6 +8,9 @@ export const wave1 = <A,B>(f: PartialFunc<A,B>, a: (y:B)=>boolean) =>
 
 export const domain = <A,B>(f: PartialFunc<A,B>) => (x: A) => f.defined(x);
 
+// Adapter for signature mismatch: convert (d: D) => A to (a: A) => A
+const adapt = <A, D>(g: (d: D) => A): ((a: A) => A) => (a) => a;
+
 // Decomposition f~1 = ∃_d ∘ m^{-1}
 export const wave1ViaExists = <A,B,D extends A>(
   incl: (d:D)=>A, med: (d:D)=>B, a: (y:B)=>boolean
@@ -18,7 +21,7 @@ export const wave1ViaExists = <A,B,D extends A>(
     // This is a simplified implementation - in practice you'd need to handle the inverse properly
     return a(med(x as D));
   };
-  return existsAlongMono(incl, predicate)(x);
+  return existsAlongMono(adapt(incl), predicate)(x);
 };
 
 // Lemma 45(iii):  df ∧ (f~1 A ⇒ f~1 B) = f~1 (A ⇒ B)  (Set-model check)

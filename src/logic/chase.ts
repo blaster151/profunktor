@@ -67,7 +67,8 @@ function freezeFormula(sig: Signature, vars: readonly { name: string; sort: Sort
     if (!by.has(cls)) {
       const val = { kind: "var", name: cls, sort: v.sort }; // labeled
       by.set(cls, val);
-      I.sorts[v.sort] = [...(I.sorts[v.sort] ?? []), val];
+      const existingSorts = I.sorts[v.sort] ?? [];
+      I.sorts[v.sort] = [...existingSorts, val];
     }
   });
 
@@ -179,10 +180,12 @@ function chaseStep(I: Instance, sig: Signature, ed: ED, f: InstanceMorphism, env
     }
     const J2 = cloneInstance(J);
     for (const [s, xs] of Object.entries(J2.sorts)) {
-      J2.sorts[s] = Array.from(new Set(xs.map(x => repOf[s] ? repOf[s](x) : x))) as unknown[];
+      const xsArray = xs ?? [];
+      J2.sorts[s] = Array.from(new Set(xsArray.map(x => repOf[s] ? repOf[s](x) : x))) as unknown[];
     }
     for (const [r, ts] of Object.entries(J2.relations)) {
-      J2.relations[r] = Array.from(new Set(ts.map(t => JSON.stringify(t.map((x, i) => {
+      const tsArray = ts ?? [];
+      J2.relations[r] = Array.from(new Set(tsArray.map(t => JSON.stringify(t.map((x, i) => {
         // sloppy but effective: look up a sort by the i-th arg's apparent sort is unknown here;
         // keep as-is (EGDs typically act via carriers already rewritten above).
         return x;
@@ -196,7 +199,8 @@ function chaseStep(I: Instance, sig: Signature, ed: ED, f: InstanceMorphism, env
   ed.exists.forEach(v => {
     ensureSort(J, v.sort);
     const fresh = { kind: "witness", of: v.name, sort: v.sort, id: Math.random().toString(36).slice(2) };
-    J.sorts[v.sort] = [...J.sorts[v.sort], fresh];
+    const existingSorts = J.sorts[v.sort] ?? [];
+    J.sorts[v.sort] = [...existingSorts, fresh];
   });
   // Add back's ψ relational atoms with mapped variables; since our frozen back already
   // carries canonical labeled values, we just union those tuples into J.relations.
@@ -207,9 +211,10 @@ function chaseStep(I: Instance, sig: Signature, ed: ED, f: InstanceMorphism, env
 
 function backRelationsUnion(J: Instance, back: Instance) {
   for (const [r, tuples] of Object.entries(back.relations)) {
-    const cur = J.relations[r] || [];
+    const cur = J.relations[r] ?? [];
+    const tuplesArray = tuples ?? [];
     const merged = [...cur];
-    for (const t of tuples) if (!merged.some(u => tupleEq(u, t))) merged.push(t);
+    for (const t of tuplesArray) if (!merged.some(u => tupleEq(u, t))) merged.push(t);
     J.relations[r] = merged;
   }
 }

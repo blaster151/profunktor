@@ -28,12 +28,12 @@ export function runStep<S>(
 // edges are labeled by directions in ?[u]. The inverse limit c? (Prop. 5.3) is approximated
 // by increasing n; here we expose a generator for depth≤N trees.  :contentReference[oaicite:2]{index=2}
 
-export type CFNode = { pos: string; edges: { dir: string; next: CFNode | undefined }[] };
+export type CFNode = { pos: string; edges: { dir: string; next?: CFNode }[] };
 
 /** Build all "shape" trees up to depth N from a root position u0. */
 export function cfreeApproxFrom(poly: Polynomial, u0: string, N: number): CFNode {
   function build(u: string, n: number): CFNode {
-    const outs = poly.fiber(u).map(dir => ({ dir, next: n > 0 ? build(u, n - 1) : undefined }));
+    const outs = poly.fiber(u).map(dir => ({ dir, ...(n > 0 ? { next: build(u, n - 1) } : {}) }));
     return { pos: u, edges: outs };
   }
   return build(u0, Math.max(0, N));

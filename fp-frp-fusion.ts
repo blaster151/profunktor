@@ -202,7 +202,7 @@ export const FRPFusionRules: FusionRule[] = [
       let fusedOp = pureOps.reduce<StreamPlanNode | null>((acc, op) => {
         if (!acc) return op;
         if (acc.type === 'map' && op.type === 'map') {
-          return { type: 'map', fn: (x: any) => op.fn!(acc.fn!(x)), purity: 'Pure', next: undefined };
+          return { type: 'map', fn: (x: any) => op.fn!(acc.fn!(x)), purity: 'Pure' };
         }
         if (acc.type === 'filter' && op.type === 'filter') {
           return { type: 'filter', predicate: (x: any) => !!acc.predicate!(x) && !!op.predicate!(x), purity: 'Pure', next: undefined };

@@ -535,7 +535,7 @@ function checkDefault<X>(
   if (ok) {
     return {
       isLocalWeakEquivalence: true,
-      witnessCover: cover,
+      ...(cover ? { witnessCover: cover } : {}),
       morphism: inp.f,
       strategy: 'default',
       coverIndex,

@@ -73,7 +73,10 @@ export async function* dfsAsync<F extends Kind1, A>(
     const kidsF = await node.tail();
     const kids = toArrayF(Fold, kidsF) as unknown as AsyncLazyCofree<F, A>[];
     // push right-to-left so left child is visited first
-    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    for (let i = kids.length - 1; i >= 0; i--) {
+      const t = assertDefined(kids[i], "cofree: tail required");
+      stack.push(t);
+    }
   }
 }
 

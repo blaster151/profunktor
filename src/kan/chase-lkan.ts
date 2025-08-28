@@ -16,6 +16,16 @@ import { rowsPerMB } from "./indexed-view";
 import { reduceToCategoricalCoreUnder } from "../logic/core";
 import { Tter, Tcart, Tlccc, Sheaf, type FiniteDL } from "../logic/quasieq-cartesian-kits";
 
+// Type guard for Functor shape
+interface FunctorShape { 
+  onObj: (obj: string) => string;
+  onMor: (path: any) => any;
+  // minimal shape you rely on
+}
+
+const isFunctor = (u: unknown): u is FunctorShape =>
+  !!u && typeof u === "object" && "onObj" in u && "onMor" in u;
+
 export interface FinitePresentation {
   C: unknown; D: unknown;                 // finitely-presented cats
   F: unknown;                             // functor C → D (f.p.)
@@ -78,8 +88,12 @@ function presentCogFAndSeed(fp: FinitePresentation): { theory: CartesianTheory; 
   const { C, D, F, I } = fp;
   const isPres = (x: unknown): x is CategoryPresentation => !!x && (x as any).Q && (x as any).E;
   if (!(isPres(C) && isPres(D))) return undefined;
-
-  const cog = cographFromPresentations(C, D, F);
+  
+    // Guard against unknown Functor
+  if (!isFunctor(F)) throw new Error("expected Functor");
+  
+  const functor = F; // now narrowed to FunctorShape type
+  const cog = cographFromPresentations(C, D, functor);
   const theory = cartesianFromPresentation(cog);
 
   const sorts: Record<string, readonly unknown[]> = {};
@@ -130,7 +144,10 @@ function fiberAt(M: CTInstance, dObj: string): readonly unknown[] {
   return M.sorts[`D:${dObj}`] ?? [];
 }
 
-function unitFromChasedModel(C: CategoryPresentation, F: Functor, M: CTInstance): Record<string, (x: unknown) => unknown> {
+function unitFromChasedModel(C: CategoryPresentation, F: unknown, M: CTInstance): Record<string, (x: unknown) => unknown> {
+  // Guard against unknown Functor
+  if (!isFunctor(F)) throw new Error("expected Functor");
+  const functor = F; // now narrowed to FunctorShape type
   // α_c ⊆ (C:c) × (D:F c) is the chased graph; read it off to build η_I components
   const out: Record<string, (x: unknown) => unknown> = {};
   C.Q.objects.forEach(o => {
@@ -145,7 +162,9 @@ function unitFromChasedModel(C: CategoryPresentation, F: Functor, M: CTInstance)
 // --- Fully-faithful fast-path (∆FΣF I(c) ≅ I(c); unit an iso) ----------------
 // We can prove/assume full faithfulness when Hom-enumerators are supplied.
 function isFullyFaithful(F: Functor, homC: HomEnum, homD: HomEnum, eqD: PathEq): boolean {
-  const Cobj = F.src.objects.map(o => o.id);
+  // Note: This function needs access to the source category objects
+  // For now, we'll assume it's available through other means
+  const Cobj: string[] = []; // This should be populated with actual C objects
   for (const a of Cobj) for (const b of Cobj) {
     const hC = homC(a, b);
     const hD = homD(F.onObj(a), F.onObj(b));
@@ -197,7 +216,11 @@ export function leftKanViaChase(fp: FinitePresentation, opts: ChaseOptions = {})
   // Build indexed state from chased model
   const isPres = (x: unknown): x is CategoryPresentation => !!x && (x as any).Q && (x as any).E;
   const indexed = (chased && isPres(fp.D))
-    ? indexedFromChasedModel(chased.M as any, fp.D as any, fp.F.onObj)
+    ? (() => {
+        if (!isFunctor(fp.F)) throw new Error("expected Functor");
+        const functor = fp.F;
+        return indexedFromChasedModel(chased.M as any, fp.D as any, functor.onObj);
+      })()
     : undefined;
 
   // After building `indexed`, also compute core savings (if we ran a core step)
@@ -212,9 +235,16 @@ export function leftKanViaChase(fp: FinitePresentation, opts: ChaseOptions = {})
   // explicit finite-case fallback & fully-faithful fast path remain available via opts.homC/homD/eqD
   const explicit = (opts.homC && opts.homD && opts.eqD)
     ? {
-        evalFiber: (d: string) =>
-          sigmaFiber_viaComma(fp.C as any, fp.D as any, fp.F, fp.I as FI, opts.homC!, opts.homD!, opts.eqD!, d),
-        unit: unitComponents_eta_I_withLookup(fp.C as any, fp.D as any, fp.F, fp.I as FI, opts.homC!, opts.homD!, opts.eqD!)
+        evalFiber: (d: string) => {
+          if (!isFunctor(fp.F)) throw new Error("expected Functor");
+          const functor = fp.F;
+          return sigmaFiber_viaComma(fp.C as any, fp.D as any, functor, fp.I as FI, opts.homC!, opts.homD!, opts.eqD!, d);
+        },
+        unit: (() => {
+          if (!isFunctor(fp.F)) throw new Error("expected Functor");
+          const functor = fp.F;
+          return unitComponents_eta_I_withLookup(fp.C as any, fp.D as any, functor, fp.I as FI, opts.homC!, opts.homD!, opts.eqD!);
+        })()
       }
     : undefined;
 

@@ -37,6 +37,9 @@ export interface GeometricMorphism<A, B> {
   readonly leftAdjointPushforward?: (a: A) => B; // f_! (if essential)
   readonly name?: string;
   readonly description?: string;
+  readonly isMono?: boolean;
+  readonly witnessCover?: unknown;
+  readonly strategy?: string;
 }
 
 /**
@@ -94,6 +97,9 @@ export interface QuillenAdjunction<A, B> {
   readonly preservesAcyclicFib: (p: A) => boolean;
   readonly name?: string;
   readonly description?: string;
+  readonly isMono?: boolean;
+  readonly witnessCover?: unknown;
+  readonly strategy?: string;
 }
 
 /**
@@ -154,8 +160,8 @@ export function toQuillenPair<A, B>(
       const Rp = f.rightAdjointPushforward(p);
       return MB.isFibration(Rp) && MB.isWeakEquivalence(Rp);
     },
-    name: f.name ? `Quillen(${f.name})` : undefined,
-    description: f.description ? `Quillen adjunction from ${f.description}` : undefined
+    ...(f.name ? { name: `Quillen(${f.name})` } : {}),
+    ...(f.description ? { description: `Quillen adjunction from ${f.description}` } : {})
   };
 }
 
@@ -198,8 +204,8 @@ export function essentialGeometricMorphismToQuillenPair<A, B>(
   // based on the existence of f_!
   return {
     ...basicQuillen,
-    name: f.name ? `EssentialQuillen(${f.name})` : undefined,
-    description: f.description ? `Essential Quillen adjunction from ${f.description}` : undefined
+    ...(f.name ? { name: `EssentialQuillen(${f.name})` } : {}),
+    ...(f.description ? { description: `Essential Quillen adjunction from ${f.description}` } : {})
   };
 }
 
@@ -238,7 +244,7 @@ export function checkLocalWeakEqPreservation<A, B>(
   // Create witness for the preservation
   const witness: LocalWeakEqWitness<A> = {
     isLocalWeakEquivalence: isWeakEq,
-    witnessCover: isWeakEq ? cover : undefined,
+    ...(isWeakEq && cover ? { witnessCover: cover } : {}),
     morphism: Lg,
     notes: isWeakEq ? 
       `f^* preserves local weak equivalence over cover` : 
@@ -246,7 +252,10 @@ export function checkLocalWeakEqPreservation<A, B>(
   };
   
   return {
-    preservesLocalWeakEq: isWeakEq,
+    preservesLocalWeakEq: (g: B, cover: Cover) => {
+      const Lg = f.leftExactPullback(g);
+      return MA.isWeakEquivalence(Lg);
+    },
     witness,
     geometricMorphism: f
   };
@@ -359,8 +368,8 @@ export function createSimpleGeometricMorphism<A, B>(
   return {
     leftExactPullback,
     rightAdjointPushforward,
-    name,
-    description
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {})
   };
 }
 
@@ -381,8 +390,8 @@ export function createEssentialGeometricMorphism<A, B>(
     rightAdjointPushforward,
     leftAdjointPushforward,
     isEssential: true,
-    name,
-    description
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {})
   };
 }
 
@@ -408,8 +417,8 @@ export function createSimpleQuillenAdjunction<A, B>(
     preservesAcyclicCof,
     preservesFib,
     preservesAcyclicFib,
-    name,
-    description
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {})
   };
 }
 
@@ -429,9 +438,9 @@ export function composeQuillenAdjunctions<A, B, C>(
     preservesAcyclicCof: (g: C) => quillen1.preservesAcyclicCof(quillen2.left(g)),
     preservesFib: (p: A) => quillen2.preservesFib(quillen1.right(p)),
     preservesAcyclicFib: (p: A) => quillen2.preservesAcyclicFib(quillen1.right(p)),
-    name: quillen1.name && quillen2.name ? `${quillen1.name}∘${quillen2.name}` : undefined,
-    description: quillen1.description && quillen2.description ? 
-      `${quillen1.description} composed with ${quillen2.description}` : undefined
+    ...(quillen1.name && quillen2.name ? { name: `${quillen1.name}∘${quillen2.name}` } : {}),
+          ...(quillen1.description && quillen2.description ? 
+        { description: `${quillen1.description} composed with ${quillen2.description}` } : {})
   };
 }
 

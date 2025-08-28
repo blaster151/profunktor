@@ -241,7 +241,11 @@ export function monoidFromSemigroup<A>(empty: A, concat: (a: A, b: A) => A): Mon
 export function FirstMonoid<A>(): MonoidWithEffect<A, 'Pure'> {
   return {
     empty: undefined as any, // First monoid doesn't have a meaningful empty value
-    concat: (a: A, b: A) => a,
+    concat: (a: A, b: A) => {
+      if (a === undefined) throw new Error("monoid: lhs required");
+      if (b === undefined) throw new Error("monoid: rhs required");
+      return a;
+    },
     __effect: 'Pure'
   };
 }
