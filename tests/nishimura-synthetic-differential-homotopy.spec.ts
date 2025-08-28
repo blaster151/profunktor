@@ -229,19 +229,24 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
   describe('Pages 11-15: Tangent Bundle Module Structure + Strong Differences', () => {
     
     it('should create and validate ThreeFoldTangentExistence', () => {
-      const existence = createThreeFoldTangentExistence();
+      const microlinearSet = createMicrolinearityHoTT();
+      const basePoint = {};
+      const existence = createThreeFoldTangentExistence(microlinearSet, basePoint);
       expect(existence.kind).toBe('ThreeFoldTangentExistence');
       expect(validateThreeFoldTangentExistence(existence)).toBe(true);
     });
     
     it('should create and validate TangentVectorOperations', () => {
-      const operations = createTangentVectorOperations();
+      const tangentSpace = createTangencyHoTT();
+      const operations = createTangentVectorOperations(tangentSpace);
       expect(operations.kind).toBe('TangentVectorOperations');
       expect(validateTangentVectorOperations(operations)).toBe(true);
     });
     
     it('should create and validate TangentSpaceRModule', () => {
-      const module = createTangentSpaceRModule();
+      const tangentSpace = createTangencyHoTT();
+      const operations = createTangentVectorOperations(tangentSpace);
+      const module = createTangentSpaceRModule(operations);
       expect(module.kind).toBe('TangentSpaceRModule');
       expect(validateTangentSpaceRModule(module)).toBe(true);
     });
@@ -253,7 +258,8 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
     });
     
     it('should create and validate StrongDifferences', () => {
-      const differences = createStrongDifferences();
+      const microlinear = createMicrolinearityHoTT();
+      const differences = createStrongDifferences(microlinear);
       expect(differences.kind).toBe('StrongDifferences');
       expect(validateStrongDifferences(differences)).toBe(true);
     });
@@ -265,7 +271,8 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
     });
     
     it('should create and validate StrongDifferencesTheory', () => {
-      const theory = createStrongDifferencesTheory();
+      const microlinear = createMicrolinearityHoTT();
+      const theory = createStrongDifferencesTheory(microlinear);
       expect(theory.kind).toBe('StrongDifferencesTheory');
       expect(validateStrongDifferencesTheory(theory)).toBe(true);
     });
@@ -274,7 +281,8 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
   describe('Pages 16-18: Quasi-Colimit Diagrams & Taylor Expansions', () => {
     
     it('should create and validate AlphaThetaComposition', () => {
-      const composition = createAlphaThetaComposition();
+      const microlinear = createMicrolinearityHoTT();
+      const composition = createAlphaThetaComposition(microlinear);
       expect(composition.kind).toBe('AlphaThetaComposition');
       expect(validateAlphaThetaComposition(composition)).toBe(true);
     });
@@ -328,7 +336,8 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
     });
     
     it('should create and validate InfinitesimalTaylorExpansionD2', () => {
-      const expansion = createInfinitesimalTaylorExpansionD2();
+      const microlinear = createMicrolinearityHoTT();
+      const expansion = createInfinitesimalTaylorExpansionD2(microlinear);
       expect(expansion.kind).toBe('InfinitesimalTaylorExpansionD2');
       expect(validateInfinitesimalTaylorExpansionD2(expansion)).toBe(true);
     });
@@ -340,13 +349,16 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
     });
     
     it('should create and validate EtaMapExistence', () => {
-      const existence = createEtaMapExistence();
+      const microlinearSet = createMicrolinearityHoTT();
+      const theta11 = (d1: any, d2: any) => ({});
+      const existence = createEtaMapExistence(microlinearSet, theta11);
       expect(existence.kind).toBe('EtaMapExistence');
       expect(validateEtaMapExistence(existence)).toBe(true);
     });
     
     it('should create and validate SumDifferenceProperties', () => {
-      const properties = createSumDifferenceProperties();
+      const microlinear = createMicrolinearityHoTT();
+      const properties = createSumDifferenceProperties(microlinear);
       expect(properties.kind).toBe('SumDifferenceProperties');
       expect(validateSumDifferenceProperties(properties)).toBe(true);
     });
@@ -361,7 +373,8 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
     });
     
     it('should create and validate ScalarMultiplicationLinearity', () => {
-      const linearity = createScalarMultiplicationLinearity();
+      const microlinear = createMicrolinearityHoTT();
+      const linearity = createScalarMultiplicationLinearity(microlinear);
       expect(linearity.kind).toBe('ScalarMultiplicationLinearity');
       expect(validateScalarMultiplicationLinearity(linearity)).toBe(true);
     });
@@ -403,7 +416,8 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
     });
     
     it('should create and validate AdvancedCoherenceConditions', () => {
-      const conditions = createAdvancedCoherenceConditions();
+      const microlinear = createMicrolinearityHoTT();
+      const conditions = createAdvancedCoherenceConditions(microlinear);
       expect(conditions.kind).toBe('AdvancedCoherenceConditions');
       expect(validateAdvancedCoherenceConditions(conditions)).toBe(true);
     });
@@ -527,19 +541,22 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
   describe('Pages 26-30: Advanced Quasi-Colimit Diagrams & Strong Differences', () => {
     
     it('should create and validate ComplexQuasiColimitDiagrams', () => {
-      const diagrams = createComplexQuasiColimitDiagrams();
+      const microlinear = createMicrolinearityHoTT();
+      const diagrams = createComplexQuasiColimitDiagrams(microlinear);
       expect(diagrams.kind).toBe('ComplexQuasiColimitDiagrams');
       expect(validateComplexQuasiColimitDiagrams(diagrams)).toBe(true);
     });
     
     it('should create and validate Lemma55QuasiColimitDiagram', () => {
-      const diagram = createLemma55QuasiColimitDiagram();
+      const microlinear = createMicrolinearityHoTT();
+      const diagram = createLemma55QuasiColimitDiagram(microlinear);
       expect(diagram.kind).toBe('Lemma55QuasiColimitDiagram');
       expect(validateLemma55QuasiColimitDiagram(diagram)).toBe(true);
     });
     
     it('should create and validate ExplicitTaylorExpansions', () => {
-      const expansions = createExplicitTaylorExpansions();
+      const microlinear = createMicrolinearityHoTT();
+      const expansions = createExplicitTaylorExpansions(microlinear);
       expect(expansions.kind).toBe('ExplicitTaylorExpansions');
       expect(validateExplicitTaylorExpansions(expansions)).toBe(true);
     });

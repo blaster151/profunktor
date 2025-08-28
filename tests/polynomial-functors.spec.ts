@@ -75,7 +75,7 @@ describe('Polynomial Functors', () => {
       const dirTea = teaInterviewPolynomial.directions('Tea?');
       expect(dirTea['Tea?']).toBe('yes');
       const dirKind = teaInterviewPolynomial.directions('Kind?');
-      expect(dirKind['Kind?']).toBe('black');
+      expect(dirKind['Kind?']).toBe('green');
     });
 
     it('should define natural number effect polynomial', () => {

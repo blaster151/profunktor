@@ -341,12 +341,11 @@ export function moduleActionΞ<P extends Polynomial<any, any>, Q extends Polynom
  * Example: Tea Interview Pattern
  */
 export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPolynomial, string> {
-  return suspendPolynomial('Tea?', (dirFn) => {
-    // dirFn is the directions function, we need to call it with the position
-    const dir1 = dirFn('Tea?');
+  return suspendPolynomial('Tea?', (dir1) => {
+    // dir1 is the direction object for position 'Tea?'
     if (dir1['Tea?'] === 'yes') {
-      return suspendPolynomial('Kind?', (dirFn2) => {
-        const dir2 = dirFn2('Kind?');
+      return suspendPolynomial('Kind?', (dir2) => {
+        // dir2 is the direction object for position 'Kind?'
         return purePolynomial(`You chose ${dir2['Kind?']} tea!`);
       });
     } else {
@@ -360,8 +359,8 @@ export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPol
  */
 export function createTeaPerson(): CofreeComonadPolynomial<typeof teaInterviewPolynomial, string> {
   return cofreePolynomial('Alice', (question) => {
-    // Return the directions function from the polynomial
-    return teaInterviewPolynomial.directions;
+    // Return the direction values for the given question
+    return teaInterviewPolynomial.directions(question);
   });
 }
 
@@ -406,8 +405,8 @@ export const guessingGameProgram: ProgramSemantics<
       return purePolynomial(false);
     }
     
-    return suspendPolynomial({ read: true }, (dirFn) => {
-      const guess = dirFn({ read: true });
+    return suspendPolynomial({ read: true }, (guess) => {
+      // guess is the direction value (a number in this case)
       if (guess === input.goal) {
         return purePolynomial(true);
       }
