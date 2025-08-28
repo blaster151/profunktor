@@ -1,13 +1,20 @@
 # Profunktor: Foundations, Capabilities, and Implementation Status
 
-This Uber-README orients new contributors quickly: what the system is, what you can build, and the current implementation status across core modules.
+This Uber-README orients new contributors quickly: what the system is, what you can build, the core type-system foundations, and current implementation status across modules.
 
 ---
 
-## 1. Foundations and Capabilities (Concise)
+## 1. Type-System Foundations (HKT, HOK, Typeclasses)
+See `TYPE_SYSTEM_FOUNDATIONS.md` for full details. Highlights:
+- HKT (Kind/Apply) enable first-class type constructors and generic algorithms.
+- HOK generalizes to functions between kinds; unlocks polymorphic typeclasses across arities.
+- FP typeclass suite (Functor/Applicative/Monad, Bifunctor/Profunctor) with laws.
 
+---
+
+## 2. Foundations and Capabilities
 See `FOUNDATIONS_AND_CAPABILITIES.md` for details; highlights:
-- Unified ADT Definition System: one-call ADT setup with automatic typeclass derivation, fluent API, registry metadata, and optics hooks.
+- Unified ADT Definition System: one-call ADT setup with automatic typeclass derivation, fluent API, registry metadata, optics hooks.
 - Profunctor optics integrated with HKT + purity; streams with usage-aware composition.
 - Capability areas: tangent categories, coalgebras/recursion schemes, compact-closed and span bicategories, TQFT, higher categories, developer tooling, and research workflows.
 
@@ -24,9 +31,8 @@ Best practices:
 
 ---
 
-## 2. Implementation Complete Summary (Eq/Ord/Show)
-
-The ADT Eq, Ord, and Show rollout is complete across core types. Summary table (see `IMPLEMENTATION_COMPLETE_SUMMARY.md` for full details):
+## 3. Implementation Complete Summary (Eq/Ord/Show)
+The ADT Eq, Ord, and Show rollout is complete across core types. See `IMPLEMENTATION_COMPLETE_SUMMARY.md`.
 
 - Core ADTs (Maybe, Either, Result, Array, Tuple, Tree) covered.
 - Effect monads: Eq via reference where applicable; Ord/Show limited by semantics.
@@ -42,18 +48,19 @@ const str = tree.show();
 
 ---
 
-## 3. Where to Go Next
-
+## 4. Where to Go Next
+- Type system: `TYPE_SYSTEM_FOUNDATIONS.md`
 - API and how-to: `FOUNDATIONS_AND_CAPABILITIES.md`
 - Law coverage and instances: `IMPLEMENTATION_COMPLETE_SUMMARY.md`
-- Optics, Streams, FRP details: docs under `optics*`, `STREAM_*`, and related.
-- Contribution and governance: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`.
+- Optics, Streams, FRP: `OPTICS_FOUNDATIONS.md`, `PROFUNCTOR_OPTICS.md`, `STREAM_FUSION.md`, `stream-core.md`
+- Fluent API: `UNIFIED_FLUENT_API.md`, `FLUENT_API_COMPLETE_SUMMARY.md`
+- Typeclasses/HKT: `FP_TYPECLASSES_GUIDE.md`, `HKT_IMPLEMENTATION_SUMMARY.md`
 
 ---
 
-## 4. Index
-
-- Foundations: `FOUNDATIONS_AND_CAPABILITIES.md`
+## 5. Index
+- Type foundations: `TYPE_SYSTEM_FOUNDATIONS.md`
+- Foundations/capabilities: `FOUNDATIONS_AND_CAPABILITIES.md`
 - Implementation status: `IMPLEMENTATION_COMPLETE_SUMMARY.md`
 - Optics overview: `OPTICS_FOUNDATIONS.md` or `PROFUNCTOR_OPTICS.md`
 - Streams overview: `STREAM_FUSION.md`, `stream-core.md`
