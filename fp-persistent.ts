@@ -1268,8 +1268,11 @@ export const PersistentListOrd = deriveOrdInstance({
     const arrB = b.toArray();
     const minLength = Math.min(arrA.length, arrB.length);
     for (let i = 0; i < minLength; i++) {
-      if (arrA[i] < arrB[i]) return -1;
-      if (arrA[i] > arrB[i]) return 1;
+      const aItem = arrA[i];
+      const bItem = arrB[i];
+      if (aItem === undefined || bItem === undefined) continue;
+      if (aItem < bItem) return -1;
+      if (aItem > bItem) return 1;
     }
     return arrA.length - arrB.length;
   }
@@ -1325,8 +1328,11 @@ export const PersistentMapOrd = deriveOrdInstance({
     const entriesA = Array.from(a.entries()).sort();
     const entriesB = Array.from(b.entries()).sort();
     for (let i = 0; i < entriesA.length; i++) {
-      const [keyA, valueA] = entriesA[i];
-      const [keyB, valueB] = entriesB[i];
+      const entryA = entriesA[i];
+      const entryB = entriesB[i];
+      if (!entryA || !entryB) continue;
+      const [keyA, valueA] = entryA;
+      const [keyB, valueB] = entryB;
       if (keyA < keyB) return -1;
       if (keyA > keyB) return 1;
       if (valueA < valueB) return -1;
@@ -1373,8 +1379,11 @@ export const PersistentSetOrd = deriveOrdInstance({
     const arrA = [...a.toArray()].sort();
     const arrB = [...b.toArray()].sort();
     for (let i = 0; i < arrA.length; i++) {
-      if (arrA[i] < arrB[i]) return -1;
-      if (arrA[i] > arrB[i]) return 1;
+      const aItem = arrA[i];
+      const bItem = arrB[i];
+      if (aItem === undefined || bItem === undefined) continue;
+      if (aItem < bItem) return -1;
+      if (aItem > bItem) return 1;
     }
     return 0;
   }

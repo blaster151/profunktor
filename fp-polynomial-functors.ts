@@ -344,11 +344,14 @@ export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPol
   return suspendPolynomial('Tea?', (dir1) => {
     // Use the factory function to get the proper type
     const m1 = mk('Tea?' as QuestionKey);
-    if (dir1['Tea?'] === 'yes') {
+    // Check for Tea? property with noUncheckedIndexedAccess
+    const teaAnswer = dir1['Tea?'];
+    if (teaAnswer === 'yes') {
       return suspendPolynomial('Kind?', (dir2) => {
         // Use the factory function to get the proper type
         const m2 = mk('Kind?' as QuestionKey);
-        return purePolynomial(`You chose ${dir2['Kind?']} tea!`);
+        const kindAnswer = dir2['Kind?'];
+        return purePolynomial(`You chose ${kindAnswer ?? 'unknown'} tea!`);
       });
     } else {
       return purePolynomial('No tea for you!');
