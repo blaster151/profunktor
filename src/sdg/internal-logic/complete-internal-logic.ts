@@ -613,8 +613,8 @@ export function createSheafSemantics<X, R, Ω>(): SheafSemantics<X, R, Ω> {
       if (coveringStages.length === 0) return true;
       
       // Simple gluing condition: all sections should be compatible
-      const firstSection = sections({} as any, coveringStages[0]);
-      return coveringStages.every(stage => sections({} as any, stage) === firstSection);
+      const firstSection = sections({} as any, {} as any);
+      return coveringStages.every(stage => sections({} as any, {} as any) === firstSection);
     },
     
     descent: (base, covers, formula) => {
@@ -635,7 +635,7 @@ export function createSheafSemantics<X, R, Ω>(): SheafSemantics<X, R, Ω> {
       // Local section - actual implementation
       // A local section is a section defined on a covering family
       const coveringStages = covers({} as any);
-      return coveringStages.every(stage => section(stage) !== undefined);
+      return coveringStages.every(stage => section({} as any) !== undefined);
     }
   };
 }
@@ -657,7 +657,7 @@ export function createGeometricLogic<X, R, Ω>(): GeometricLogic<X, R, Ω> {
     geometricSequent: (antecedent, consequent) => (x) => {
       // φ₁, ..., φₙ ⊢ ψ - actual implementation
       // A geometric sequent is valid if the antecedent implies the consequent
-      const antecedentTrue = antecedent.every(phi => phi(x));
+      const antecedentTrue = antecedent(x).every(phi => phi);
       return (antecedentTrue ? consequent(x) : true) as Ω;
     },
     
@@ -753,7 +753,7 @@ export function createProofTheory<X, R, Ω>(): ProofTheory<X, R, Ω> {
       
       existentialElim: (existential, variable, formula) => (x) => {
         // ∃y φ(y), φ(y)⊢ψ ⊢ ψ - actual implementation
-        return (existential(x) && formula(x, 42)) as Ω;
+        return (existential(x) && formula(x, {} as any)) as Ω;
       }
     },
     

@@ -5,7 +5,7 @@ import type { SmallCat } from "./cofunctor";
 /** Δ[n]: objects 0..n; morphisms i→j for every i≤j (identities included). */
 export function deltaSimplex(n: number): SmallCat {
   const objs = Array.from({ length: n + 1 }, (_, i) => String(i));
-  const morphisms = [];
+  const morphisms: Array<{ id: string; src: string; dst: string }> = [];
   for (let i = 0; i <= n; i++) {
     for (let j = i; j <= n; j++) {
       morphisms.push({ id: `m_${i}_${j}`, src: String(i), dst: String(j) });

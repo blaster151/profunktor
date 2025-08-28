@@ -23,7 +23,7 @@ export function colimSimplicial(diag: SimpCatDiagram, pMax = 1) {
     for (const i of diag.J.objects) C[i] = diag.C_p(i, p);
     for (const u of diag.J.arrows) {
       const fp = diag.F_p(u.id, p);
-      F[u.id] = { id: u.id, src: u.src, dst: u.dst, ...fp };
+      F[u.id] = { id: u.id, ...fp };
     }
     out[p] = colimitCategory({ J: diag.J, C, F });
   }

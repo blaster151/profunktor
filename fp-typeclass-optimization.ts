@@ -6,6 +6,8 @@
  * Provides fusibility analysis and optimization paths for various typeclass instances.
  */
 
+import { assertDefined } from './src/util/assert';
+
 // Simple stub for fusibility stats (used only for tracing)
 // Simple stub for fusibility stats (used only for tracing)
 function fusibilityStats(): { operators: number; reachablePairs: number } {
