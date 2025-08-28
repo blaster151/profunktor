@@ -49,7 +49,11 @@ export function substAtom(a: Atom, ctx: Context, terms: readonly Term[]): Atom {
   const sub = (t: Term): Term => {
     if (t.kind === "var") {
       const i = ctx.findIndex(v => v.name === t.name && v.sort === t.sort);
-      return i >= 0 ? terms[i] : t;
+      if (i >= 0) {
+        const replacement = terms[i];
+        return replacement !== undefined ? replacement : t;
+      }
+      return t;
     }
     return { ...t, args: t.args.map(sub) };
   };

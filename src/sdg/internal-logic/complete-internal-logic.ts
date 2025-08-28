@@ -657,7 +657,8 @@ export function createGeometricLogic<X, R, Ω>(): GeometricLogic<X, R, Ω> {
     geometricSequent: (antecedent, consequent) => (x) => {
       // φ₁, ..., φₙ ⊢ ψ - actual implementation
       // A geometric sequent is valid if the antecedent implies the consequent
-      const antecedentTrue = antecedent.every(phi => phi(x));
+      const antecedentFormulas = antecedent(x);
+      const antecedentTrue = antecedentFormulas.every((phi: any) => phi);
       return (antecedentTrue ? consequent(x) : true) as Ω;
     },
     

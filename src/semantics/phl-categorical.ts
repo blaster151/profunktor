@@ -145,8 +145,16 @@ function extractAtomsFromFormula(F: Formula): Atom[] {
 // Very light substitution on atoms (variables only via de Bruijn-like indices).
 function substituteAtom(a: Atom, Et: Term[]): Atom {
   if (a.kind !== "eq") return a;
-  const sub = (t: Term): Term =>
-    t.kind === "var" ? Et[t.idx] : { ...t, args: t.args.map(sub) };
+  const sub = (t: Term): Term => {
+    if (t.kind === "var") {
+      const replacement = Et[t.idx];
+      if (replacement === undefined) {
+        throw new Error(`Variable index ${t.idx} out of bounds`);
+      }
+      return replacement;
+    }
+    return { ...t, args: t.args.map(sub) };
+  };
   return { kind: "eq", left: sub(a.left), right: sub(a.right) };
 }
 

@@ -125,7 +125,9 @@ function homFromFrozenToInstance(front: Frozen, I: Instance): { map: InstanceMor
       out.push({ map: { onSort }, env: { ...env } });
       return;
     }
-    const [vn, info] = vars[k];
+    const varEntry = vars[k];
+    if (varEntry === undefined) return;
+    const [vn, info] = varEntry;
     const carrier = I.sorts[info.sort] || [];
     for (const x of carrier) { env[vn] = x; go(k + 1); }
   }

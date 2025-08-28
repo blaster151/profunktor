@@ -32,6 +32,9 @@ export function elementsGraph(F: ObFDiagram): Map<string, ElemNode[]> {
     if (obSrc === undefined) continue;
     for (const a of obSrc) {
       const from = { i: u.src, a };
+      if (f === undefined) {
+        throw new Error(`Function not found for arrow ${u.id}`);
+      }
       const to = { i: u.dst, a: f(a) };
       adj.get(key(from))!.push(to);
     }

@@ -54,7 +54,9 @@ export function colimObjects(diag: DiagramCat): { repOf: Map<string,string>; cla
   const tag = (i: string, o: ObjId) => `${i}::${o}`;
   for (const u of diag.J.arrows) {
     const fun = diag.F[u.id];
-    const Ci = diag.C[u.src]; const Cj = diag.C[u.dst];
+    const Ci = diag.C[u.src];
+    const Cj = diag.C[u.dst];
+    if (Ci === undefined || fun === undefined) continue;
     Ci.objects.forEach(o => {
       uf.union(tag(u.src, o), tag(u.dst, fun.onObj(o)));
     });
@@ -103,6 +105,9 @@ function whisker(diag: DiagramCat, leg: RoofLeg,
 ): { obj?: ObjId; mor?: { id: MorId; src: ObjId; dst: ObjId }; atIndex: string } {
   const u = diag.J.arrows.find(a => a.id === leg.arrowId)!;
   const F = diag.F[leg.arrowId];
+  if (F === undefined) {
+    throw new Error(`Functor not found for arrow ${leg.arrowId}`);
+  }
   if (leg.dir === "fwd") {
     if (x.obj !== undefined) return { obj: F.onObj(x.obj), atIndex: u.dst };
     if (x.mor !== undefined) return { mor: F.onMor(x.mor), atIndex: u.dst };
@@ -196,6 +201,9 @@ export function pi0OfElements(setDiag: SetDiagram): Map<string, number> {
     if (srcElems === undefined) continue;
     for (const elem of srcElems) {
       const srcKey = `${arr.src}::${elem}`;
+      if (f === undefined) {
+        throw new Error(`Function not found for arrow ${arr.id}`);
+      }
       const dstKey = `${arr.dst}::${f(elem)}`;
       union(srcKey, dstKey);
     }

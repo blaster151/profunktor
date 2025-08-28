@@ -40,13 +40,24 @@ export function equivPArrow(lhs: PArrowRep, rhs: PArrowRep): boolean {
     for (let i = 0; i <= k; i++) {
       const ni = beadsN[i];
       const j = theta[i];                      // target bead
+      if (ni === undefined || j === undefined) {
+        throw new Error(`Missing bead or theta mapping at index ${i}`);
+      }
       const mj = beadsM[j];
+      if (mj === undefined) {
+        throw new Error(`Missing target bead at index ${j}`);
+      }
       // affine monotone map [0..ni]→[0..mj] fixing 0 and ni↦mj
       const local = (t: number) => Math.round((t / ni) * mj);
       // rebase to global vertex indices
       const mapV = (v: number) => offsetM + local(v - offsetN);
       pieceMaps.push(mapV);
-      offsetN += ni; if (i < j) offsetM += beadsM.slice(theta[i - 1] ?? 0, j).reduce((s,n)=>s+n,0);
+      const prevTheta = i > 0 ? theta[i - 1] : undefined;
+      offsetN += ni;
+      if (i < j) {
+        const startIdx = prevTheta ?? 0;
+        offsetM += beadsM.slice(startIdx, j).reduce((s,n)=>s+n,0);
+      }
     }
     // stitch piecewise map across beads
     const rho = (v: number) => {

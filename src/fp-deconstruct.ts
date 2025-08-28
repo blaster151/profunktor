@@ -44,7 +44,9 @@ export function unconsArray<T>(xs: readonly T[]): readonly [head: T, tail: reado
 export function unsnocArray<T>(xs: readonly T[]): readonly [init: readonly T[], last: T] | undefined {
   const n = xs.length;
   if (n === 0) return undefined;
-  return [xs.slice(0, n - 1), xs[n - 1]] as const;
+  const last = xs[n - 1];
+  if (last === undefined) return undefined;
+  return [xs.slice(0, n - 1), last] as const;
 }
 
 /**

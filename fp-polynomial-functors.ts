@@ -341,17 +341,13 @@ export function moduleActionΞ<P extends Polynomial<any, any>, Q extends Polynom
  * Example: Tea Interview Pattern
  */
 export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPolynomial, string> {
-  return suspendPolynomial('Tea?', (dir1) => {
-    // Use the factory function to get the proper type
-    const m1 = mk('Tea?' as QuestionKey);
-    // Check for Tea? property with noUncheckedIndexedAccess
-    const teaAnswer = dir1['Tea?'];
-    if (teaAnswer === 'yes') {
-      return suspendPolynomial('Kind?', (dir2) => {
-        // Use the factory function to get the proper type
-        const m2 = mk('Kind?' as QuestionKey);
-        const kindAnswer = dir2['Kind?'];
-        return purePolynomial(`You chose ${kindAnswer ?? 'unknown'} tea!`);
+  return suspendPolynomial('Tea?', (dirFn) => {
+    // dirFn is the directions function, we need to call it with the position
+    const dir1 = dirFn('Tea?');
+    if (dir1['Tea?'] === 'yes') {
+      return suspendPolynomial('Kind?', (dirFn2) => {
+        const dir2 = dirFn2('Kind?');
+        return purePolynomial(`You chose ${dir2['Kind?']} tea!`);
       });
     } else {
       return purePolynomial('No tea for you!');
@@ -410,7 +406,8 @@ export const guessingGameProgram: ProgramSemantics<
       return purePolynomial(false);
     }
     
-    return suspendPolynomial({ read: true }, (guess) => {
+    return suspendPolynomial({ read: true }, (dirFn) => {
+      const guess = dirFn({ read: true });
       if (guess === input.goal) {
         return purePolynomial(true);
       }

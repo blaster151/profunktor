@@ -33,10 +33,24 @@ export function isHomomorphism(M: PartialStructure, N: PartialStructure, alpha: 
     for (const a of testArgs) {
       const m = M.ops.apply(f.name, a);
       if (m.defined) {
-        const a2 = a.map((x, i) => alpha[f.inSorts[i]](x));
+        const a2 = a.map((x, i) => {
+          const inSort = f.inSorts[i];
+          if (inSort === undefined) {
+            throw new Error(`Missing input sort at index ${i} for operation ${f.name}`);
+          }
+          const sortMap = alpha[inSort];
+          if (sortMap === undefined) {
+            throw new Error(`No mapping found for sort ${inSort}`);
+          }
+          return sortMap(x);
+        });
         const n = N.ops.apply(f.name, a2);
         if (!n.defined) return false;
-        if (alpha[f.outSort](m.value) !== n.value) return false;
+        const sortMap = alpha[f.outSort];
+        if (sortMap === undefined) {
+          throw new Error(`No mapping found for sort ${f.outSort}`);
+        }
+        if (sortMap(m.value) !== n.value) return false;
       }
     }
   }
