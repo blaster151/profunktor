@@ -32,7 +32,8 @@ import {
 export function unconsArray<T>(xs: readonly T[]): readonly [head: T, tail: readonly T[]] | undefined {
   if (xs.length === 0) return undefined;
   const [h, ...t] = xs;
-  return [h, t] as const;
+  const head = assertDefined(h, "unconsArray: head required");
+  return [head, t] as const;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
 } from './fp-hkt';
 
 import { attachPurityMarker } from './fp-purity';
+import { assertDefined } from './src/util/assert';
 
 // ============================================================================
 // Core Typeclass Definitions
