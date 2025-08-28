@@ -63,7 +63,9 @@ export function colimObjects(diag: DiagramCat): { repOf: Map<string,string>; cla
   const repOf = new Map<string,string>();
   const classes = new Map<string,string[]>();
   for (const i of diag.J.objects) {
-    for (const o of diag.C[i].objects) {
+    const cat = diag.C[i];
+    if (cat === undefined) continue;
+    for (const o of cat.objects) {
       const t = tag(i,o); const r = uf.find(t);
       repOf.set(t, r);
       if (!classes.has(r)) classes.set(r, []);
@@ -161,7 +163,9 @@ export function pi0OfElements(setDiag: SetDiagram): Map<string, number> {
   
   // Collect all elements
   for (const obj of setDiag.J.objects) {
-    for (const elem of setDiag.C[obj]) {
+    const elemSet = setDiag.C[obj];
+    if (elemSet === undefined) continue;
+    for (const elem of elemSet) {
       const key = `${obj}::${elem}`;
       elements.push(key);
       parent.set(key, key); // Initially each element is its own parent
@@ -188,7 +192,9 @@ export function pi0OfElements(setDiag: SetDiagram): Map<string, number> {
   // Connect elements related by morphisms
   for (const arr of setDiag.J.arrows) {
     const f = setDiag.F[arr.id];
-    for (const elem of setDiag.C[arr.src]) {
+    const srcElems = setDiag.C[arr.src];
+    if (srcElems === undefined) continue;
+    for (const elem of srcElems) {
       const srcKey = `${arr.src}::${elem}`;
       const dstKey = `${arr.dst}::${f(elem)}`;
       union(srcKey, dstKey);

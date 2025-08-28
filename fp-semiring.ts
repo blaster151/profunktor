@@ -6,6 +6,7 @@
  */
 
 import { assertDefined } from './src/util/assert';
+import { safeArrayAccess } from './src/utils/strict-helpers';
 
 // ---------- Type classes ----------
 export interface Semiring<A> {
@@ -63,7 +64,9 @@ export function powS<A>(S: Semiring<A>, a: A, n: number): A {
 export type Matrix<A> = A[][];
 
 export function matMul<A>(S: Semiring<A>, X: Matrix<A>, Y: Matrix<A>): Matrix<A> {
-  const n = X.length, m = Y[0].length, k = Y.length;
+  const n = X.length;
+  const firstRow = assertDefined(Y[0], "matMul: Y must have at least one row");
+  const m = firstRow.length, k = Y.length;
   const Z: Matrix<A> = Array.from({ length: n }, () => Array(m).fill(S.zero));
   for (let i = 0; i < n; i++) {
     for (let t = 0; t < k; t++) {
@@ -72,7 +75,8 @@ export function matMul<A>(S: Semiring<A>, X: Matrix<A>, Y: Matrix<A>): Matrix<A>
       for (let j = 0; j < m; j++) {
         const ytj = assertDefined(Y[t]?.[j], "matMul: Y[t][j] must be defined");
         const zij = assertDefined(Z[i]?.[j], "matMul: Z[i][j] must be defined");
-        Z[i][j] = S.add(zij, S.mul(xit, ytj));
+        const row = assertDefined(Z[i], "matMul: Z[i] must be defined");
+        row[j] = S.add(zij, S.mul(xit, ytj));
       }
     }
   }
@@ -81,7 +85,10 @@ export function matMul<A>(S: Semiring<A>, X: Matrix<A>, Y: Matrix<A>): Matrix<A>
 
 export function matId<A>(S: Semiring<A>, n: number): Matrix<A> {
   const I: Matrix<A> = Array.from({ length: n }, () => Array(n).fill(S.zero));
-  for (let i = 0; i < n; i++) I[i][i] = S.one;
+  for (let i = 0; i < n; i++) {
+    const row = assertDefined(I[i], "matId: I[i] must be defined");
+    row[i] = S.one;
+  }
   return I;
 }
 
@@ -111,7 +118,8 @@ export function closure<A>(S: StarSemiring<A>, A0: Matrix<A>): Matrix<A> {
         const ckj = assertDefined(C[k]?.[j], "closure: C[k][j] must be defined");
         const cij = assertDefined(C[i]?.[j], "closure: C[i][j] must be defined");
         const via = S.mul(cik, S.mul(akkStar, ckj));
-        C[i][j] = S.add(cij, via);
+        const row = assertDefined(C[i], "closure: C[i] must be defined");
+        row[j] = S.add(cij, via);
       }
     }
   }
