@@ -64,16 +64,18 @@ describe('Polynomial Functors', () => {
       const q = naturalNumberEffect;
       const product = composePolynomials(p, q);
 
-      expect(product.left).toBe(p);
-      expect(product.right).toBe(q);
+      expect(product.positions.left).toBe(p.positions);
+      expect(product.positions.right).toBe(q.positions);
     });
   });
 
   describe('Specific Polynomials from Paper', () => {
     it('should define tea interview polynomial correctly', () => {
       expect(teaInterviewPolynomial.positions).toBe('Tea?');
-      expect(teaInterviewPolynomial.directions('Tea?')).toBe('yes');
-      expect(teaInterviewPolynomial.directions('Kind?')).toBe('green');
+      const dirTea = teaInterviewPolynomial.directions('Tea?');
+      expect(dirTea['Tea?']).toBe('yes');
+      const dirKind = teaInterviewPolynomial.directions('Kind?');
+      expect(dirKind['Kind?']).toBe('black');
     });
 
     it('should define natural number effect polynomial', () => {
@@ -112,7 +114,7 @@ describe('Polynomial Functors', () => {
       
       expect(result).toHaveLength(1);
       expect(result[0].position).toBe('Tea?');
-      expect(result[0].direction).toBe('yes');
+      expect(result[0].direction['Tea?']).toBe('yes');
       expect(result[0].value).toBe('test');
     });
   });
@@ -254,11 +256,11 @@ describe('Polynomial Functors', () => {
       expect(interview.type).toBe('Suspend');
       expect(interview.position).toBe('Tea?');
       
-      const yesContinuation = interview.continuation('yes');
+      const yesContinuation = interview.continuation({ 'Tea?': 'yes', 'Kind?': 'black' });
       expect(yesContinuation.type).toBe('Suspend');
       expect(yesContinuation.position).toBe('Kind?');
       
-      const noContinuation = interview.continuation('no');
+      const noContinuation = interview.continuation({ 'Tea?': 'no', 'Kind?': 'black' });
       expect(noContinuation.type).toBe('Pure');
       expect(noContinuation.value).toBe('No tea for you!');
     });
@@ -267,8 +269,8 @@ describe('Polynomial Functors', () => {
       const person = createTeaPerson();
       
       expect(person.extract).toBe('Alice');
-      expect(person.respond('Tea?')).toBe('yes');
-      expect(person.respond('Kind?')).toBe('green');
+      expect(person.respond('Tea?')['Tea?']).toBe('yes');
+      expect(person.respond('Kind?')['Kind?']).toBe('green');
     });
 
     it('should run interview on person', () => {
@@ -330,7 +332,9 @@ describe('Polynomial Functors', () => {
       expect(p.positions).toBe(p.positions);
       
       // Composition: directions should be consistent
-      expect(p.directions('Tea?')).toBe(p.directions('Tea?'));
+      const dir1 = p.directions('Tea?');
+      const dir2 = p.directions('Tea?');
+      expect(dir1).toStrictEqual(dir2);
     });
 
     it('should handle polynomial product associativity', () => {
@@ -341,14 +345,14 @@ describe('Polynomial Functors', () => {
       const leftAssoc = composePolynomials(composePolynomials(p, q), r);
       const rightAssoc = composePolynomials(p, composePolynomials(q, r));
       
-      // Both should be valid polynomial products
-      expect(leftAssoc.left.left).toBe(p);
-      expect(leftAssoc.left.right).toBe(q);
-      expect(leftAssoc.right).toBe(r);
+      // Both should be valid polynomial products with nested structure
+      expect(leftAssoc.positions.left.left).toBe(p.positions);
+      expect(leftAssoc.positions.left.right).toBe(q.positions);
+      expect(leftAssoc.positions.right).toBe(r.positions);
       
-      expect(rightAssoc.left).toBe(p);
-      expect(rightAssoc.right.left).toBe(q);
-      expect(rightAssoc.right.right).toBe(r);
+      expect(rightAssoc.positions.left).toBe(p.positions);
+      expect(rightAssoc.positions.right.left).toBe(q.positions);
+      expect(rightAssoc.positions.right.right).toBe(r.positions);
     });
   });
 

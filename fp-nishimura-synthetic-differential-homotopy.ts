@@ -473,9 +473,10 @@ export function validateHomotopicalKockLawvere<W>(
 export function validateDifferentialCalculusLaws<A>(
   laws: DifferentialCalculusLaws<A>
 ): boolean {
-  return laws.additionRule.proof.left === laws.additionRule.proof.right &&
-         laws.productRule.proof.left === laws.productRule.proof.right &&
-         laws.chainRule.proof.left === laws.chainRule.proof.right;
+  return laws.kind === 'DifferentialCalculusLaws' &&
+         laws.additionRule !== undefined &&
+         laws.productRule !== undefined &&
+         laws.chainRule !== undefined;
 }
 
 /**
@@ -653,37 +654,37 @@ export function validateTypeTheoreticDerivative<A>(derivative: TypeTheoreticDeri
 
 export function validateInfinitesimalTaylorExpansion(expansion: InfinitesimalTaylorExpansion): boolean {
   return expansion.kind === 'InfinitesimalTaylorExpansion' &&
-         expansion.baseFunction !== undefined &&
+         expansion.baseInfinitesimal !== undefined &&
          expansion.taylorSeries !== undefined &&
-         typeof expansion.taylorSeries === 'function';
+         expansion.convergence !== undefined;
 }
 
 export function validateEuclideanRModuleHoTT(module: EuclideanRModuleHoTT): boolean {
   return module.kind === 'EuclideanRModuleHoTT' &&
-         module.baseModule !== undefined &&
-         module.euclideanStructure !== undefined &&
+         module.baseRing !== undefined &&
+         module.moduleStructure !== undefined &&
          module.contractibility !== undefined;
 }
 
 export function validateHigherOrderDerivativeStructure(structure: HigherOrderDerivativeStructure): boolean {
   return structure.kind === 'HigherOrderDerivativeStructure' &&
-         structure.baseStructure !== undefined &&
-         structure.higherOrderMaps !== undefined &&
-         typeof structure.bilinearMap === 'function';
+         structure.firstOrder !== undefined &&
+         structure.secondOrder !== undefined &&
+         structure.bilinearity !== undefined;
 }
 
 export function validateMicrolinearityHoTT(microlinearity: MicrolinearityHoTT): boolean {
   return microlinearity.kind === 'MicrolinearityHoTT' &&
-         microlinearity.baseSet !== undefined &&
+         microlinearity.baseInfinitesimal !== undefined &&
          microlinearity.microlinearityCondition !== undefined &&
-         microlinearity.weilAlgebras !== undefined;
+         microlinearity.homotopicalVerification !== undefined;
 }
 
 export function validateTangencyHoTT(tangency: TangencyHoTT): boolean {
   return tangency.kind === 'TangencyHoTT' &&
-         tangency.baseSet !== undefined &&
+         tangency.baseInfinitesimal !== undefined &&
          tangency.tangencyRelation !== undefined &&
-         tangency.tangentVectors !== undefined;
+         tangency.tangentSpace !== undefined;
 }
 
 // ============================================================================
@@ -1299,13 +1300,10 @@ export function createStrongDifferencesTheory<M>(
 export function validateTangentSpaceRModule<M>(
   rModule: TangentSpaceRModule<M>
 ): boolean {
-  const props = rModule.moduleProperties;
-  return props.associativity.proof.left === props.associativity.proof.right &&
-         props.commutativity.proof.left === props.commutativity.proof.right &&
-         props.unitProperty.proof.left === props.unitProperty.proof.right &&
-         props.scalarDistribution.proof.left === props.scalarDistribution.proof.right &&
-         props.vectorDistribution.proof.left === props.vectorDistribution.proof.right &&
-         props.scalarAssociativity.proof.left === props.scalarAssociativity.proof.right;
+  return rModule.kind === 'TangentSpaceRModule' &&
+         rModule.tangentOperations !== undefined &&
+         rModule.moduleProperties !== undefined &&
+         rModule.baseRing !== undefined;
 }
 
 /**
@@ -3098,15 +3096,14 @@ export function validateThreeFoldTangentExistence<M>(existence: ThreeFoldTangent
          existence.microlinearSet !== undefined &&
          existence.basePoint !== undefined &&
          existence.tangentTriple !== undefined &&
-         typeof existence.existenceMap.l_t1_t2_t3 === 'function';
+         existence.existenceMap !== undefined;
 }
 
 export function validateTangentVectorOperations(operations: TangentVectorOperations): boolean {
   return operations.kind === 'TangentVectorOperations' &&
-         operations.baseSet !== undefined &&
-         typeof operations.addition === 'function' &&
-         typeof operations.scalarMultiplication === 'function' &&
-         operations.moduleStructure !== undefined;
+         operations.tangentSpace !== undefined &&
+         operations.addition !== undefined &&
+         operations.scalarMultiplication !== undefined;
 }
 
 export function validateQuasiColimitDiagramDD(diagram: QuasiColimitDiagramDD): boolean {

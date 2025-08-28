@@ -408,7 +408,7 @@ export const guessingGameProgram: ProgramSemantics<
     }
     
     return suspendPolynomial({ read: true }, (guess) => {
-      if (guess({ read: true }) === input.goal) {
+      if (guess === input.goal) {
         return purePolynomial(true);
       }
       
