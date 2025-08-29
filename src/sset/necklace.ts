@@ -25,8 +25,13 @@ export function necklaceToZigZag(backbone: { beadSimplexIds: string[] }): ZigZag
   const xs = backbone.beadSimplexIds;
   const chain: ZigZagInSX["chain"] = [];
   for (let i = 0; i < xs.length - 1; i++) {
-    chain.push({ simplexId: xs[i], via: "ω" });
-    chain.push({ simplexId: xs[i + 1], via: "α" });
+    const current = xs[i];
+    const next = xs[i + 1];
+    if (current === undefined || next === undefined) {
+      throw new Error(`Invalid zigzag: missing element at index ${i} or ${i + 1}`);
+    }
+    chain.push({ simplexId: current, via: "ω" });
+    chain.push({ simplexId: next, via: "α" });
   }
   return { chain };
 }
@@ -40,7 +45,8 @@ export function joinsOf(necklace: Necklace): number[] {
   const joins: number[] = [];
   let acc = 0;
   for (let i = 0; i < necklace.beads.length - 1; i++) {
-    acc += necklace.beads[i];
+    const bead = necklace.beads[i];
+    if (bead !== undefined) acc += bead;
     joins.push(acc);
   }
   // vertices are 0..m-1; joins are internal vertices

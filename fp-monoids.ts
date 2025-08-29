@@ -212,6 +212,7 @@ export function testMonoidLaws<A>(monoid: Monoid<A>, testValues: A[]): boolean {
     const a = testValues[i];
     const b = testValues[i + 1];
     const c = testValues[i + 2];
+    if (a === undefined || b === undefined || c === undefined) continue;
     if (!laws.associativity(a, b, c)) {
       return false;
     }

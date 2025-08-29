@@ -22,12 +22,19 @@ export function elementsGraph(F: ObFDiagram): Map<string, ElemNode[]> {
   const key = (x: ElemNode) => `${x.i}::${x.a}`;
   const adj = new Map<string, ElemNode[]>();
   for (const i of F.J.objects) {
-    for (const a of F.Ob[i]) adj.set(key({ i, a }), []);
+    const obI = F.Ob[i];
+    if (obI === undefined) continue;
+    for (const a of obI) adj.set(key({ i, a }), []);
   }
   for (const u of F.J.arrows) {
     const f = F.uObj[u.id];
-    for (const a of F.Ob[u.src]) {
+    const obSrc = F.Ob[u.src];
+    if (obSrc === undefined) continue;
+    for (const a of obSrc) {
       const from = { i: u.src, a };
+      if (f === undefined) {
+        throw new Error(`Function not found for arrow ${u.id}`);
+      }
       const to = { i: u.dst, a: f(a) };
       adj.get(key(from))!.push(to);
     }

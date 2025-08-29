@@ -187,8 +187,11 @@ export const ArrayOrd = deriveOrdInstance({
   customOrd: <A>(a: Array<A>, b: Array<A>): number => {
     const minLength = Math.min(a.length, b.length);
     for (let i = 0; i < minLength; i++) {
-      if (a[i] < b[i]) return -1;
-      if (a[i] > b[i]) return 1;
+      const aItem = a[i];
+      const bItem = b[i];
+      if (aItem == null || bItem == null) continue;
+      if (aItem < bItem) return -1;
+      if (aItem > bItem) return 1;
     }
     return a.length - b.length;
   }

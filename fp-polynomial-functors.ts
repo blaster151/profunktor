@@ -342,12 +342,10 @@ export function moduleActionΞ<P extends Polynomial<any, any>, Q extends Polynom
  */
 export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPolynomial, string> {
   return suspendPolynomial('Tea?', (dir1) => {
-    // Use the factory function to get the proper type
-    const m1 = mk('Tea?' as QuestionKey);
+    // dir1 is the direction object for position 'Tea?'
     if (dir1['Tea?'] === 'yes') {
       return suspendPolynomial('Kind?', (dir2) => {
-        // Use the factory function to get the proper type
-        const m2 = mk('Kind?' as QuestionKey);
+        // dir2 is the direction object for position 'Kind?'
         return purePolynomial(`You chose ${dir2['Kind?']} tea!`);
       });
     } else {
@@ -361,8 +359,8 @@ export function createTeaInterview(): FreeMonadPolynomial<typeof teaInterviewPol
  */
 export function createTeaPerson(): CofreeComonadPolynomial<typeof teaInterviewPolynomial, string> {
   return cofreePolynomial('Alice', (question) => {
-    // Return the directions function from the polynomial
-    return teaInterviewPolynomial.directions;
+    // Return the direction values for the given question
+    return teaInterviewPolynomial.directions(question);
   });
 }
 
@@ -408,7 +406,8 @@ export const guessingGameProgram: ProgramSemantics<
     }
     
     return suspendPolynomial({ read: true }, (guess) => {
-      if (guess({ read: true }) === input.goal) {
+      // guess is the direction value (a number in this case)
+      if (guess === input.goal) {
         return purePolynomial(true);
       }
       

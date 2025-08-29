@@ -198,6 +198,7 @@ export function checkLocalWeakEquivalence<X>(inp: LocalWeakEqInput<X>): LocalWea
   // Try each candidate cover
   for (let i = 0; i < inp.candidateCovers.length; i++) {
     const cover = inp.candidateCovers[i];
+    if (cover === undefined) continue;
     
     // Check if this cover witnesses the local weak equivalence
     const coverWitness = checkCoverForLocalWeakEquivalence(inp, cover, i);

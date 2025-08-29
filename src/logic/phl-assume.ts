@@ -27,7 +27,11 @@ export function parameterizeWithFreshConstants(
   if (EcNames.length !== Ez.length) throw new Error("EcNames length must match Ez length.");
 
   // Build constant terms and "definedness" axiom > ⊢ Ec↓
-  const EcTerms: Term[] = Ez.map((v, i) => ({ kind: "app", sym: EcNames[i], args: [], sort: v.sort }));
+  const EcTerms: Term[] = Ez.map((v, i) => {
+    const sym = EcNames[i];
+    if (sym === undefined) throw new Error(`Missing constant name at index ${i}`);
+    return { kind: "app", sym, args: [], sort: v.sort };
+  });
   const defCtx: Context = []; // closed
   const definedness: Sequent = { ctx: defCtx, lhs: { all: [] }, rhs: { all: EcTerms.map(defined) } };
 

@@ -25,7 +25,10 @@ export function forAll2<A,B>(n: number, g1: Gen<A>, g2: Gen<B>, prop:(a:A,b:B)=>
   return { name: "forAll-2", run: (seed) => {
     const xs = sample(n, seed); const ys = sample(n, seed+137);
     for (let i=0;i<n;i++){
-      const r = prop(g1(xs[i]), g2(ys[i]));
+      const x = xs[i];
+      const y = ys[i];
+      if (x === undefined || y === undefined) continue;
+      const r = prop(g1(x), g2(y));
       if (r !== true) return (typeof r === "string" ? r : `counterexample (i=${i})`);
     } return true;
   }};

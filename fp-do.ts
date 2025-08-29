@@ -222,8 +222,12 @@ export function composeMonadicEffects<Effects extends readonly EffectTag[]>(
 ): ComposedEffect<Effects> {
   // Simplified runtime combiner: prefer 'Async' > 'IO' > 'Impure' > 'State' > 'Pure'
   const order: Record<EffectTag, number> = { Pure: 0, State: 1, Impure: 2, IO: 3, Async: 4 } as const;
-  const result = effects.reduce<EffectTag>((acc, effect) =>
-    (order[effect] > order[acc] ? effect : acc), 'Pure');
+  const result = effects.reduce<EffectTag>((acc, effect) => {
+    const effectOrder = order[effect];
+    const accOrder = order[acc];
+    if (effectOrder === undefined || accOrder === undefined) return acc;
+    return effectOrder > accOrder ? effect : acc;
+  }, 'Pure');
   return result as ComposedEffect<Effects>;
 }
 

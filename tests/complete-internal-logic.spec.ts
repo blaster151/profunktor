@@ -442,7 +442,7 @@ describe('Complete Internal Logic System', () => {
     });
 
     it('should implement geometric sequent', () => {
-      const antecedent = [(x: string) => true, (x: string) => false];
+      const antecedent = (x: string) => [(x: string) => true, (x: string) => false];
       const consequent = (x: string) => true;
       const sequent = geometric.geometricSequent(antecedent, consequent);
       

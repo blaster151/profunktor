@@ -338,13 +338,14 @@ export function createExtensionalityAndLambdaConversionSystem<X, D, R, Y>(
       const extensionalityCheck = extensionality.areEqual(f1, f2, domain, stage);
       
       // Test λ-conversion with f1
-      const lambdaConversionValid = domain.length > 0 ? 
-        lambda.verifyLaw(f1, stage, domain[0]) : true;
+      const firstElem = domain[0];
+      const lambdaConversionValid = domain.length > 0 && firstElem !== undefined ? 
+        lambda.verifyLaw(f1, stage, firstElem) : true;
       
       // Test function rewriting
       const twoVarF1 = rewriting.toTwoVariable(f1);
-      const functionRewritingValid = domain.length > 0 ?
-        rewriting.verifyConversion(twoVarF1, stage, domain[0]) : true;
+      const functionRewritingValid = domain.length > 0 && firstElem !== undefined ?
+        rewriting.verifyConversion(twoVarF1, stage, firstElem) : true;
       
       return {
         extensionalityCheck,

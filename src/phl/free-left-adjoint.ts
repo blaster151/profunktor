@@ -78,6 +78,7 @@ function buildDiagramSeed(Tm: TheoryMorphism, M: PartialStructure): CartInstance
       // Find the lifted constants for inputs and output
       const argsLift = a.map((x, i) => {
         const A = f.inSorts[i];
+        if (A === undefined) return undefined;
         const Aprime = Tm.rho.onSort(A);
         // pick the first matching constant element we created
         const arr = sorts[Aprime] ?? [];
@@ -140,7 +141,8 @@ export function freeLeftAdjoint(
     const map = new Map<unknown, unknown>();
     for (const s of M.carriers[A] ?? []) {
       const r = model.relations[`c[${Aprime}:${String(s)}]`] ?? [];
-      const y = r.length ? r[0][0] : undefined; // R_c(y) has arity 1
+      const firstTuple = r[0];
+      const y = firstTuple?.[0]; // R_c(y) has arity 1
       if (y !== undefined) map.set(s, y);
     }
     unit[A] = (s: unknown) => map.get(s) ?? s;

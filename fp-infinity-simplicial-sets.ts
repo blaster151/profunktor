@@ -303,6 +303,7 @@ export function createInfinitySimplicialSet<M>(
     innerHornFilling: <N extends number>(n: N, i: number, horn: InnerHorn<M, N>) => {
       // Implement inner horn filling
       return {
+        kind: 'InfinitySimplex' as const,
         id: `inner_horn_${n}_${i}`,
         vertices: horn.faces.flatMap(f => f.vertices),
         dimension: n,
@@ -315,6 +316,7 @@ export function createInfinitySimplicialSet<M>(
     outerHornFilling: <N extends number>(n: N, i: number, horn: OuterHorn<M, N>) => {
       // Implement outer horn filling
       return {
+        kind: 'InfinitySimplex' as const,
         id: `outer_horn_${n}_${i}`,
         vertices: horn.faces.flatMap(f => f.vertices),
         dimension: n,
@@ -328,6 +330,7 @@ export function createInfinitySimplicialSet<M>(
     kanFilling: <N extends number>(n: N, horn: KanHorn<M, N>) => {
       // Implement Kan filling
       return {
+        kind: 'InfinitySimplex' as const,
         id: `kan_horn_${n}`,
         vertices: horn.faces.flatMap(f => f.vertices),
         dimension: n,

@@ -325,7 +325,10 @@ export const mapMapFusion: FusionRule = {
   description: 'Fuse consecutive map operations into a single map',
   applicable: (ops: Operation[]) => {
     if (ops.length < 2) return false;
-    return ops[0].type === 'map' && ops[1].type === 'map';
+    const first = ops[0];
+    const second = ops[1];
+    return first !== undefined && second !== undefined && 
+           first.type === 'map' && second.type === 'map';
   },
   fuse: (ops: Operation[]) => {
     const [map1, map2] = ops;
@@ -362,7 +365,10 @@ export const mapFilterFusion: FusionRule = {
   description: 'Fuse map followed by filter into a single filterMap operation',
   applicable: (ops: Operation[]) => {
     if (ops.length < 2) return false;
-    return ops[0].type === 'map' && ops[1].type === 'filter';
+    const first = ops[0];
+    const second = ops[1];
+    return first !== undefined && second !== undefined && 
+           first.type === 'map' && second.type === 'filter';
   },
   fuse: (ops: Operation[]) => {
     const [mapOp, filterOp] = ops;
@@ -400,7 +406,10 @@ export const filterFilterFusion: FusionRule = {
   description: 'Fuse consecutive filter operations into a single filter',
   applicable: (ops: Operation[]) => {
     if (ops.length < 2) return false;
-    return ops[0].type === 'filter' && ops[1].type === 'filter';
+    const first = ops[0];
+    const second = ops[1];
+    return first !== undefined && second !== undefined && 
+           first.type === 'filter' && second.type === 'filter';
   },
   fuse: (ops: Operation[]) => {
     const [filter1, filter2] = ops;
@@ -743,7 +752,7 @@ export function generateSinglePassOperation(pipeline: Operation[]): Operation | 
       allocationCost: pipeline.reduce((sum, op) => sum + op.metadata.allocationCost, 0)
     },
     dependencies: pipeline.flatMap(op => op.dependencies),
-    outputType: pipeline[pipeline.length - 1].outputType
+    outputType: pipeline[pipeline.length - 1]?.outputType ?? 'unknown'
   };
 }
 

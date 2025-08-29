@@ -54,7 +54,9 @@ export function colimObjects(diag: DiagramCat): { repOf: Map<string,string>; cla
   const tag = (i: string, o: ObjId) => `${i}::${o}`;
   for (const u of diag.J.arrows) {
     const fun = diag.F[u.id];
-    const Ci = diag.C[u.src]; const Cj = diag.C[u.dst];
+    const Ci = diag.C[u.src];
+    const Cj = diag.C[u.dst];
+    if (Ci === undefined || fun === undefined) continue;
     Ci.objects.forEach(o => {
       uf.union(tag(u.src, o), tag(u.dst, fun.onObj(o)));
     });
@@ -63,7 +65,9 @@ export function colimObjects(diag: DiagramCat): { repOf: Map<string,string>; cla
   const repOf = new Map<string,string>();
   const classes = new Map<string,string[]>();
   for (const i of diag.J.objects) {
-    for (const o of diag.C[i].objects) {
+    const cat = diag.C[i];
+    if (cat === undefined) continue;
+    for (const o of cat.objects) {
       const t = tag(i,o); const r = uf.find(t);
       repOf.set(t, r);
       if (!classes.has(r)) classes.set(r, []);
@@ -101,6 +105,9 @@ function whisker(diag: DiagramCat, leg: RoofLeg,
 ): { obj?: ObjId; mor?: { id: MorId; src: ObjId; dst: ObjId }; atIndex: string } {
   const u = diag.J.arrows.find(a => a.id === leg.arrowId)!;
   const F = diag.F[leg.arrowId];
+  if (F === undefined) {
+    throw new Error(`Functor not found for arrow ${leg.arrowId}`);
+  }
   if (leg.dir === "fwd") {
     if (x.obj !== undefined) return { obj: F.onObj(x.obj), atIndex: u.dst };
     if (x.mor !== undefined) return { mor: F.onMor(x.mor), atIndex: u.dst };
@@ -147,6 +154,82 @@ export function composeZigZag(diag: DiagramCat, g: ZigZag, f: ZigZag): ZigZag {
 }
 
 /** Build a "colimit category" façade exposing reps and zig-zag arrows. */
+// SetDiagram type for working with Set-valued functors
+export interface SetDiagram {
+  J: IndexingCategory;
+  C: { [obj: string]: string[] };
+  F: { [arr: string]: (x: string) => string };
+}
+
+// Compute π0 (path components) of the category of elements
+export function pi0OfElements(setDiag: SetDiagram): Map<string, number> {
+  const elements: string[] = [];
+  const parent = new Map<string, string>();
+  
+  // Collect all elements
+  for (const obj of setDiag.J.objects) {
+    const elemSet = setDiag.C[obj];
+    if (elemSet === undefined) continue;
+    for (const elem of elemSet) {
+      const key = `${obj}::${elem}`;
+      elements.push(key);
+      parent.set(key, key); // Initially each element is its own parent
+    }
+  }
+  
+  // Find operation to get root parent
+  const find = (x: string): string => {
+    if (parent.get(x) === x) return x;
+    const root = find(parent.get(x)!);
+    parent.set(x, root); // Path compression
+    return root;
+  };
+  
+  // Union operation
+  const union = (x: string, y: string) => {
+    const rootX = find(x);
+    const rootY = find(y);
+    if (rootX !== rootY) {
+      parent.set(rootX, rootY);
+    }
+  };
+  
+  // Connect elements related by morphisms
+  for (const arr of setDiag.J.arrows) {
+    const f = setDiag.F[arr.id];
+    const srcElems = setDiag.C[arr.src];
+    if (srcElems === undefined) continue;
+    for (const elem of srcElems) {
+      const srcKey = `${arr.src}::${elem}`;
+      if (f === undefined) {
+        throw new Error(`Function not found for arrow ${arr.id}`);
+      }
+      const dstKey = `${arr.dst}::${f(elem)}`;
+      union(srcKey, dstKey);
+    }
+  }
+  
+  // Assign component numbers
+  const componentMap = new Map<string, number>();
+  const roots = new Map<string, number>();
+  let componentId = 0;
+  
+  for (const elem of elements) {
+    const root = find(elem);
+    if (!roots.has(root)) {
+      roots.set(root, componentId++);
+    }
+    componentMap.set(elem, roots.get(root)!);
+  }
+  
+  return componentMap;
+}
+
+// Placeholder for categoryOfElements - not used in the test
+export function categoryOfElements(setDiag: SetDiagram) {
+  return {}; // Placeholder
+}
+
 export function colimitCategory(diag: DiagramCat) {
   const { classes, repOf } = colimObjects(diag);
   return {

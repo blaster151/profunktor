@@ -144,7 +144,9 @@ function discrList<T, R>(l: PersistentList<T>) {
 function discrMap<K, V, R>(m: PersistentMap<K, V>) {
   if (m.isEmpty()) return { tag: 'empty' as const, args: [] };
   const entries = Array.from(m.entries()) as [K, V][];
-  const [k, v] = entries[0];
+  const firstEntry = entries[0];
+  if (firstEntry === undefined) return { tag: 'empty' as const, args: [] };
+  const [k, v] = firstEntry;
   const rest = PersistentMap.fromEntries(entries.slice(1));
   return { tag: 'nonEmpty' as const, args: [k, v, rest] };
 }

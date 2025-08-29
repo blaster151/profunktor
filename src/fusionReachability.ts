@@ -11,11 +11,15 @@ function floydWarshallBool(m: boolean[][]): void {
   const n = m.length;
   for (let k = 0; k < n; k++) {
     const mk = m[k];
-    for (let i = 0; i < n; i++) if (m[i][k]) {
-      const mi = m[i];
+    if (mk === undefined) continue;
+    for (let i = 0; i < n; i++) {
+      const rowI = m[i];
+      if (rowI === undefined || !rowI[k]) continue;
+      const mi = rowI;
       for (let j = 0; j < n; j++) {
         // reach(i,j) |= reach(i,k) && reach(k,j)
-        if (mk[j]) mi[j] = true;
+        const mkj = mk[j];
+        if (mkj) mi[j] = true;
       }
     }
   }
@@ -34,13 +38,15 @@ export function getFusibilityReachability(): Reachability {
     Array<boolean>(n).fill(false)
   );
   for (let i = 0; i < n; i++) {
-    mat[i][i] = true; // reflexive
+    const row = mat[i];
+    if (row !== undefined) row[i] = true; // reflexive
     const a = names[i];
+    if (a === undefined) continue;
     const info = (operatorRegistry as any)[a];
     const after: string[] = info?.fusibleAfter ?? [];
     for (const b of after) {
       const j = indexOf.get(b);
-      if (j != null) mat[i][j] = true;
+      if (j != null && row !== undefined) row[j] = true;
     }
   }
 
@@ -56,7 +62,8 @@ export function isFusibleReachable(a: string, b: string): boolean {
   const i = R.indexOf.get(a);
   const j = R.indexOf.get(b);
   if (i == null || j == null) return false;
-  return R.mat[i][j];
+  const row = R.mat[i];
+  return row !== undefined && row[j] === true;
 }
 
 // Optional: quick stats for tracing
@@ -64,7 +71,13 @@ export function fusibilityStats() {
   const { names, mat } = getFusibilityReachability();
   const n = names.length;
   let edges = 0;
-  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) if (i !== j && mat[i][j]) edges++;
+  for (let i = 0; i < n; i++) {
+    const row = mat[i];
+    if (row === undefined) continue;
+    for (let j = 0; j < n; j++) {
+      if (i !== j && row[j]) edges++;
+    }
+  }
   return { operators: n, reachablePairs: edges };
 }
 

@@ -10,7 +10,15 @@ export interface Chunk<A> {
 export const Chunk = {
   of<A>(xs: ReadonlyArray<A>): Chunk<A> {
     const arr = xs.slice();
-    return { size: arr.length, at: (i) => arr[i], toArray: () => arr.slice() };
+    return { 
+      size: arr.length, 
+      at: (i) => {
+        const value = arr[i];
+        if (value === undefined) throw new Error(`Index ${i} out of bounds`);
+        return value;
+      }, 
+      toArray: () => arr.slice() 
+    };
   },
   singleton<A>(a: A): Chunk<A> { return Chunk.of([a]); },
   empty<A>(): Chunk<A> { return Chunk.of([]); }

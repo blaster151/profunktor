@@ -98,7 +98,7 @@ export function matchReadonlyArray<T, R>(
   }
   
   const [head, ...tail] = array;
-  return patterns.nonEmpty(head, tail);
+  return patterns.nonEmpty(head!, tail);
 }
 
 /**
@@ -225,7 +225,7 @@ export function matchReadonlyArrayPartial<T, R>(
   }
   
   const [head, ...tail] = array;
-  return patterns.nonEmpty?.(head, tail);
+  return patterns.nonEmpty?.(head!, tail);
 }
 
 /**
@@ -314,7 +314,7 @@ export function matchNestedReadonlyArray<T, R>(
   }
   
   const [head, ...tail] = array;
-  return patterns.nonEmpty(head, tail);
+  return patterns.nonEmpty(head!, tail);
 }
 
 /**
@@ -560,7 +560,9 @@ export function matchReadonlyUnion<T extends object, R>(
   
   const k = assertDefined(keys[0], "key required") as keyof T;
   const valueForKey = value[k];
-  const handler = patterns[k] ?? patterns["_"];
+  const kHandler = patterns[k];
+  const defaultHandler = (patterns as any)["_"];
+  const handler = kHandler ?? defaultHandler;
   if (handler) {
     return handler(valueForKey);
   }

@@ -720,8 +720,11 @@ export function createProductType<
           const bKeys = Object.keys(b).sort();
 
           for (let i = 0; i < Math.min(aKeys.length, bKeys.length); i++) {
-            if (aKeys[i] < bKeys[i]) return -1;
-            if (aKeys[i] > bKeys[i]) return 1;
+            const aKey = aKeys[i];
+            const bKey = bKeys[i];
+            if (aKey === undefined || bKey === undefined) continue;
+            if (aKey < bKey) return -1;
+            if (aKey > bKey) return 1;
           }
 
           if (aKeys.length < bKeys.length) return -1;

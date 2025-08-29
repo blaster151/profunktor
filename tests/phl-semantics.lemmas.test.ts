@@ -29,7 +29,7 @@ test("Decomposition f~1 = ∃_d ∘ m^{-1}", () => {
   const med  = (d: number)=> f.apply(d);  // m_f : D → B
   const a = (y:string)=> y==="c";
   const w1  = (x:number)=> wave1(f,a)(x);
-  const w1e = (x:number)=> wave1ViaExists(incl,med,a)(x);
+  const w1e = (x:number)=> wave1ViaExists(incl,med,a,f)(x);
   expect(A.every(x => w1(x)===w1e(x))).toBe(true);
 });
 

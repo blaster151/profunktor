@@ -27,12 +27,25 @@ export function deltaNP(n: number, p: number): SmallCategory {
 export function composeP(p: number, g: PArrow, f: PArrow): PArrow {
   if (f.j !== g.i) throw new Error("composeP: middle endpoint mismatch");
   const flag: Flag = Array.from({ length: p + 1 }, (_, k) =>
-    Array.from(new Set([...f.flag[k], ...g.flag[k]])).sort((a, b) => a - b)
+    {
+      const fFace = f.flag[k];
+      const gFace = g.flag[k];
+      if (fFace === undefined || gFace === undefined) {
+        throw new Error(`Invalid flag index ${k}`);
+      }
+      return Array.from(new Set([...fFace, ...gFace])).sort((a, b) => a - b);
+    }
   );
   return { i: f.i, j: g.j, flag };
 }
 
 // θ*: pick indices along θ (monotone [q]→[p]); we encode θ as an array θ(0..q)
 export function thetaStar(theta: number[], flag: Flag): Flag {
-  return theta.map(ti => flag[ti]);
+  return theta.map(ti => {
+    const face = flag[ti];
+    if (face === undefined) {
+      throw new Error(`Invalid theta index ${ti} for flag of length ${flag.length}`);
+    }
+    return face;
+  });
 }
