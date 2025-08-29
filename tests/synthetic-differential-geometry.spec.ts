@@ -4482,7 +4482,7 @@ describe('Revolutionary Synthetic Differential Geometry (SDG)', () => {
         
         expect(page110.functionDescription.kind).toBe('FunctionDescriptionNotation');
         expect(page110.conversionDiagram.kind).toBe('ConversionDiagram');
-        expect(page110.equations.kind).toBe('FunctionDescriptionConversionLaws');
+        expect(page110.conversionLaws.kind).toBe('FunctionDescriptionConversionLaws');
         expect(page110.groupHomomorphism.kind).toBe('GroupHomomorphism');
         expect(page110.rModuleHomomorphism.kind).toBe('RModuleHomomorphism');
       });
@@ -4502,11 +4502,11 @@ describe('Revolutionary Synthetic Differential Geometry (SDG)', () => {
         
         expect(result.functionDescriptionValid).toBe(true);
         expect(result.conversionDiagramValid).toBe(true);
-        expect(result.equationsValid).toBe(true);
+        expect(result.conversionLawsValid).toBe(true);
         expect(result.groupHomomorphismValid).toBe(true);
         expect(result.summary).toContain('FunctionDesc=true');
         expect(result.summary).toContain('Conversion=true');
-        expect(result.summary).toContain('Equations=true');
+        expect(result.summary).toContain('ConversionLaws=true');
         expect(result.summary).toContain('GroupHom=true');
       });
     });
@@ -4546,7 +4546,7 @@ describe('Revolutionary Synthetic Differential Geometry (SDG)', () => {
         
         expect(result.functionDescriptionValid).toBe(true);
         expect(result.conversionDiagramValid).toBe(true);
-        expect(result.equationsValid).toBe(true);
+        expect(result.conversionLawsValid).toBe(true);
         expect(result.groupHomomorphismValid).toBe(true);
       });
     });

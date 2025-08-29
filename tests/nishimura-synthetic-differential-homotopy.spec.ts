@@ -620,9 +620,9 @@ describe('Nishimura Synthetic Differential Geometry within Homotopy Type Theory'
       const microlinearity = createMicrolinearityHoTT();
       
       // These structures represent the revolutionary unification
-      expect(homotopicalAxiom.kockLawvereAxiom).toContain('homotopical');
-      expect(typeTheoreticDerivative.derivativeOperation).toContain('type-theoretic');
-      expect(microlinearity.microlinearityCondition).toContain('microlinear');
+      expect(homotopicalAxiom.kind).toBe('HomotopicalKockLawvereAxiom');
+      expect(typeTheoreticDerivative.kind).toBe('TypeTheoreticDerivative');
+      expect(microlinearity.kind).toBe('MicrolinearityHoTT');
       
       // Test advanced structures from pages 26-30
       const lemma55 = createLemma55QuasiColimitDiagram();

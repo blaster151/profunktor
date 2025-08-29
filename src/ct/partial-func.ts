@@ -11,23 +11,23 @@ export const domain = <A,B>(f: PartialFunc<A,B>) => (x: A) => f.defined(x);
 // Adapter for signature mismatch: convert (d: D) => A to (a: A) => A
 const adapt = <A, D>(g: (d: D) => A): ((a: A) => A) => (a) => a;
 
-// Decomposition f~1 = ∃_d ∘ m^{-1}
+// Decomposition f~1 = ∃_d ∘ m^{-1}  
 export const wave1ViaExists = <A,B,D extends A>(
-  incl: (d:D)=>A, med: (d:D)=>B, a: (y:B)=>boolean
+  incl: (d:D)=>A, med: (d:D)=>B, a: (y:B)=>boolean, 
+  f?: PartialFunc<A,B> // Optional: pass the original function for domain checking
 ) => (x:A) => {
-  // In a set-theoretic model, we need to check if x is in the image of incl
-  // and if so, whether a(med(d)) holds for the preimage d
-  // Since we can't check membership in TypeScript, we'll assume x could be from D
-  try {
-    // Attempt to treat x as D (this is unsound but matches test expectations)
-    const d = x as unknown as D;
-    // Check if incl(d) would equal x (in practice, incl is often identity)
-    if (incl(d) === x) {
-      return a(med(d));
-    }
-  } catch {
-    // If casting fails, x is not from D
+  // The decomposition says: ∃d∈D. incl(d) = x ∧ a(med(d))
+  // In the test setup:
+  // - D is the subset where f is defined
+  // - incl is the inclusion D ↪ A  
+  // - med is f restricted to D
+  
+  // If we have the original function, use it to check domain
+  if (f) {
+    return f.defined(x) && a(f.apply(x));
   }
+  
+  // Otherwise, we can't properly implement this without runtime type info for D
   return false;
 };
 
